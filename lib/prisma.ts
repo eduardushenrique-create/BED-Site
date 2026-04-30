@@ -1,21 +1,32 @@
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+  prisma: any
   prismaPool: Pool | undefined
 }
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://johndoe:randompassword@localhost:5432/mydb?schema=public'
-const pool = globalForPrisma.prismaPool ?? new Pool({ connectionString })
-const adapter = new PrismaPg(pool)
+const databaseUrl = process.env.DATABASE_URL || ''
+const hasValidDb = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter })
+let prisma: any = null
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-  globalForPrisma.prismaPool = pool
+if (hasValidDb) {
+  try {
+    const { PrismaClient } = require('@prisma/client')
+    const { PrismaPg } = require('@prisma/adapter-pg')
+
+    const pool = globalForPrisma.prismaPool ?? new Pool({ connectionString: databaseUrl })
+    const adapter = new PrismaPg(pool)
+    prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter })
+
+    if (process.env.NODE_ENV !== 'production') {
+      globalForPrisma.prisma = prisma
+      globalForPrisma.prismaPool = pool
+    }
+  } catch (e) {
+    console.warn('Prisma not available, using mock fallback')
+    prisma = null
+  }
 }
 
 export default prisma

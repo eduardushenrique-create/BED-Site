@@ -5,49 +5,7 @@ import Button from '@/components/Button'
 import Badge from '@/components/Badge'
 import Input from '@/components/Input'
 import { useCart } from '@/context/CartContext'
-
-interface ProductImage {
-  id: string
-  url: string
-  alt: string | null
-  isMain: boolean
-}
-
-interface ProductVariant {
-  id: string
-  name: string
-  sku: string | null
-  priceDelta: number | null
-}
-
-interface PersonalizationField {
-  id: string
-  label: string
-  fieldType: string
-  placeholder: string | null
-  helpText: string | null
-  isRequired: boolean
-  minLength: number | null
-  maxLength: number | null
-}
-
-interface Product {
-  id: string
-  name: string
-  slug: string
-  sku: string | null
-  shortDescription: string | null
-  description: string | null
-  price: number
-  compareAtPrice: number | null
-  isPersonalizable: boolean
-  productionTimeMinDays: number
-  productionTimeMaxDays: number
-  images: ProductImage[]
-  variants: ProductVariant[]
-  personalizationFields: PersonalizationField[]
-  category: { name: string; slug: string } | null
-}
+import { Product } from '@/lib/types'
 
 interface ProductDetailClientProps {
   product: Product

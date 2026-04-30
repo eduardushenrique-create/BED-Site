@@ -1,13 +1,14 @@
 import { notFound } from 'next/navigation'
 import { getProductBySlug } from '@/lib/db'
 import { getLocalCatalogProductBySlug } from '@/lib/catalog'
+import { Product } from '@/lib/types'
 import ProductDetailClient from './ProductDetailClient'
 
 interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-async function getProduct(slug: string) {
+async function getProduct(slug: string): Promise<Product | null> {
   const useDatabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (useDatabase) {
@@ -46,7 +47,7 @@ async function getProduct(slug: string) {
             maxLength: pf.max_length,
           })),
           category: product.category,
-        }
+        } as Product
       }
     } catch (error) {
       console.error('Error fetching product from database:', error)
@@ -54,15 +55,7 @@ async function getProduct(slug: string) {
   }
 
   const product = await getLocalCatalogProductBySlug(slug)
-  if (!product) return null
-
-  return {
-    ...product,
-    variants: product.variants.map((v: { priceDelta?: number | null }) => ({
-      ...v,
-      priceDelta: v.priceDelta || null,
-    })),
-  }
+  return product
 }
 
 export default async function ProductPage({ params }: PageProps) {

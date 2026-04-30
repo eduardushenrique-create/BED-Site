@@ -4,8 +4,12 @@ import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
 import { getLocalCatalogProducts } from '@/lib/catalog'
 
+type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
+
 export default async function Home() {
-  const featuredProducts = (await getLocalCatalogProducts({ featured: true })).slice(0, 4)
+  const featuredProducts: ProductCardProduct[] = (
+    await getLocalCatalogProducts({ featured: true })
+  ).slice(0, 4)
 
   return (
     <main className="container" style={{ paddingTop: '32px', paddingBottom: '64px' }}>
@@ -27,15 +31,15 @@ export default async function Home() {
           </Link>
         </div>
       </section>
-      
+
       <section style={{ marginBottom: '64px' }}>
         <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center' }}>
           Categorias
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
           {['Decoração', 'Cozinha', 'Escritório', 'Infantil', 'Pets', 'Casamento', 'Aniversário'].map((cat) => (
-            <Link 
-              key={cat} 
+            <Link
+              key={cat}
               href={`/produtos?categoria=${cat.toLowerCase()}`}
               style={{
                 backgroundColor: 'white',
@@ -60,7 +64,7 @@ export default async function Home() {
         {featuredProducts.length > 0 ? (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
-              {featuredProducts.map(product => (
+              {featuredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
