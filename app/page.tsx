@@ -4,6 +4,8 @@ import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
 import { getLocalCatalogProducts } from '@/lib/catalog'
 
+export const dynamic = 'force-dynamic'
+
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
 export default async function Home() {

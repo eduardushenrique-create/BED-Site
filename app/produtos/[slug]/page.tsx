@@ -4,6 +4,8 @@ import { getLocalCatalogProductBySlug } from '@/lib/catalog'
 import { Product } from '@/lib/types'
 import ProductDetailClient from './ProductDetailClient'
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   params: Promise<{ slug: string }>
 }
