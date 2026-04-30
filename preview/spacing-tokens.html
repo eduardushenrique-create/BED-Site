@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: white; font-family: 'DM Sans', sans-serif; }
+  .section { margin-bottom: 20px; }
+  .label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #A8AFCA; margin-bottom: 10px; font-family: monospace; }
+  .spacing-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+  .bar { background: #BBCFEB; border-right: 2px solid #8AAFD8; height: 13px; border-radius: 2px; }
+  .meta { font-size: 11px; font-family: monospace; color: #6B7494; }
+  .radius-row { display: flex; gap: 12px; align-items: flex-end; }
+  .rbox { background: #E4EDF8; border: 1.5px solid #BBCFEB; width: 48px; height: 48px; }
+  .rlabel { font-size: 9px; font-family: monospace; color: #8AAFD8; text-align: center; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="section">
+  <div class="label">Escala de espaçamento (base 4px)</div>
+  <div class="spacing-row"><div class="bar" style="width:4px;"></div><div class="meta">4px — space-1</div></div>
+  <div class="spacing-row"><div class="bar" style="width:8px;"></div><div class="meta">8px — space-2</div></div>
+  <div class="spacing-row"><div class="bar" style="width:12px;"></div><div class="meta">12px — space-3</div></div>
+  <div class="spacing-row"><div class="bar" style="width:16px;"></div><div class="meta">16px — space-4</div></div>
+  <div class="spacing-row"><div class="bar" style="width:24px;"></div><div class="meta">24px — space-6</div></div>
+  <div class="spacing-row"><div class="bar" style="width:32px;"></div><div class="meta">32px — space-8</div></div>
+  <div class="spacing-row"><div class="bar" style="width:48px;"></div><div class="meta">48px — space-12</div></div>
+  <div class="spacing-row"><div class="bar" style="width:64px;"></div><div class="meta">64px — space-16</div></div>
+</div>
+<div class="section">
+  <div class="label">Border Radius</div>
+  <div class="radius-row">
+    <div><div class="rbox" style="border-radius:4px;"></div><div class="rlabel">4px / sm</div></div>
+    <div><div class="rbox" style="border-radius:8px;"></div><div class="rlabel">8px / md</div></div>
+    <div><div class="rbox" style="border-radius:12px;"></div><div class="rlabel">12px / lg</div></div>
+    <div><div class="rbox" style="border-radius:20px;"></div><div class="rlabel">20px / xl</div></div>
+    <div><div class="rbox" style="border-radius:999px;"></div><div class="rlabel">999px / full</div></div>
+  </div>
+</div>
+</body>
+</html>

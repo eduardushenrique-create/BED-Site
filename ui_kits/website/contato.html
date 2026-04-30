@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entre em Contato — B&D Artes & Impressões</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #F0F5FB; color: #1D2235; -webkit-font-smoothing: antialiased; }
+  input, select, textarea { font-family: 'DM Sans', sans-serif; font-size: 15px; padding: 13px 16px; border: 1.5px solid #D8DCE8; border-radius: 10px; outline: none; background: white; color: #1D2235; width: 100%; transition: border-color 150ms, box-shadow 150ms; }
+  input:focus, select:focus, textarea:focus { border-color: #8AAFD8; box-shadow: 0 0 0 3px rgba(187,207,235,0.25); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const Header = () => (
+  <header style={{ background:'white', borderBottom:'1px solid #D8DCE8', position:'sticky', top:0, zIndex:100 }}>
+    <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px', height:68, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <a href="index.html" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
+        <img src="../../assets/logo.png" alt="B&D" style={{ height:44, width:44, objectFit:'contain' }} />
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:17, color:'#1D2235', lineHeight:1.1 }}>B&amp;D</div>
+          <div style={{ fontSize:9, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#6B7494' }}>Artes &amp; Impressões</div>
+        </div>
+      </a>
+      <nav style={{ display:'flex', gap:4 }}>
+        {[['index.html','Coleções'],['index.html','Presentes'],['index.html','Personalizados'],['sobre.html','Sobre nós'],['contato.html','Contato']].map(([href, label]) => (
+          <a key={label} href={href} style={{ fontSize:14, fontWeight: label==='Contato' ? 600 : 500, color: label==='Contato' ? '#1D2235' : '#3D4460', textDecoration:'none', padding:'6px 12px', borderRadius:8, background: label==='Contato' ? '#F0F5FB' : 'transparent' }}>{label}</a>
+        ))}
+      </nav>
+      <div />
+    </div>
+  </header>
+);
+
+const ContactApp = () => {
+  const [form, setForm] = React.useState({ name:'', email:'', phone:'', subject:'', message:'' });
+  const [sent, setSent] = React.useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSent(true);
+  };
+
+  const SUBJECTS = ['Dúvida sobre produto','Pedido personalizado','Rastrear pedido','Prazo de entrega','Troca ou devolução','Outro'];
+
+  const contacts = [
+    { icon:'📧', label:'E-mail', value:'contato@bdimpressoes.com.br', sub:'Respondemos em até 24h' },
+    { icon:'📱', label:'WhatsApp', value:'(11) 99999-9999', sub:'Seg–Sex, 9h–18h' },
+    { icon:'📍', label:'Ateliê', value:'São Paulo, SP', sub:'Visitas com agendamento' },
+    { icon:'⏰', label:'Atendimento', value:'Seg–Sex', sub:'9h às 18h (horário de Brasília)' },
+  ];
+
+  const faqs = [
+    { q:'Quanto tempo leva para produzir meu pedido?', a:'A produção leva de 2 a 4 dias úteis. Após o envio, o prazo de entrega é de 3 a 7 dias úteis, dependendo da sua região.' },
+    { q:'Como funciona a personalização?', a:'Após a compra, você recebe um formulário para inserir nome, data, mensagem ou qualquer informação. Confirmamos com você antes de imprimir.' },
+    { q:'Vocês fazem pedidos em quantidade (empresas)?', a:'Sim! Trabalhamos com pedidos corporativos com desconto por volume. Entre em contato para orçamento.' },
+    { q:'Posso trocar ou devolver um produto?', a:'Sim, aceitamos trocas em até 30 dias. Produtos personalizados só são trocados em caso de defeito de fabricação.' },
+  ];
+
+  const [openFaq, setOpenFaq] = React.useState(null);
+
+  return (
+    <>
+      <div style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'10px', fontSize:13, fontWeight:500 }}>
+        🎁 Frete grátis em pedidos acima de R$ 150,00
+      </div>
+      <Header />
+
+      {/* Hero */}
+      <div style={{ background:'#BBCFEB', padding:'72px 48px 0' }}>
+        <div style={{ maxWidth:700, margin:'0 auto', textAlign:'center', paddingBottom:72 }}>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.14em', textTransform:'uppercase', color:'#2E3650', marginBottom:16 }}>Fale com a gente</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:56, fontWeight:700, color:'#1D2235', lineHeight:1.1, letterSpacing:'-0.02em', marginBottom:20 }}>
+            Como podemos<br /><em style={{ fontStyle:'italic', fontWeight:400 }}>te ajudar?</em>
+          </h1>
+          <p style={{ fontSize:17, color:'#2E3650', lineHeight:1.7 }}>
+            Quer um pedido personalizado, tem uma dúvida ou quer saber mais sobre nossos produtos? Estamos aqui.
+          </p>
+        </div>
+      </div>
+
+      {/* Contact cards */}
+      <div style={{ background:'white' }}>
+        <div style={{ maxWidth:960, margin:'0 auto', padding:'0 48px', transform:'translateY(-32px)' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
+            {contacts.map(c => (
+              <div key={c.label} style={{ background:'white', borderRadius:16, padding:'24px 20px', boxShadow:'0 4px 20px rgba(29,34,53,0.08)', textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:12 }}>{c.icon}</div>
+                <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', color:'#6B7494', marginBottom:6 }}>{c.label}</div>
+                <div style={{ fontSize:14, fontWeight:600, color:'#1D2235', marginBottom:3 }}>{c.value}</div>
+                <div style={{ fontSize:12, color:'#A8AFCA' }}>{c.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Form + FAQ */}
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'0 48px 80px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:48, alignItems:'start' }}>
+
+        {/* Form */}
+        <div>
+          <div style={{ marginBottom:32 }}>
+            <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:10 }}>Formulário</div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:36, fontWeight:700, color:'#1D2235' }}>Envie uma mensagem</h2>
+          </div>
+
+          {sent ? (
+            <div style={{ background:'white', borderRadius:20, padding:'48px 32px', textAlign:'center', boxShadow:'0 1px 4px rgba(29,34,53,0.06)' }}>
+              <div style={{ width:72, height:72, background:'#E0F4F0', borderRadius:'50%', margin:'0 auto 20px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32 }}>✓</div>
+              <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:26, fontWeight:700, color:'#1D2235', marginBottom:10 }}>Mensagem enviada!</h3>
+              <p style={{ fontSize:15, color:'#6B7494', lineHeight:1.7, marginBottom:24 }}>Recebemos seu contato. Nossa equipe responderá em até 24 horas úteis.</p>
+              <button onClick={() => setSent(false)} style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'12px 24px', border:'none', borderRadius:10, cursor:'pointer' }}>Enviar outra mensagem</button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ background:'white', borderRadius:20, padding:'32px', boxShadow:'0 1px 4px rgba(29,34,53,0.06)', display:'flex', flexDirection:'column', gap:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Nome completo *</label>
+                  <input required value={form.name} onChange={e => set('name', e.target.value)} placeholder="Seu nome" />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Telefone / WhatsApp</label>
+                  <input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(11) 99999-9999" />
+                </div>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>E-mail *</label>
+                <input required type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="seu@email.com" />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Assunto</label>
+                <select value={form.subject} onChange={e => set('subject', e.target.value)}>
+                  <option value="">Selecione um assunto...</option>
+                  {['Dúvida sobre produto','Pedido personalizado','Rastrear pedido','Prazo de entrega','Troca ou devolução','Orçamento corporativo','Outro'].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Mensagem *</label>
+                <textarea required rows={5} value={form.message} onChange={e => set('message', e.target.value)} placeholder="Descreva como podemos ajudar..." style={{ resize:'vertical' }} />
+              </div>
+              <button type="submit" style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'16px 0', border:'none', borderRadius:12, cursor:'pointer', marginTop:4 }}>
+                Enviar mensagem
+              </button>
+              <p style={{ fontSize:12, color:'#A8AFCA', textAlign:'center' }}>Respondemos em até 24 horas úteis · Seg–Sex 9h–18h</p>
+            </form>
+          )}
+        </div>
+
+        {/* FAQ */}
+        <div>
+          <div style={{ marginBottom:32 }}>
+            <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:10 }}>Perguntas frequentes</div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:36, fontWeight:700, color:'#1D2235' }}>Dúvidas comuns</h2>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {faqs.map((faq, i) => (
+              <div key={i} style={{ background:'white', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 4px rgba(29,34,53,0.06)', border: openFaq===i ? '1.5px solid #BBCFEB' : '1.5px solid transparent', transition:'border 150ms' }}>
+                <button onClick={() => setOpenFaq(openFaq===i ? null : i)} style={{ width:'100%', background:'none', border:'none', padding:'18px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', textAlign:'left', gap:12 }}>
+                  <span style={{ fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, color:'#1D2235', lineHeight:1.4 }}>{faq.q}</span>
+                  <span style={{ fontSize:18, color:'#8AAFD8', flexShrink:0, transform: openFaq===i ? 'rotate(45deg)' : 'none', transition:'transform 200ms', lineHeight:1 }}>+</span>
+                </button>
+                {openFaq===i && (
+                  <div style={{ padding:'0 20px 18px' }}>
+                    <p style={{ fontSize:14, color:'#6B7494', lineHeight:1.7 }}>{faq.a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Social */}
+          <div style={{ background:'#1D2235', borderRadius:16, padding:'28px 24px', marginTop:24 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'white', marginBottom:6 }}>Redes sociais</div>
+            <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', marginBottom:20, lineHeight:1.6 }}>Acompanhe nosso ateliê e veja as peças saindo da impressora em tempo real.</p>
+            <div style={{ display:'flex', gap:10 }}>
+              {[['@bdimpressoes','Instagram'],['B&D Impressões','TikTok'],['B&D Artes','Pinterest']].map(([handle, platform]) => (
+                <a key={platform} href="#" style={{ background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.7)', fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:500, padding:'8px 14px', borderRadius:8, textDecoration:'none', border:'1px solid rgba(255,255,255,0.1)' }}>
+                  {platform}
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'24px', fontSize:13, color:'rgba(255,255,255,0.35)' }}>
+        © 2024 B&amp;D Artes &amp; Impressões · Feito com ♥ e filamento PLA
+      </footer>
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ContactApp />);
+</script>
+</body>
+</html>

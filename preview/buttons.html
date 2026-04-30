@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: white; font-family: var(--font-body); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #A8AFCA; margin-bottom: 10px; font-family: monospace; }
+  button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; font-weight: 500; transition: all 150ms ease-out; }
+  .btn-primary { background: #1D2235; color: white; padding: 11px 22px; border-radius: 8px; font-size: 15px; }
+  .btn-primary:hover { background: #2E3650; }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-blue { background: #BBCFEB; color: #1D2235; padding: 11px 22px; border-radius: 8px; font-size: 15px; font-weight: 600; }
+  .btn-blue:hover { background: #8AAFD8; }
+  .btn-outline { background: transparent; color: #1D2235; padding: 10px 21px; border-radius: 8px; font-size: 15px; border: 1.5px solid #1D2235 !important; }
+  .btn-outline:hover { background: #F0F5FB; }
+  .btn-ghost { background: transparent; color: #1D2235; padding: 11px 22px; border-radius: 8px; font-size: 15px; }
+  .btn-ghost:hover { background: #EEF1F8; }
+  .btn-rose { background: #D4849A; color: white; padding: 11px 22px; border-radius: 8px; font-size: 15px; }
+  .btn-disabled { background: #EEF1F8; color: #A8AFCA; padding: 11px 22px; border-radius: 8px; font-size: 15px; cursor: not-allowed; }
+  .btn-sm { padding: 7px 14px; font-size: 13px; border-radius: 6px; }
+  .btn-lg { padding: 15px 30px; font-size: 17px; border-radius: 10px; }
+  .btn-pill { border-radius: 999px; }
+</style>
+</head>
+<body>
+  <div class="label">Variantes</div>
+  <div class="row">
+    <button class="btn-primary">Adicionar ao carrinho</button>
+    <button class="btn-blue">Ver coleção</button>
+    <button class="btn-outline">Ver detalhes</button>
+    <button class="btn-ghost">Saiba mais</button>
+    <button class="btn-rose">♥ Favoritar</button>
+    <button class="btn-disabled" disabled>Esgotado</button>
+  </div>
+  <div class="label">Tamanhos · Pill</div>
+  <div class="row">
+    <button class="btn-primary btn-sm">Pequeno</button>
+    <button class="btn-primary">Médio</button>
+    <button class="btn-primary btn-lg">Grande</button>
+    <button class="btn-primary btn-pill" style="padding:11px 28px;">Comprar agora</button>
+    <button class="btn-blue btn-pill" style="padding:11px 28px;">Explorar</button>
+  </div>
+</body>
+</html>

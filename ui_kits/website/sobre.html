@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sobre Nós — B&D Artes & Impressões</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #F0F5FB; color: #1D2235; -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const Header = () => (
+  <header style={{ background:'white', borderBottom:'1px solid #D8DCE8', position:'sticky', top:0, zIndex:100 }}>
+    <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px', height:68, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <a href="index.html" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
+        <img src="../../assets/logo.png" alt="B&D" style={{ height:44, width:44, objectFit:'contain' }} />
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:17, color:'#1D2235', lineHeight:1.1 }}>B&amp;D</div>
+          <div style={{ fontSize:9, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#6B7494' }}>Artes &amp; Impressões</div>
+        </div>
+      </a>
+      <nav style={{ display:'flex', gap:4 }}>
+        {[['index.html','Coleções'],['index.html','Presentes'],['index.html','Personalizados'],['sobre.html','Sobre nós'],['contato.html','Contato']].map(([href, label]) => (
+          <a key={label} href={href} style={{ fontSize:14, fontWeight: label==='Sobre nós' ? 600 : 500, color: label==='Sobre nós' ? '#1D2235' : '#3D4460', textDecoration:'none', padding:'6px 12px', borderRadius:8, background: label==='Sobre nós' ? '#F0F5FB' : 'transparent' }}>{label}</a>
+        ))}
+      </nav>
+      <div style={{ display:'flex', gap:4 }}>
+        <a href="contato.html" style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:600, padding:'9px 18px', borderRadius:8, textDecoration:'none' }}>Fale conosco</a>
+      </div>
+    </div>
+  </header>
+);
+
+const Hero = () => (
+  <div style={{ background:'#1D2235', color:'white', padding:'96px 48px' }}>
+    <div style={{ maxWidth:800, margin:'0 auto', textAlign:'center' }}>
+      <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.14em', textTransform:'uppercase', color:'#BBCFEB', marginBottom:20 }}>Nossa história</div>
+      <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:64, fontWeight:700, lineHeight:1.1, letterSpacing:'-0.02em', marginBottom:24 }}>
+        Feitos com amor,<br /><em style={{ fontStyle:'italic', fontWeight:400, color:'#BBCFEB' }}>impressos em 3D.</em>
+      </h1>
+      <p style={{ fontSize:18, color:'rgba(255,255,255,0.65)', lineHeight:1.75, maxWidth:560, margin:'0 auto' }}>
+        Começamos na garagem de casa, com uma impressora e um sonho: tornar cada presente algo verdadeiramente único.
+      </p>
+    </div>
+  </div>
+);
+
+const Timeline = () => {
+  const events = [
+    { year:'2019', title:'O início', text:'Bruna e Diego começam a imprimir peças para amigos e família. A primeira impressora foi comprada com as economias do casal.' },
+    { year:'2020', title:'Primeira venda online', text:'A loja virtual nasce durante a pandemia. Em 3 meses, mais de 200 pedidos de todo o Brasil.' },
+    { year:'2022', title:'Novo ateliê', text:'Com a demanda crescendo, nos mudamos para um ateliê próprio em São Paulo, com 6 impressoras funcionando 24h.' },
+    { year:'2024', title:'Mais de 10 mil clientes', text:'Atingimos a marca de 10.000 clientes felizes. Cada peça ainda é revisada manualmente antes de sair.' },
+  ];
+  return (
+    <div style={{ background:'white', padding:'80px 0' }}>
+      <div style={{ maxWidth:800, margin:'0 auto', padding:'0 48px' }}>
+        <div style={{ textAlign:'center', marginBottom:60 }}>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#6B7494', marginBottom:12 }}>Nossa trajetória</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:700, color:'#1D2235' }}>Como chegamos até aqui</h2>
+        </div>
+        <div style={{ position:'relative' }}>
+          <div style={{ position:'absolute', left:32, top:0, bottom:0, width:2, background:'#E4EDF8' }} />
+          {events.map((e, i) => (
+            <div key={i} style={{ display:'flex', gap:32, marginBottom:48, position:'relative' }}>
+              <div style={{ width:66, flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+                <div style={{ width:14, height:14, borderRadius:'50%', background:'#BBCFEB', border:'3px solid white', boxShadow:'0 0 0 2px #BBCFEB', zIndex:1 }} />
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500, color:'#8AAFD8' }}>{e.year}</div>
+              </div>
+              <div style={{ paddingBottom:8 }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:'#1D2235', marginBottom:8 }}>{e.title}</div>
+                <p style={{ fontSize:15, color:'#6B7494', lineHeight:1.7 }}>{e.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Team = () => {
+  const members = [
+    { name:'Bruna Ferreira', role:'Co-fundadora & Design', initial:'B', color:'#BBCFEB' },
+    { name:'Diego Martins', role:'Co-fundador & Tecnologia', initial:'D', color:'#E4EDF8' },
+    { name:'Carol Santos', role:'Atendimento ao cliente', initial:'C', color:'#F7E6EB' },
+    { name:'Rafael Nunes', role:'Produção & Qualidade', initial:'R', color:'#E0F4F0' },
+  ];
+  return (
+    <div style={{ background:'#F0F5FB', padding:'80px 0' }}>
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'0 48px' }}>
+        <div style={{ textAlign:'center', marginBottom:56 }}>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#6B7494', marginBottom:12 }}>Quem faz acontecer</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:700, color:'#1D2235' }}>Nossa equipe</h2>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:24 }}>
+          {members.map(m => (
+            <div key={m.name} style={{ background:'white', borderRadius:20, padding:'32px 20px', textAlign:'center', boxShadow:'0 1px 4px rgba(29,34,53,0.07)' }}>
+              <div style={{ width:80, height:80, background:m.color, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235' }}>{m.initial}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:'#1D2235', marginBottom:4 }}>{m.name}</div>
+              <div style={{ fontSize:13, color:'#6B7494' }}>{m.role}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Values = () => {
+  const vals = [
+    { icon:'♥', title:'Feito com amor', text:'Cada peça passa por uma revisão cuidadosa antes de sair do ateliê. Qualidade não é opção, é obrigação.' },
+    { icon:'♻️', title:'Sustentável', text:'Usamos filamento PLA biodegradável e reduzimos ao máximo o desperdício no processo de impressão.' },
+    { icon:'✏️', title:'100% personalizado', text:'Não existe peça igual. Cada produto é único, criado especialmente para quem vai receber.' },
+    { icon:'⚡', title:'Entrega rápida', text:'Da impressão à sua porta em até 7 dias úteis. Acompanhe seu pedido em tempo real.' },
+  ];
+  return (
+    <div style={{ background:'#1D2235', padding:'80px 0' }}>
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'0 48px' }}>
+        <div style={{ textAlign:'center', marginBottom:56 }}>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#BBCFEB', marginBottom:12 }}>O que nos move</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:700, color:'white' }}>Nossos valores</h2>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:20 }}>
+          {vals.map(v => (
+            <div key={v.title} style={{ background:'rgba(255,255,255,0.06)', borderRadius:16, padding:'28px 22px', border:'1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize:32, marginBottom:16 }}>{v.icon}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'white', marginBottom:10 }}>{v.title}</div>
+              <p style={{ fontSize:14, color:'rgba(255,255,255,0.55)', lineHeight:1.7 }}>{v.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CTA = () => (
+  <div style={{ background:'#BBCFEB', padding:'72px 48px', textAlign:'center' }}>
+    <div style={{ maxWidth:560, margin:'0 auto' }}>
+      <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:700, color:'#1D2235', marginBottom:16 }}>Pronto para criar algo especial?</h2>
+      <p style={{ fontSize:16, color:'#2E3650', lineHeight:1.7, marginBottom:32 }}>Explore nossa coleção ou entre em contato para um pedido personalizado.</p>
+      <div style={{ display:'flex', gap:12, justifyContent:'center' }}>
+        <a href="index.html" style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:15, fontWeight:600, padding:'14px 28px', borderRadius:10, textDecoration:'none' }}>Ver coleção</a>
+        <a href="contato.html" style={{ background:'white', color:'#1D2235', fontFamily:"'DM Sans',sans-serif", fontSize:15, fontWeight:500, padding:'14px 28px', borderRadius:10, textDecoration:'none' }}>Fale conosco</a>
+      </div>
+    </div>
+  </div>
+);
+
+const Footer = () => (
+  <footer style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'24px', fontSize:13, color:'rgba(255,255,255,0.35)' }}>
+    © 2024 B&amp;D Artes &amp; Impressões · Feito com ♥ e filamento PLA
+  </footer>
+);
+
+const App = () => (
+  <>
+    <div style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'10px', fontSize:13, fontWeight:500 }}>
+      🎁 Frete grátis em pedidos acima de R$ 150,00
+    </div>
+    <Header />
+    <Hero />
+    <Timeline />
+    <Team />
+    <Values />
+    <CTA />
+    <Footer />
+  </>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

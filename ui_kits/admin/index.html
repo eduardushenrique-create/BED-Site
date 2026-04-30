@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — B&D Artes & Impressões</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #F0F5FB; color: #1D2235; -webkit-font-smoothing: antialiased; height: 100vh; overflow: hidden; }
+  input, select, textarea { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 14px; border: 1.5px solid #D8DCE8; border-radius: 8px; outline: none; background: white; color: #1D2235; width: 100%; transition: border-color 150ms; }
+  input:focus, select:focus, textarea:focus { border-color: #8AAFD8; box-shadow: 0 0 0 3px rgba(187,207,235,0.2); }
+  ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #D8DCE8; border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7494; padding: 10px 16px; text-align: left; background: #F7F9FC; border-bottom: 1px solid #EEF1F8; }
+  td { padding: 14px 16px; border-bottom: 1px solid #EEF1F8; font-size: 14px; color: #1D2235; vertical-align: middle; }
+  tr:hover td { background: #FAFCFE; }
+  tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+/* ── DATA ── */
+const INITIAL_PRODUCTS = [
+  { id:1, name:'Porta-Retratos Geométrico', category:'Decoração', price:89.90, stock:24, status:'active', sales:142 },
+  { id:2, name:'Vaso Orgânico Moderno', category:'Decoração', price:64.90, stock:8, status:'active', sales:97 },
+  { id:3, name:'Suporte Articulado para Celular', category:'Escritório', price:39.90, stock:0, status:'sold_out', sales:213 },
+  { id:4, name:'Porta-Canetas Hexagonal', category:'Escritório', price:54.90, stock:31, status:'active', sales:76 },
+  { id:5, name:'Mini Vaso com Mensagem', category:'Personalizados', price:44.90, stock:15, status:'active', sales:189 },
+  { id:6, name:'Organizador de Mesa Modular', category:'Escritório', price:79.90, stock:4, status:'active', sales:54 },
+  { id:7, name:'Cachepô Facetado P', category:'Decoração', price:34.90, stock:40, status:'active', sales:38 },
+  { id:8, name:'Porta-Chaves de Parede', category:'Decoração', price:59.90, stock:0, status:'draft', sales:0 },
+];
+
+const ORDERS = [
+  { id:'#BD-4382', customer:'Ana Paula Silva', products:'Porta-Retratos + Mini Vaso', total:134.80, status:'shipped', date:'27 abr' },
+  { id:'#BD-4381', customer:'Marcos Souza', products:'Vaso Orgânico (×2)', total:129.80, status:'processing', date:'27 abr' },
+  { id:'#BD-4380', customer:'Camila Rodrigues', products:'Porta-Canetas Hex', total:54.90, status:'delivered', date:'26 abr' },
+  { id:'#BD-4379', customer:'João Carlos', products:'Suporte Celular (×3)', total:119.70, status:'delivered', date:'25 abr' },
+  { id:'#BD-4378', customer:'Beatriz Lima', products:'Mini Vaso Mensagem', total:44.90, status:'cancelled', date:'24 abr' },
+  { id:'#BD-4377', customer:'Rafael Torres', products:'Organizador Modular', total:79.90, status:'delivered', date:'23 abr' },
+];
+
+/* ── HELPERS ── */
+const fmt = n => `R$ ${n.toFixed(2).replace('.',',')}`;
+
+const Badge = ({ status }) => {
+  const map = {
+    active:     { label:'Ativo',       bg:'#E0F4F0', color:'#2E7D6E' },
+    sold_out:   { label:'Esgotado',    bg:'#FDE8E6', color:'#C0392B' },
+    draft:      { label:'Rascunho',    bg:'#EEF1F8', color:'#6B7494' },
+    shipped:    { label:'Enviado',     bg:'#E4EDF8', color:'#1D2235' },
+    processing: { label:'Processando', bg:'#FEF0DC', color:'#A05C1A' },
+    delivered:  { label:'Entregue',    bg:'#E0F4F0', color:'#2E7D6E' },
+    cancelled:  { label:'Cancelado',   bg:'#FDE8E6', color:'#C0392B' },
+    pending:    { label:'Pendente',    bg:'#FEF0DC', color:'#A05C1A' },
+  };
+  const s = map[status] || map.draft;
+  return <span style={{ display:'inline-flex', alignItems:'center', fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:999, background:s.bg, color:s.color, letterSpacing:'0.03em' }}>{s.label}</span>;
+};
+
+const StatCard = ({ label, value, sub, color = '#BBCFEB', icon }) => (
+  <div style={{ background:'white', borderRadius:16, padding:'20px 24px', boxShadow:'0 1px 4px rgba(29,34,53,0.06)', display:'flex', alignItems:'center', gap:16 }}>
+    <div style={{ width:48, height:48, background:color, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:22 }}>{icon}</div>
+    <div>
+      <div style={{ fontSize:12, color:'#6B7494', marginBottom:2 }}>{label}</div>
+      <div style={{ fontFamily:"'DM Mono',monospace", fontSize:22, fontWeight:500, color:'#1D2235', lineHeight:1 }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:'#2E7D6E', marginTop:3 }}>{sub}</div>}
+    </div>
+  </div>
+);
+
+/* ── MODALS ── */
+const Modal = ({ title, onClose, children, width=560 }) => (
+  <div style={{ position:'fixed', inset:0, background:'rgba(29,34,53,0.5)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:24, backdropFilter:'blur(3px)' }}>
+    <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:width, maxHeight:'90vh', overflow:'auto', boxShadow:'0 20px 60px rgba(29,34,53,0.25)' }}>
+      <div style={{ padding:'20px 24px', borderBottom:'1px solid #EEF1F8', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, background:'white', zIndex:1 }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:'#1D2235' }}>{title}</div>
+        <button onClick={onClose} style={{ background:'#F0F5FB', border:'none', cursor:'pointer', width:32, height:32, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:'#6B7494' }}>×</button>
+      </div>
+      <div style={{ padding:24 }}>{children}</div>
+    </div>
+  </div>
+);
+
+const FormField = ({ label, children, col }) => (
+  <div style={{ gridColumn: col || 'span 1' }}>
+    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6, letterSpacing:'0.03em' }}>{label}</label>
+    {children}
+  </div>
+);
+
+const ProductForm = ({ product, onSave, onClose }) => {
+  const [form, setForm] = React.useState(product || { name:'', category:'Decoração', price:'', stock:'', status:'active', description:'' });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const CATS = ['Decoração','Escritório','Cozinha','Personalizados','Infantil','Pets'];
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <FormField label="Nome do produto" col="span 2">
+        <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Porta-Retratos Geométrico" />
+      </FormField>
+      <FormField label="Categoria">
+        <select value={form.category} onChange={e => set('category', e.target.value)}>
+          {CATS.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Status">
+        <select value={form.status} onChange={e => set('status', e.target.value)}>
+          <option value="active">Ativo</option>
+          <option value="draft">Rascunho</option>
+          <option value="sold_out">Esgotado</option>
+        </select>
+      </FormField>
+      <FormField label="Preço (R$)">
+        <input type="number" step="0.01" value={form.price} onChange={e => set('price', e.target.value)} placeholder="89,90" />
+      </FormField>
+      <FormField label="Estoque (unidades)">
+        <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} placeholder="0" />
+      </FormField>
+      <FormField label="Descrição" col="span 2">
+        <textarea rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Descreva o produto, materiais, personalização..." style={{ resize:'vertical' }} />
+      </FormField>
+      <FormField label="Imagem do produto" col="span 2">
+        <div style={{ border:'2px dashed #D8DCE8', borderRadius:10, padding:'24px', textAlign:'center', cursor:'pointer', color:'#A8AFCA', fontSize:14 }}>
+          📷 Clique para fazer upload ou arraste a imagem aqui
+        </div>
+      </FormField>
+      <div style={{ gridColumn:'span 2', display:'flex', gap:10, justifyContent:'flex-end', paddingTop:8, borderTop:'1px solid #EEF1F8', marginTop:8 }}>
+        <button onClick={onClose} style={{ background:'white', color:'#1D2235', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'10px 20px', border:'1.5px solid #D8DCE8', borderRadius:10, cursor:'pointer' }}>Cancelar</button>
+        <button onClick={() => onSave(form)} style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'10px 24px', border:'none', borderRadius:10, cursor:'pointer' }}>
+          {product ? 'Salvar alterações' : 'Cadastrar produto'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ── SCREENS ── */
+const Dashboard = () => (
+  <div>
+    <div style={{ marginBottom:28 }}>
+      <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:6 }}>Visão geral</div>
+      <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235' }}>Dashboard</h1>
+    </div>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:32 }}>
+      <StatCard label="Receita do mês" value="R$ 4.821" sub="↑ +18% vs mês anterior" color="#E4EDF8" icon="💰" />
+      <StatCard label="Pedidos" value="63" sub="↑ +9 esta semana" color="#E0F4F0" icon="📦" />
+      <StatCard label="Produtos ativos" value="6" sub="2 com estoque baixo" color="#FEF0DC" icon="🏷" />
+      <StatCard label="Clientes" value="148" sub="↑ 12 novos este mês" color="#F7E6EB" icon="👥" />
+    </div>
+
+    <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:20 }}>
+      {/* Recent orders */}
+      <div style={{ background:'white', borderRadius:16, boxShadow:'0 1px 4px rgba(29,34,53,0.06)', overflow:'hidden' }}>
+        <div style={{ padding:'18px 20px', borderBottom:'1px solid #EEF1F8', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:'#1D2235' }}>Pedidos recentes</div>
+          <a href="#" style={{ fontSize:13, color:'#6B7494', textDecoration:'none' }}>Ver todos →</a>
+        </div>
+        <table>
+          <thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody>
+            {ORDERS.slice(0,5).map(o => (
+              <tr key={o.id}>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13 }}>{o.id}</span></td>
+                <td>{o.customer}</td>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13 }}>{fmt(o.total)}</span></td>
+                <td><Badge status={o.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Top products */}
+      <div style={{ background:'white', borderRadius:16, boxShadow:'0 1px 4px rgba(29,34,53,0.06)', overflow:'hidden' }}>
+        <div style={{ padding:'18px 20px', borderBottom:'1px solid #EEF1F8' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:'#1D2235' }}>Mais vendidos</div>
+        </div>
+        <div style={{ padding:'12px 0' }}>
+          {INITIAL_PRODUCTS.sort((a,b) => b.sales-a.sales).slice(0,5).map((p, i) => (
+            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 20px' }}>
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:12, color:'#A8AFCA', width:16 }}>{i+1}</span>
+              <div style={{ width:36, height:36, background:'#E4EDF8', borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8AAFD8" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:500, color:'#1D2235', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize:11, color:'#6B7494' }}>{p.sales} vendas</div>
+              </div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:12, color:'#1D2235', fontWeight:500 }}>{fmt(p.price)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const Products = () => {
+  const [products, setProducts] = React.useState(INITIAL_PRODUCTS);
+  const [modal, setModal] = React.useState(null); // null | 'new' | {product}
+  const [search, setSearch] = React.useState('');
+  const [deleteId, setDeleteId] = React.useState(null);
+
+  const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const handleSave = (form) => {
+    if (modal === 'new') {
+      setProducts(prev => [...prev, { ...form, id: Date.now(), sales: 0, price: parseFloat(form.price||0), stock: parseInt(form.stock||0) }]);
+    } else {
+      setProducts(prev => prev.map(p => p.id === modal.id ? { ...p, ...form, price: parseFloat(form.price||p.price), stock: parseInt(form.stock||p.stock) } : p));
+    }
+    setModal(null);
+  };
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
+        <div>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:6 }}>Catálogo</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235' }}>Produtos</h1>
+        </div>
+        <button onClick={() => setModal('new')} style={{ background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'11px 20px', border:'none', borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
+          + Cadastrar produto
+        </button>
+      </div>
+
+      {/* Search + filters */}
+      <div style={{ display:'flex', gap:12, marginBottom:20 }}>
+        <div style={{ flex:1, position:'relative' }}>
+          <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8AFCA" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar produto..." style={{ paddingLeft:38 }} />
+        </div>
+        <select style={{ width:160 }}>
+          <option>Todas categorias</option>
+          {['Decoração','Escritório','Personalizados'].map(c => <option key={c}>{c}</option>)}
+        </select>
+        <select style={{ width:140 }}>
+          <option>Todos status</option>
+          <option>Ativo</option><option>Esgotado</option><option>Rascunho</option>
+        </select>
+      </div>
+
+      <div style={{ background:'white', borderRadius:16, boxShadow:'0 1px 4px rgba(29,34,53,0.06)', overflow:'hidden' }}>
+        <table>
+          <thead>
+            <tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Vendas</th><th>Status</th><th style={{ textAlign:'right' }}>Ações</th></tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id}>
+                <td>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:36, height:36, background:'#E4EDF8', borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8AAFD8" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                    </div>
+                    <span style={{ fontWeight:500, fontSize:13 }}>{p.name}</span>
+                  </div>
+                </td>
+                <td><span style={{ fontSize:12, color:'#6B7494' }}>{p.category}</span></td>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500 }}>{fmt(p.price)}</span></td>
+                <td>
+                  <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, color: p.stock===0 ? '#C0392B' : p.stock < 5 ? '#A05C1A' : '#1D2235', fontWeight: p.stock < 5 ? 600 : 400 }}>
+                    {p.stock === 0 ? 'Esgotado' : p.stock}
+                  </span>
+                </td>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13 }}>{p.sales}</span></td>
+                <td><Badge status={p.status} /></td>
+                <td style={{ textAlign:'right' }}>
+                  <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                    <button onClick={() => setModal(p)} style={{ background:'#F0F5FB', border:'none', borderRadius:7, padding:'6px 12px', fontSize:12, fontWeight:600, color:'#1D2235', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>Editar</button>
+                    <button onClick={() => setDeleteId(p.id)} style={{ background:'#FDE8E6', border:'none', borderRadius:7, padding:'6px 10px', fontSize:12, fontWeight:600, color:'#C0392B', cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>✕</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modals */}
+      {modal && (
+        <Modal title={modal === 'new' ? 'Cadastrar produto' : 'Editar produto'} onClose={() => setModal(null)}>
+          <ProductForm product={modal === 'new' ? null : modal} onSave={handleSave} onClose={() => setModal(null)} />
+        </Modal>
+      )}
+      {deleteId && (
+        <Modal title="Excluir produto" onClose={() => setDeleteId(null)} width={400}>
+          <p style={{ fontSize:14, color:'#6B7494', lineHeight:1.6, marginBottom:20 }}>Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.</p>
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+            <button onClick={() => setDeleteId(null)} style={{ background:'white', color:'#1D2235', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'10px 20px', border:'1.5px solid #D8DCE8', borderRadius:10, cursor:'pointer' }}>Cancelar</button>
+            <button onClick={() => { setProducts(prev => prev.filter(p => p.id !== deleteId)); setDeleteId(null); }} style={{ background:'#C0392B', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'10px 20px', border:'none', borderRadius:10, cursor:'pointer' }}>Excluir</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+const Orders = () => {
+  const [orders, setOrders] = React.useState(ORDERS);
+  const [search, setSearch] = React.useState('');
+  const filtered = orders.filter(o => o.customer.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search));
+
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:6 }}>Vendas</div>
+        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235' }}>Pedidos</h1>
+      </div>
+      <div style={{ display:'flex', gap:12, marginBottom:20 }}>
+        <div style={{ flex:1, position:'relative' }}>
+          <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8AFCA" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar pedido ou cliente..." style={{ paddingLeft:38 }} />
+        </div>
+        <select style={{ width:160 }}>
+          <option>Todos os status</option>
+          {['Processando','Enviado','Entregue','Cancelado'].map(s => <option key={s}>{s}</option>)}
+        </select>
+      </div>
+      <div style={{ background:'white', borderRadius:16, boxShadow:'0 1px 4px rgba(29,34,53,0.06)', overflow:'hidden' }}>
+        <table>
+          <thead><tr><th>Pedido</th><th>Cliente</th><th>Produtos</th><th>Total</th><th>Status</th><th>Data</th><th style={{ textAlign:'right' }}>Ação</th></tr></thead>
+          <tbody>
+            {filtered.map(o => (
+              <tr key={o.id}>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500 }}>{o.id}</span></td>
+                <td style={{ fontWeight:500 }}>{o.customer}</td>
+                <td style={{ fontSize:12, color:'#6B7494', maxWidth:180 }}>{o.products}</td>
+                <td><span style={{ fontFamily:"'DM Mono',monospace", fontSize:13 }}>{fmt(o.total)}</span></td>
+                <td><Badge status={o.status} /></td>
+                <td style={{ fontSize:12, color:'#6B7494' }}>{o.date}</td>
+                <td style={{ textAlign:'right' }}>
+                  <select value={o.status} onChange={e => setOrders(prev => prev.map(p => p.id===o.id ? {...p, status:e.target.value} : p))}
+                    style={{ width:'auto', fontSize:12, padding:'5px 10px', borderRadius:6, border:'1px solid #D8DCE8' }}>
+                    {['processing','shipped','delivered','cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const Settings = () => {
+  const [saved, setSaved] = React.useState(false);
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}>
+        <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:6 }}>Configurações</div>
+        <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235' }}>Configurações da loja</h1>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+        {/* Store info */}
+        <div style={{ background:'white', borderRadius:16, padding:24, boxShadow:'0 1px 4px rgba(29,34,53,0.06)', gridColumn:'span 2' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'#1D2235', marginBottom:20 }}>Informações da loja</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Nome da loja</label><input defaultValue="B&D Artes & Impressões" /></div>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>CNPJ</label><input defaultValue="00.000.000/0001-00" /></div>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>E-mail de contato</label><input defaultValue="contato@bdimpressoes.com.br" /></div>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Telefone</label><input defaultValue="(11) 99999-9999" /></div>
+            <div style={{ gridColumn:'span 2' }}><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Descrição</label><textarea rows={2} defaultValue="Presentes únicos, impressos em 3D com cuidado." style={{ resize:'vertical' }} /></div>
+          </div>
+        </div>
+        {/* Shipping */}
+        <div style={{ background:'white', borderRadius:16, padding:24, boxShadow:'0 1px 4px rgba(29,34,53,0.06)' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'#1D2235', marginBottom:20 }}>Frete</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Frete grátis acima de (R$)</label><input defaultValue="150" type="number" /></div>
+            <div><label style={{ display:'block', fontSize:12, fontWeight:600, color:'#3D4460', marginBottom:6 }}>Prazo padrão (dias úteis)</label><input defaultValue="7" type="number" /></div>
+            <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+              <input type="checkbox" defaultChecked style={{ width:'auto', accentColor:'#1D2235' }} />
+              <span style={{ fontSize:14, color:'#1D2235' }}>Oferecer retirada no local</span>
+            </label>
+          </div>
+        </div>
+        {/* Notifications */}
+        <div style={{ background:'white', borderRadius:16, padding:24, boxShadow:'0 1px 4px rgba(29,34,53,0.06)' }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:'#1D2235', marginBottom:20 }}>Notificações</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {['Novo pedido recebido','Estoque baixo (< 5 un.)','Pedido cancelado','Avaliação recebida'].map(n => (
+              <label key={n} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+                <input type="checkbox" defaultChecked style={{ width:'auto', accentColor:'#1D2235' }} />
+                <span style={{ fontSize:14, color:'#1D2235' }}>{n}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop:20, display:'flex', justifyContent:'flex-end' }}>
+        <button onClick={save} style={{ background: saved ? '#2E7D6E' : '#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'12px 28px', border:'none', borderRadius:10, cursor:'pointer', transition:'background 200ms', minWidth:160 }}>
+          {saved ? '✓ Salvo!' : 'Salvar configurações'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ── LAYOUT ── */
+const SIDEBAR_ITEMS = [
+  { key:'dashboard', label:'Dashboard', icon:'◻' },
+  { key:'products',  label:'Produtos',  icon:'🏷' },
+  { key:'orders',    label:'Pedidos',   icon:'📦' },
+  { key:'customers', label:'Clientes',  icon:'👥' },
+  { key:'settings',  label:'Configurações', icon:'⚙' },
+];
+
+const AdminApp = () => {
+  const [page, setPage] = React.useState('dashboard');
+
+  return (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
+      {/* Sidebar */}
+      <div style={{ width:230, background:'#1D2235', display:'flex', flexDirection:'column', flexShrink:0 }}>
+        {/* Logo */}
+        <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <img src="../../assets/logo.png" alt="B&D" style={{ width:36, height:36, objectFit:'contain', mixBlendMode:'luminosity', borderRadius:8 }} />
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:15, color:'white', lineHeight:1.1 }}>B&amp;D</div>
+              <div style={{ fontSize:9, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)' }}>Admin</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex:1, padding:'12px 10px', overflowY:'auto' }}>
+          {SIDEBAR_ITEMS.map(item => (
+            <button key={item.key} onClick={() => setPage(item.key)} style={{
+              width:'100%', display:'flex', alignItems:'center', gap:10,
+              padding:'10px 12px', borderRadius:10, border:'none',
+              background: page===item.key ? 'rgba(187,207,235,0.15)' : 'transparent',
+              color: page===item.key ? '#BBCFEB' : 'rgba(255,255,255,0.55)',
+              fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight: page===item.key ? 600 : 400,
+              cursor:'pointer', marginBottom:2, textAlign:'left', transition:'all 150ms',
+            }}>
+              <span style={{ fontSize:16 }}>{item.icon}</span>
+              {item.label}
+              {page===item.key && <div style={{ marginLeft:'auto', width:4, height:16, background:'#BBCFEB', borderRadius:2 }} />}
+            </button>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div style={{ padding:'14px 16px', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:32, height:32, background:'rgba(187,207,235,0.2)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>👤</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.8)' }}>Admin</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)' }}>admin@bdimpressoes.com</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        {/* Top bar */}
+        <div style={{ background:'white', borderBottom:'1px solid #EEF1F8', padding:'0 32px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div style={{ fontSize:13, color:'#6B7494' }}>
+            {new Date().toLocaleDateString('pt-BR', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <a href="../website/index.html" target="_blank" style={{ fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:500, color:'#6B7494', textDecoration:'none', padding:'7px 14px', background:'#F0F5FB', borderRadius:8 }}>
+              🔗 Ver loja
+            </a>
+            <div style={{ width:32, height:32, background:'#E4EDF8', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, position:'relative' }}>
+              🔔
+              <span style={{ position:'absolute', top:2, right:2, width:8, height:8, background:'#D4849A', borderRadius:'50%' }}></span>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex:1, overflowY:'auto', padding:32 }}>
+          {page==='dashboard' && <Dashboard />}
+          {page==='products'  && <Products />}
+          {page==='orders'    && <Orders />}
+          {page==='customers' && (
+            <div style={{ textAlign:'center', paddingTop:80 }}>
+              <div style={{ fontSize:48, marginBottom:16 }}>👥</div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:24, color:'#1D2235', marginBottom:8 }}>Clientes</div>
+              <div style={{ fontSize:14, color:'#6B7494' }}>Módulo em desenvolvimento</div>
+            </div>
+          )}
+          {page==='settings'  && <Settings />}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+</script>
+</body>
+</html>

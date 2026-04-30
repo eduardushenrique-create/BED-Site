@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B&D Artes & Impressões</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #F0F5FB; color: #1D2235; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #EEF1F8; } ::-webkit-scrollbar-thumb { background: #BBCFEB; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="Header.jsx"></script>
+<script type="text/babel" src="ProductCard.jsx"></script>
+<script type="text/babel" src="CartDrawer.jsx"></script>
+<script type="text/babel" src="Footer.jsx"></script>
+<script type="text/babel">
+
+const PRODUCTS = [
+  { id:1, name:'Porta-Retratos Geométrico', price:'R$ 89,90', priceNum:89.90, oldPrice:'R$ 119,90', badge:'Novo', badgeType:'new' },
+  { id:2, name:'Vaso Orgânico Moderno', price:'R$ 64,90', priceNum:64.90, badge:'+ Vendido', badgeType:'hot' },
+  { id:3, name:'Suporte Articulado para Celular', price:'R$ 39,90', priceNum:39.90, oldPrice:'R$ 49,90', badge:'-20%', badgeType:'sale' },
+  { id:4, name:'Porta-Canetas Hexagonal', price:'R$ 54,90', priceNum:54.90, badge:'Personalizável', badgeType:'custom' },
+  { id:5, name:'Mini Vaso com Mensagem', price:'R$ 44,90', priceNum:44.90, badge:'Novo', badgeType:'new' },
+  { id:6, name:'Organizador de Mesa Modular', price:'R$ 79,90', priceNum:79.90, oldPrice:'R$ 99,90', badge:'-20%', badgeType:'sale' },
+  { id:7, name:'Cachepô Facetado P', price:'R$ 34,90', priceNum:34.90 },
+  { id:8, name:'Porta-Chaves de Parede', price:'R$ 59,90', priceNum:59.90, badge:'+ Vendido', badgeType:'hot' },
+];
+
+const CATEGORIES = ['Todos', 'Decoração', 'Escritório', 'Cozinha', 'Personalizados', 'Promoções'];
+
+const Hero = ({ onShop }) => (
+  <div style={{ background: '#BBCFEB', padding: '80px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ maxWidth: 520 }}>
+      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#2E3650', marginBottom: 16 }}>Impressão 3D com alma</div>
+      <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 56, fontWeight: 700, lineHeight: 1.1, color: '#1D2235', letterSpacing: '-0.02em', marginBottom: 20 }}>
+        Presentes feitos<br /><em style={{ fontStyle: 'italic', fontWeight: 400 }}>para durar.</em>
+      </h1>
+      <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 17, color: '#3D4460', lineHeight: 1.65, marginBottom: 32, maxWidth: 420 }}>
+        Cada peça é impressa sob demanda com filamento premium. Personalize com nome, data ou mensagem especial.
+      </p>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <button onClick={onShop} style={{ background: '#1D2235', color: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 600, padding: '14px 28px', border: 'none', borderRadius: 10, cursor: 'pointer' }}>
+          Explorar coleção
+        </button>
+        <button style={{ background: 'white', color: '#1D2235', fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 500, padding: '14px 28px', border: 'none', borderRadius: 10, cursor: 'pointer' }}>
+          Como funciona
+        </button>
+      </div>
+    </div>
+    {/* Illustration placeholder */}
+    <div style={{ width: 340, height: 340, background: 'rgba(255,255,255,0.45)', borderRadius: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+      <img src="../../assets/logo.png" alt="B&D" style={{ width: 160, height: 160, objectFit: 'contain', mixBlendMode: 'multiply' }} />
+      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#2E3650', opacity: 0.7 }}>Feito com ♥ e filamento PLA</div>
+    </div>
+  </div>
+);
+
+const Announcement = () => (
+  <div style={{ background: '#1D2235', color: 'white', textAlign: 'center', padding: '10px 24px', fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 500, letterSpacing: '0.02em' }}>
+    🎁 Frete grátis em pedidos acima de R$ 150,00 · Entrega em até 7 dias úteis
+  </div>
+);
+
+const Highlights = () => {
+  const items = [
+    { icon: '📦', title: 'Entrega rápida', sub: 'Em até 7 dias úteis' },
+    { icon: '✏️', title: 'Personalizável', sub: 'Nome, data ou mensagem' },
+    { icon: '♻️', title: 'Filamento PLA', sub: 'Material sustentável' },
+    { icon: '♥', title: 'Feito com amor', sub: 'Peça única, impressa pra você' },
+  ];
+  return (
+    <div style={{ background: 'white', borderTop: '1px solid #EEF1F8', borderBottom: '1px solid #EEF1F8' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 48px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
+        {items.map(item => (
+          <div key={item.title} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 28 }}>{item.icon}</span>
+            <div>
+              <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, color: '#1D2235' }}>{item.title}</div>
+              <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#6B7494' }}>{item.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ProductGrid = ({ onAddToCart, shopRef }) => {
+  const [activeCategory, setActiveCategory] = React.useState('Todos');
+
+  return (
+    <div ref={shopRef} style={{ maxWidth: 1280, margin: '0 auto', padding: '64px 48px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div>
+          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7494', marginBottom: 8 }}>Nossa loja</div>
+          <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 700, color: '#1D2235', letterSpacing: '-0.01em' }}>Coleção completa</h2>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {CATEGORIES.map(cat => (
+            <button key={cat} onClick={() => setActiveCategory(cat)} style={{
+              fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 500,
+              padding: '7px 14px', borderRadius: 8, cursor: 'pointer', border: 'none',
+              background: activeCategory === cat ? '#1D2235' : '#F0F5FB',
+              color: activeCategory === cat ? 'white' : '#3D4460',
+              transition: 'all 150ms',
+            }}>{cat}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
+        {PRODUCTS.map(p => (
+          <BDProductCard
+            key={p.id}
+            name={p.name}
+            price={p.price}
+            oldPrice={p.oldPrice}
+            badge={p.badge}
+            badgeType={p.badgeType}
+            onAddToCart={() => onAddToCart(p)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Toast = ({ message, visible }) => (
+  <div style={{
+    position: 'fixed', bottom: 32, left: '50%', transform: `translateX(-50%) translateY(${visible ? 0 : 20}px)`,
+    background: '#1D2235', color: 'white', borderRadius: 10,
+    padding: '12px 24px', fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 500,
+    boxShadow: '0 8px 32px rgba(29,34,53,0.25)',
+    opacity: visible ? 1 : 0, transition: 'all 250ms ease-out',
+    pointerEvents: 'none', zIndex: 999, whiteSpace: 'nowrap',
+  }}>
+    ✓ Produto adicionado ao carrinho
+  </div>
+);
+
+const App = () => {
+  const [cartOpen, setCartOpen] = React.useState(false);
+  const [cartItems, setCartItems] = React.useState([]);
+  const [toast, setToast] = React.useState(false);
+  const shopRef = React.useRef(null);
+
+  const addToCart = (product) => {
+    setCartItems(prev => {
+      const existing = prev.find(i => i.name === product.name);
+      if (existing) return prev.map(i => i.name === product.name ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { name: product.name, price: product.priceNum, qty: 1 }];
+    });
+    setToast(true);
+    setTimeout(() => setToast(false), 2200);
+  };
+
+  const removeFromCart = (idx) => setCartItems(prev => prev.filter((_, i) => i !== idx));
+
+  const scrollToShop = () => shopRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+  return (
+    <>
+      <Announcement />
+      <BDHeader cartCount={cartItems.reduce((s,i) => s + i.qty, 0)} onCartOpen={() => setCartOpen(true)} />
+      <Hero onShop={scrollToShop} />
+      <Highlights />
+      <ProductGrid onAddToCart={addToCart} shopRef={shopRef} />
+      <BDFooter />
+      <BDCartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={cartItems}
+        onRemove={removeFromCart}
+        onCheckout={() => alert('Checkout! (protótipo)')}
+      />
+      <Toast message="Produto adicionado!" visible={toast} />
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

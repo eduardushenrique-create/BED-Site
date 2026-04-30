@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: #F0F5FB; font-family: 'DM Sans', sans-serif; }
+  .row { display: flex; gap: 14px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .box { background: white; border-radius: 10px; width: 110px; height: 64px; }
+  .meta { font-size: 10px; font-family: monospace; color: #6B7494; margin-top: 6px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="col"><div class="box" style="box-shadow:0 1px 2px rgba(29,34,53,0.06);"></div><div class="meta">shadow-xs</div></div>
+  <div class="col"><div class="box" style="box-shadow:0 1px 4px rgba(29,34,53,0.07),0 4px 12px rgba(29,34,53,0.05);"></div><div class="meta">shadow-sm (card)</div></div>
+  <div class="col"><div class="box" style="box-shadow:0 4px 16px rgba(29,34,53,0.09),0 1px 4px rgba(29,34,53,0.05);"></div><div class="meta">shadow-md</div></div>
+  <div class="col"><div class="box" style="box-shadow:0 8px 40px rgba(29,34,53,0.13),0 2px 8px rgba(29,34,53,0.06);"></div><div class="meta">shadow-lg</div></div>
+  <div class="col"><div class="box" style="box-shadow:0 20px 60px rgba(29,34,53,0.18),0 4px 16px rgba(29,34,53,0.08);"></div><div class="meta">shadow-xl</div></div>
+</div>
+</body>
+</html>

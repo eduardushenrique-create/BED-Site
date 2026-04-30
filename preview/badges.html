@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px 24px; background: white; font-family: 'DM Sans', sans-serif; }
+  .row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #A8AFCA; margin-bottom: 8px; font-family: monospace; }
+  .badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.03em; }
+  .b-new    { background: #1D2235; color: #FFFFFF; }
+  .b-sale   { background: #D4849A; color: #FFFFFF; }
+  .b-hot    { background: #BBCFEB; color: #1D2235; }
+  .b-sold   { background: #EEF1F8; color: #6B7494; }
+  .b-custom { background: #F7E6EB; color: #D4849A; }
+  .b-free   { background: #E0F4F0; color: #2E7D6E; }
+  .tag { display: inline-flex; font-size: 12px; font-weight: 500; padding: 5px 13px; border-radius: 7px; background: #F0F5FB; color: #1D2235; border: 1px solid #D8DCE8; cursor: pointer; transition: all 150ms; }
+  .tag:hover { background: #E4EDF8; border-color: #8AAFD8; }
+  .tag-active { background: #1D2235; color: white; border-color: #1D2235; }
+</style>
+</head>
+<body>
+  <div class="label">Badges de status</div>
+  <div class="row">
+    <span class="badge b-new">Novo</span>
+    <span class="badge b-sale">-20% OFF</span>
+    <span class="badge b-hot">Mais vendido</span>
+    <span class="badge b-sold">Esgotado</span>
+    <span class="badge b-custom">♥ Personalizável</span>
+    <span class="badge b-free">Frete grátis</span>
+  </div>
+  <div class="label">Tags de filtro</div>
+  <div class="row">
+    <span class="tag tag-active">Decoração</span>
+    <span class="tag">Cozinha</span>
+    <span class="tag">Escritório</span>
+    <span class="tag">Infantil</span>
+    <span class="tag">Pets</span>
+    <span class="tag">Casamento</span>
+    <span class="tag">Aniversário</span>
+  </div>
+</body>
+</html>

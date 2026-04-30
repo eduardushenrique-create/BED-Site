@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Porta-Retratos Geométrico — B&D Artes & Impressões</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #F0F5FB; color: #1D2235; -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const NAV_LINKS = ['Coleções','Presentes','Personalizados','Novidades'];
+
+const Header = ({ cartCount, onCart }) => (
+  <header style={{ background:'white', borderBottom:'1px solid #D8DCE8', position:'sticky', top:0, zIndex:100 }}>
+    <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px', height:68, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <a href="index.html" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
+        <img src="../../assets/logo.png" alt="B&D" style={{ height:44, width:44, objectFit:'contain' }} />
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:17, color:'#1D2235', lineHeight:1.1 }}>B&amp;D</div>
+          <div style={{ fontSize:9, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:'#6B7494' }}>Artes &amp; Impressões</div>
+        </div>
+      </a>
+      <nav style={{ display:'flex', gap:4 }}>
+        {NAV_LINKS.map(n => <a key={n} href="#" style={{ fontSize:14, fontWeight:500, color:'#3D4460', textDecoration:'none', padding:'6px 12px', borderRadius:8 }}>{n}</a>)}
+      </nav>
+      <div style={{ display:'flex', gap:4 }}>
+        {[
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+        ].map((icon, i) => (
+          <button key={i} style={{ background:'transparent', border:'none', cursor:'pointer', padding:8, borderRadius:8, color:'#3D4460', display:'flex', alignItems:'center', justifyContent:'center' }}>{icon}</button>
+        ))}
+        <button onClick={onCart} style={{ background:'transparent', border:'none', cursor:'pointer', padding:8, borderRadius:8, color:'#3D4460', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          {cartCount > 0 && <span style={{ position:'absolute', top:2, right:2, background:'#D4849A', color:'white', fontSize:9, fontWeight:700, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>{cartCount}</span>}
+        </button>
+      </div>
+    </div>
+  </header>
+);
+
+const Breadcrumb = () => (
+  <div style={{ maxWidth:1280, margin:'0 auto', padding:'16px 48px', display:'flex', gap:8, alignItems:'center' }}>
+    {['Início','Decoração','Porta-Retratos'].map((c, i, arr) => (
+      <React.Fragment key={c}>
+        <a href="#" style={{ fontSize:13, color: i === arr.length-1 ? '#1D2235' : '#6B7494', textDecoration:'none', fontWeight: i === arr.length-1 ? 500 : 400 }}>{c}</a>
+        {i < arr.length-1 && <span style={{ color:'#A8AFCA', fontSize:12 }}>›</span>}
+      </React.Fragment>
+    ))}
+  </div>
+);
+
+const THUMBS = ['#E4EDF8','#BBCFEB','#D8DCE8','#EEF1F8'];
+const COLORS = [{label:'Branco',hex:'#F5F5F5'},{label:'Azul',hex:'#BBCFEB'},{label:'Navy',hex:'#1D2235'},{label:'Rosa',hex:'#D4849A'}];
+const SIZES = ['Pequeno (10cm)','Médio (15cm)','Grande (20cm)'];
+
+const PDPApp = () => {
+  const [activeThumb, setActiveThumb] = React.useState(0);
+  const [selectedColor, setSelectedColor] = React.useState(0);
+  const [selectedSize, setSelectedSize] = React.useState(1);
+  const [qty, setQty] = React.useState(1);
+  const [customText, setCustomText] = React.useState('');
+  const [added, setAdded] = React.useState(false);
+  const [cartCount, setCartCount] = React.useState(0);
+  const [fav, setFav] = React.useState(false);
+  const [tab, setTab] = React.useState('desc');
+
+  const addToCart = () => {
+    setAdded(true);
+    setCartCount(c => c + qty);
+    setTimeout(() => setAdded(false), 2000);
+  };
+
+  return (
+    <>
+      <div style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'10px', fontSize:13, fontWeight:500 }}>
+        🎁 Frete grátis em pedidos acima de R$ 150,00 · Entrega em até 7 dias úteis
+      </div>
+      <Header cartCount={cartCount} onCart={() => {}} />
+      <Breadcrumb />
+
+      {/* Main PDP */}
+      <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px 80px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:64, alignItems:'start' }}>
+
+        {/* Left: Images */}
+        <div>
+          {/* Main image */}
+          <div style={{ background: THUMBS[activeThumb], borderRadius:20, height:440, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:12, position:'relative' }}>
+            <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="0.8" strokeLinecap="round" opacity="0.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+            </svg>
+            <span style={{ position:'absolute', top:16, left:16, background:'#1D2235', color:'white', fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:999, textTransform:'uppercase', letterSpacing:'0.05em' }}>Novo</span>
+            <button onClick={() => setFav(!fav)} style={{ position:'absolute', top:12, right:14, background:'none', border:'none', cursor:'pointer', fontSize:22, color: fav ? '#D4849A' : 'rgba(255,255,255,0.5)', transition:'all 150ms' }}>♥</button>
+          </div>
+          {/* Thumbnails */}
+          <div style={{ display:'flex', gap:10 }}>
+            {THUMBS.map((c, i) => (
+              <div key={i} onClick={() => setActiveThumb(i)} style={{ width:80, height:80, background:c, borderRadius:12, cursor:'pointer', border: activeThumb===i ? '2px solid #1D2235' : '2px solid transparent', transition:'border 150ms', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Info */}
+        <div style={{ paddingTop:8 }}>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'#6B7494', marginBottom:10 }}>Decoração · Porta-Retratos</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:40, fontWeight:700, color:'#1D2235', lineHeight:1.15, letterSpacing:'-0.01em', marginBottom:16 }}>Porta-Retratos Geométrico</h1>
+
+          {/* Rating */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+            <div style={{ display:'flex', gap:2 }}>{[...Array(5)].map((_,i) => <span key={i} style={{ color: i<4 ? '#BBCFEB' : '#D8DCE8', fontSize:16 }}>★</span>)}</div>
+            <span style={{ fontSize:13, color:'#6B7494' }}>4.0 · 38 avaliações</span>
+            <span style={{ fontSize:13, color:'#2E7D6E', marginLeft:8 }}>✓ Em estoque</span>
+          </div>
+
+          {/* Price */}
+          <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:28, paddingBottom:28, borderBottom:'1px solid #EEF1F8' }}>
+            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:36, fontWeight:500, color:'#1D2235' }}>R$ 89,90</span>
+            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:18, color:'#A8AFCA', textDecoration:'line-through' }}>R$ 119,90</span>
+            <span style={{ background:'#D4849A', color:'white', fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:999 }}>-25%</span>
+          </div>
+
+          {/* Color */}
+          <div style={{ marginBottom:22 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:10 }}>Cor: <span style={{ fontWeight:400, color:'#6B7494' }}>{COLORS[selectedColor].label}</span></div>
+            <div style={{ display:'flex', gap:8 }}>
+              {COLORS.map((c, i) => (
+                <button key={i} onClick={() => setSelectedColor(i)} title={c.label} style={{ width:32, height:32, borderRadius:'50%', background:c.hex, border: selectedColor===i ? '3px solid #1D2235' : '3px solid transparent', outline: selectedColor===i ? '2px solid #1D2235' : 'none', outlineOffset:2, cursor:'pointer', transition:'all 150ms' }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Size */}
+          <div style={{ marginBottom:22 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:10 }}>Tamanho</div>
+            <div style={{ display:'flex', gap:8 }}>
+              {SIZES.map((s, i) => (
+                <button key={i} onClick={() => setSelectedSize(i)} style={{ fontSize:13, fontWeight:500, padding:'8px 16px', borderRadius:8, border: selectedSize===i ? '1.5px solid #1D2235' : '1.5px solid #D8DCE8', background: selectedSize===i ? '#1D2235' : 'white', color: selectedSize===i ? 'white' : '#3D4460', cursor:'pointer', transition:'all 150ms', fontFamily:"'DM Sans',sans-serif" }}>{s}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Personalization */}
+          <div style={{ marginBottom:28 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:6 }}>Personalização <span style={{ fontSize:12, color:'#6B7494', fontWeight:400 }}>(opcional)</span></div>
+            <input value={customText} onChange={e => setCustomText(e.target.value)} maxLength={40} placeholder="Nome, data ou mensagem especial..." style={{ width:'100%', fontFamily:"'DM Sans',sans-serif", fontSize:14, padding:'11px 14px', border:'1.5px solid #D8DCE8', borderRadius:10, outline:'none', color:'#1D2235', transition:'border 150ms' }}
+              onFocus={e => e.target.style.borderColor='#8AAFD8'}
+              onBlur={e => e.target.style.borderColor='#D8DCE8'}
+            />
+            <div style={{ fontSize:11, color:'#A8AFCA', marginTop:4, textAlign:'right' }}>{customText.length}/40 caracteres</div>
+          </div>
+
+          {/* Qty + CTA */}
+          <div style={{ display:'flex', gap:12, marginBottom:16, alignItems:'center' }}>
+            <div style={{ display:'flex', alignItems:'center', border:'1.5px solid #D8DCE8', borderRadius:10, overflow:'hidden' }}>
+              <button onClick={() => setQty(q => Math.max(1, q-1))} style={{ width:40, height:48, background:'white', border:'none', cursor:'pointer', fontSize:18, color:'#1D2235', fontFamily:"'DM Sans',sans-serif" }}>−</button>
+              <span style={{ width:40, textAlign:'center', fontSize:15, fontWeight:600, color:'#1D2235', fontFamily:"'DM Mono',monospace" }}>{qty}</span>
+              <button onClick={() => setQty(q => q+1)} style={{ width:40, height:48, background:'white', border:'none', cursor:'pointer', fontSize:18, color:'#1D2235', fontFamily:"'DM Sans',sans-serif" }}>+</button>
+            </div>
+            <button onClick={addToCart} style={{ flex:1, background: added ? '#2E7D6E' : '#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'14px 0', border:'none', borderRadius:12, cursor:'pointer', transition:'background 200ms' }}>
+              {added ? '✓ Adicionado!' : 'Adicionar ao carrinho'}
+            </button>
+          </div>
+          <button style={{ width:'100%', background:'#BBCFEB', color:'#1D2235', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'14px 0', border:'none', borderRadius:12, cursor:'pointer' }}>
+            Comprar agora
+          </button>
+
+          {/* Trust badges */}
+          <div style={{ display:'flex', gap:24, marginTop:24, paddingTop:24, borderTop:'1px solid #EEF1F8' }}>
+            {[['📦','Entrega em 7 dias'],['🔄','Troca em 30 dias'],['🔒','Pagamento seguro']].map(([icon, label]) => (
+              <div key={label} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:16 }}>{icon}</span>
+                <span style={{ fontSize:12, color:'#6B7494', fontWeight:500 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs: description / specs / reviews */}
+      <div style={{ background:'white', borderTop:'1px solid #EEF1F8', borderBottom:'1px solid #EEF1F8' }}>
+        <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px', display:'flex', gap:0 }}>
+          {[['desc','Descrição'],['specs','Especificações'],['reviews','Avaliações (38)']].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)} style={{ fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600, padding:'16px 24px', background:'none', border:'none', cursor:'pointer', color: tab===key ? '#1D2235' : '#6B7494', borderBottom: tab===key ? '2px solid #1D2235' : '2px solid transparent', transition:'all 150ms' }}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ maxWidth:1280, margin:'0 auto', padding:'40px 48px 80px' }}>
+        {tab === 'desc' && (
+          <div style={{ maxWidth:640 }}>
+            <p style={{ fontSize:16, lineHeight:1.75, color:'#3D4460', marginBottom:16 }}>O Porta-Retratos Geométrico é uma peça única, com design inspirado em formas da natureza e geometria moderna. Impresso em filamento PLA de alta qualidade, cada detalhe é pensado para durar e emocionar.</p>
+            <p style={{ fontSize:16, lineHeight:1.75, color:'#3D4460' }}>Personalizado com o texto que você escolher — nome, data de nascimento, casamento, ou uma mensagem especial — ele se torna um presente inesquecível.</p>
+          </div>
+        )}
+        {tab === 'specs' && (
+          <div style={{ maxWidth:480 }}>
+            {[['Material','PLA biodegradável'],['Impressão','FDM 0.2mm'],['Acabamento','Lixado e pintado'],['Tamanho (M)','15 × 15 × 2 cm'],['Peso','~180g'],['Foto suportada','10 × 15 cm']].map(([k,v]) => (
+              <div key={k} style={{ display:'flex', padding:'12px 0', borderBottom:'1px solid #EEF1F8', gap:40 }}>
+                <span style={{ fontSize:14, color:'#6B7494', width:160, flexShrink:0 }}>{k}</span>
+                <span style={{ fontSize:14, fontWeight:500, color:'#1D2235' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {tab === 'reviews' && (
+          <div style={{ maxWidth:640 }}>
+            {[{name:'Ana Paula',rating:5,text:'Lindo demais! Qualidade excelente e veio exatamente como eu pedi. Super recomendo!',date:'12 abr 2024'},{name:'Marcos S.',rating:4,text:'Chegou dentro do prazo e a personalização ficou perfeita. Material resistente.',date:'3 mar 2024'},{name:'Camila R.',rating:5,text:'Dei de presente e a pessoa amou! Já quero mais peças. O acabamento é muito bonito.',date:'18 fev 2024'}].map((r, i) => (
+              <div key={i} style={{ padding:'20px 0', borderBottom:'1px solid #EEF1F8' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                  <div style={{ fontWeight:600, fontSize:14, color:'#1D2235' }}>{r.name}</div>
+                  <div style={{ fontSize:12, color:'#A8AFCA' }}>{r.date}</div>
+                </div>
+                <div style={{ display:'flex', gap:2, marginBottom:8 }}>{[...Array(5)].map((_,j) => <span key={j} style={{ color: j<r.rating ? '#BBCFEB' : '#D8DCE8', fontSize:14 }}>★</span>)}</div>
+                <p style={{ fontSize:14, color:'#3D4460', lineHeight:1.6 }}>{r.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Related */}
+      <div style={{ background:'white', padding:'64px 0' }}>
+        <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 48px' }}>
+          <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:32, fontWeight:700, color:'#1D2235', marginBottom:32 }}>Você também pode gostar</h3>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:20 }}>
+            {['Vaso Orgânico Moderno','Porta-Canetas Hexagonal','Mini Vaso com Mensagem','Organizador Modular'].map((name, i) => (
+              <div key={i} style={{ background:'#F0F5FB', borderRadius:14, overflow:'hidden', cursor:'pointer' }}>
+                <div style={{ height:140, background:['#E4EDF8','#BBCFEB','#D8DCE8','#EEF1F8'][i], display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"><circle cx="12" cy="12" r="10"/></svg>
+                </div>
+                <div style={{ padding:'12px 14px 16px' }}>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:6 }}>{name}</div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:14, fontWeight:500, color:'#1D2235' }}>R$ {[64.90,54.90,44.90,79.90][i].toFixed(2).replace('.',',')}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <footer style={{ background:'#1D2235', color:'white', textAlign:'center', padding:'24px', fontSize:13, color:'rgba(255,255,255,0.4)' }}>
+        © 2024 B&amp;D Artes &amp; Impressões · Feito com ♥ e filamento PLA
+      </footer>
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<PDPApp />);
+</script>
+</body>
+</html>

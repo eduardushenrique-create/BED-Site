@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B&D Artes & Impressões — Mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1C1C1E; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 32px 16px; font-family: 'DM Sans', sans-serif; }
+  .phone { width: 390px; background: #F0F5FB; border-radius: 44px; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 10px #2C2C2E; position: relative; min-height: 844px; }
+  .status-bar { background: white; height: 48px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; }
+  .status-time { font-size: 15px; font-weight: 600; color: #1D2235; }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const PRODUCTS = [
+  { id:1, name:'Porta-Retratos Geométrico', price:'R$ 89,90', badge:'Novo', color:'#E4EDF8' },
+  { id:2, name:'Vaso Orgânico', price:'R$ 64,90', badge:'+ Vendido', color:'#BBCFEB' },
+  { id:3, name:'Suporte Articulado', price:'R$ 39,90', badge:'-20%', color:'#D8DCE8' },
+  { id:4, name:'Porta-Canetas Hex', price:'R$ 54,90', color:'#EEF1F8' },
+  { id:5, name:'Mini Vaso Mensagem', price:'R$ 44,90', badge:'Novo', color:'#E4EDF8' },
+  { id:6, name:'Organizador Modular', price:'R$ 79,90', color:'#BBCFEB' },
+];
+
+const CATS = ['Todos','Decoração','Escritório','Personalizados','Promoções'];
+
+const NavBar = ({ active, onNav, cartCount }) => {
+  const tabs = [
+    { key:'home', label:'Início', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+    { key:'search', label:'Buscar', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> },
+    { key:'fav', label:'Favoritos', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> },
+    { key:'cart', label:'Carrinho', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> },
+    { key:'account', label:'Conta', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+  ];
+  return (
+    <div style={{ position:'sticky', bottom:0, background:'white', borderTop:'1px solid #EEF1F8', display:'flex', paddingBottom:20 }}>
+      {tabs.map(t => (
+        <button key={t.key} onClick={() => onNav(t.key)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', padding:'10px 0 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:3, position:'relative' }}>
+          <span style={{ color: active===t.key ? '#1D2235' : '#A8AFCA', transition:'color 150ms' }}>{t.icon}</span>
+          <span style={{ fontSize:10, fontWeight:600, color: active===t.key ? '#1D2235' : '#A8AFCA' }}>{t.label}</span>
+          {t.key==='cart' && cartCount > 0 && (
+            <span style={{ position:'absolute', top:6, right:'25%', background:'#D4849A', color:'white', fontSize:9, fontWeight:700, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>{cartCount}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const HomeScreen = ({ onProduct, onAddToCart }) => {
+  const [cat, setCat] = React.useState('Todos');
+  return (
+    <div style={{ flex:1, overflowY:'auto' }}>
+      {/* Header */}
+      <div style={{ background:'white', padding:'16px 20px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div style={{ fontSize:13, color:'#6B7494' }}>Bom dia! 👋</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:'#1D2235' }}>B&amp;D Artes &amp; Impressões</div>
+        </div>
+        <img src="../../assets/logo.png" alt="B&D" style={{ width:40, height:40, objectFit:'contain', mixBlendMode:'multiply' }} />
+      </div>
+
+      {/* Search bar */}
+      <div style={{ padding:'12px 20px', background:'white', borderBottom:'1px solid #EEF1F8' }}>
+        <div style={{ background:'#F0F5FB', borderRadius:12, padding:'10px 14px', display:'flex', alignItems:'center', gap:8 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8AFCA" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span style={{ fontSize:14, color:'#A8AFCA' }}>Buscar presentes...</span>
+        </div>
+      </div>
+
+      {/* Hero banner */}
+      <div style={{ background:'#BBCFEB', margin:'16px', borderRadius:20, padding:'24px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div>
+          <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', color:'#2E3650', marginBottom:6 }}>Em destaque</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:'#1D2235', lineHeight:1.2, marginBottom:12 }}>Presentes<br /><em style={{ fontStyle:'italic', fontWeight:400 }}>únicos</em></div>
+          <button style={{ background:'#1D2235', color:'white', border:'none', borderRadius:8, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>Explorar</button>
+        </div>
+        <div style={{ width:80, height:80, background:'rgba(255,255,255,0.3)', borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="1.2" strokeLinecap="round" opacity="0.6"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div style={{ padding:'0 16px 12px', overflowX:'auto', display:'flex', gap:8, WebkitOverflowScrolling:'touch' }}>
+        {CATS.map(c => (
+          <button key={c} onClick={() => setCat(c)} style={{ flexShrink:0, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:500, padding:'7px 14px', borderRadius:999, border:'none', background: cat===c ? '#1D2235' : '#EEF1F8', color: cat===c ? 'white' : '#3D4460', cursor:'pointer', transition:'all 150ms', whiteSpace:'nowrap' }}>{c}</button>
+        ))}
+      </div>
+
+      {/* Section title */}
+      <div style={{ padding:'8px 20px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:'#1D2235' }}>Coleção</div>
+        <a href="#" style={{ fontSize:13, color:'#6B7494', textDecoration:'none' }}>Ver todos →</a>
+      </div>
+
+      {/* Product grid 2-col */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, padding:'0 16px 24px' }}>
+        {PRODUCTS.map(p => (
+          <div key={p.id} onClick={() => onProduct(p)} style={{ background:'white', borderRadius:16, overflow:'hidden', boxShadow:'0 1px 4px rgba(29,34,53,0.07)', cursor:'pointer' }}>
+            <div style={{ background:p.color, height:140, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+              {p.badge && <span style={{ position:'absolute', top:8, left:8, background:'#1D2235', color:'white', fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:999, textTransform:'uppercase', letterSpacing:'0.05em' }}>{p.badge}</span>}
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              <button onClick={e => { e.stopPropagation(); }} style={{ position:'absolute', top:6, right:8, background:'none', border:'none', fontSize:16, cursor:'pointer', color:'rgba(255,255,255,0.6)' }}>♥</button>
+            </div>
+            <div style={{ padding:'10px 12px 12px' }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:12, fontWeight:600, color:'#1D2235', lineHeight:1.3, marginBottom:6 }}>{p.name}</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:14, fontWeight:500, color:'#1D2235' }}>{p.price}</span>
+                <button onClick={e => { e.stopPropagation(); onAddToCart(p); }} style={{ background:'#1D2235', color:'white', border:'none', borderRadius:6, width:28, height:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>+</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ProductScreen = ({ product, onBack, onAddToCart }) => (
+  <div style={{ flex:1, overflowY:'auto' }}>
+    <div style={{ background: product.color, height:280, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+      <button onClick={onBack} style={{ position:'absolute', top:16, left:16, width:36, height:36, background:'white', border:'none', borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.1)' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </button>
+      <button style={{ position:'absolute', top:16, right:16, width:36, height:36, background:'white', border:'none', borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:'#D4849A', boxShadow:'0 2px 8px rgba(0,0,0,0.1)' }}>♥</button>
+      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    </div>
+    <div style={{ background:'white', borderRadius:'24px 24px 0 0', marginTop:-16, padding:'24px 20px', flex:1 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+        <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:'#1D2235', lineHeight:1.25, flex:1, marginRight:12 }}>{product.name}</h2>
+        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:20, fontWeight:500, color:'#1D2235', flexShrink:0 }}>{product.price}</div>
+      </div>
+      <div style={{ display:'flex', gap:2, marginBottom:14 }}>{[...Array(5)].map((_,i) => <span key={i} style={{ color: i<4 ? '#BBCFEB' : '#D8DCE8', fontSize:14 }}>★</span>)}</div>
+      <p style={{ fontSize:14, color:'#6B7494', lineHeight:1.7, marginBottom:20 }}>Peça exclusiva, impressa em filamento PLA premium. Personalize com nome, data ou mensagem — um presente inesquecível feito sob medida.</p>
+      <div style={{ marginBottom:20 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:10 }}>Personalização</div>
+        <input placeholder="Nome, data ou mensagem..." style={{ width:'100%', fontFamily:"'DM Sans',sans-serif", fontSize:14, padding:'11px 14px', border:'1.5px solid #D8DCE8', borderRadius:10, outline:'none', color:'#1D2235' }} />
+      </div>
+      <button onClick={() => onAddToCart(product)} style={{ width:'100%', background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'16px 0', border:'none', borderRadius:14, cursor:'pointer', marginBottom:10 }}>
+        Adicionar ao carrinho
+      </button>
+      <button style={{ width:'100%', background:'#BBCFEB', color:'#1D2235', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'16px 0', border:'none', borderRadius:14, cursor:'pointer' }}>
+        Comprar agora
+      </button>
+    </div>
+  </div>
+);
+
+const CartScreen = ({ items, onRemove }) => {
+  const total = items.reduce((s,i) => s + i.priceNum * i.qty, 0);
+  return (
+    <div style={{ flex:1, overflowY:'auto', padding:20 }}>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:'#1D2235', marginBottom:20 }}>Carrinho</div>
+      {items.length===0 ? (
+        <div style={{ textAlign:'center', paddingTop:60 }}>
+          <div style={{ fontSize:48, marginBottom:12 }}>🛍</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, color:'#1D2235', marginBottom:6 }}>Carrinho vazio</div>
+          <div style={{ fontSize:14, color:'#6B7494' }}>Adicione presentes incríveis!</div>
+        </div>
+      ) : (
+        <>
+          {items.map((item, i) => (
+            <div key={i} style={{ background:'white', borderRadius:14, padding:14, marginBottom:10, display:'flex', gap:12, boxShadow:'0 1px 4px rgba(29,34,53,0.06)' }}>
+              <div style={{ width:56, height:56, background:'#E4EDF8', borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8AAFD8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:13, fontWeight:600, color:'#1D2235', marginBottom:4 }}>{item.name}</div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500, color:'#1D2235' }}>R$ {(item.priceNum*item.qty).toFixed(2).replace('.',',')}</span>
+                  <button onClick={() => onRemove(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#A8AFCA', fontSize:20 }}>×</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ background:'white', borderRadius:14, padding:16, marginTop:16, boxShadow:'0 1px 4px rgba(29,34,53,0.06)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+              <span style={{ fontSize:13, color:'#6B7494' }}>Subtotal</span>
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500, color:'#1D2235' }}>R$ {total.toFixed(2).replace('.',',')}</span>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
+              <span style={{ fontSize:13, color:'#2E7D6E' }}>Frete grátis ✓</span>
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, color:'#2E7D6E' }}>R$ 0,00</span>
+            </div>
+            <button style={{ width:'100%', background:'#1D2235', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:16, fontWeight:600, padding:'15px 0', border:'none', borderRadius:12, cursor:'pointer' }}>
+              Finalizar pedido · R$ {total.toFixed(2).replace('.',',')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const MobileApp = () => {
+  const [screen, setScreen] = React.useState('home');
+  const [selectedProduct, setSelectedProduct] = React.useState(null);
+  const [cartItems, setCartItems] = React.useState([]);
+  const [activeNav, setActiveNav] = React.useState('home');
+
+  const addToCart = (p) => {
+    setCartItems(prev => {
+      const ex = prev.find(i => i.name===p.name);
+      if (ex) return prev.map(i => i.name===p.name ? {...i, qty:i.qty+1} : i);
+      return [...prev, { name:p.name, priceNum: parseFloat(p.price.replace('R$ ','').replace(',','.')), qty:1 }];
+    });
+    setActiveNav('cart');
+    setScreen('cart');
+  };
+
+  const handleNav = (key) => {
+    setActiveNav(key);
+    if (key==='home') setScreen('home');
+    else if (key==='cart') setScreen('cart');
+    else setScreen(key);
+  };
+
+  const handleProduct = (p) => {
+    setSelectedProduct(p);
+    setScreen('product');
+  };
+
+  return (
+    <div style={{ display:'flex', justifyContent:'center', alignItems:'flex-start' }}>
+      <div className="phone">
+        {/* Status bar */}
+        <div className="status-bar">
+          <span className="status-time">9:41</span>
+          <div className="status-icons">
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#1D2235"><rect x="0" y="4" width="3" height="8" rx="1"/><rect x="4.5" y="2.5" width="3" height="9.5" rx="1"/><rect x="9" y="0.5" width="3" height="11.5" rx="1"/><rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity="0.3"/></svg>
+            <svg width="16" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="#1D2235" strokeOpacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#1D2235"/><path d="M23 4.5v3a2 2 0 0 0 0-3z" fill="#1D2235" fillOpacity="0.4"/></svg>
+          </div>
+        </div>
+
+        {/* Screen */}
+        <div style={{ display:'flex', flexDirection:'column', height:'calc(844px - 48px)' }}>
+          {screen==='home' && <HomeScreen onProduct={handleProduct} onAddToCart={addToCart} />}
+          {screen==='product' && selectedProduct && <ProductScreen product={selectedProduct} onBack={() => { setScreen('home'); setActiveNav('home'); }} onAddToCart={addToCart} />}
+          {screen==='cart' && <CartScreen items={cartItems} onRemove={i => setCartItems(prev => prev.filter((_,j) => j!==i))} />}
+          {screen==='search' && <div style={{ padding:24, textAlign:'center', paddingTop:60 }}><div style={{ fontSize:32, marginBottom:12 }}>🔍</div><div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#1D2235' }}>Buscar produtos</div></div>}
+          {screen==='fav' && <div style={{ padding:24, textAlign:'center', paddingTop:60 }}><div style={{ fontSize:32, marginBottom:12 }}>♥</div><div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#1D2235' }}>Seus favoritos</div></div>}
+          {screen==='account' && <div style={{ padding:24, textAlign:'center', paddingTop:60 }}><div style={{ fontSize:32, marginBottom:12 }}>👤</div><div style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#1D2235' }}>Minha conta</div></div>}
+          <NavBar active={activeNav} onNav={handleNav} cartCount={cartItems.reduce((s,i) => s+i.qty, 0)} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<MobileApp />);
+</script>
+</body>
+</html>

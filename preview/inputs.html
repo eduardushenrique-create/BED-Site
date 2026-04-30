@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: white; font-family: 'DM Sans', sans-serif; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #A8AFCA; margin-bottom: 8px; font-family: monospace; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 13px; font-weight: 500; color: #1D2235; }
+  input { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 14px; border: 1.5px solid #D8DCE8; border-radius: 8px; outline: none; background: white; color: #1D2235; width: 190px; transition: border-color 150ms ease-out; }
+  input:focus { border-color: #8AAFD8; box-shadow: 0 0 0 3px rgba(187,207,235,0.3); }
+  input.err { border-color: #C0392B; }
+  input.ok { border-color: #2E7D6E; }
+  input:disabled { background: #F0F5FB; color: #A8AFCA; cursor: not-allowed; }
+  .hint { font-size: 11px; color: #6B7494; }
+  .hint.err { color: #C0392B; }
+  .hint.ok { color: #2E7D6E; }
+</style>
+</head>
+<body>
+  <div class="label">Estados dos campos</div>
+  <div class="row">
+    <div class="field"><label>Nome</label><input type="text" placeholder="Seu nome"><span class="hint">Campo obrigatório</span></div>
+    <div class="field"><label>E-mail</label><input type="email" value="ana@exemplo.com" class="ok"><span class="hint ok">E-mail válido ✓</span></div>
+    <div class="field"><label>CPF</label><input type="text" value="123.456" class="err"><span class="hint err">CPF inválido</span></div>
+    <div class="field"><label>Cupom</label><input type="text" placeholder="Código do cupom" disabled><span class="hint">Desativado</span></div>
+  </div>
+</body>
+</html>
