@@ -33,14 +33,15 @@ Definidas em `lib/auth.ts:10`. Quem é admin vs cliente é decidido por `OWNER_E
 
 | Fase | Escopo | Tamanho | Status |
 |---|---|---|---|
-| [01 — Conta do cliente (mínimo viável)](phases/01-customer-account-mvp.md) | Header logado + `/meus-pedidos` + detalhe + `/api/me/orders` | 1 PR médio | 📋 planejado |
-| [02 — Dados pessoais e endereços salvos](phases/02-customer-profile-addresses.md) | Editar perfil + CRUD endereços + pré-popular checkout | 1 PR + migração | 📋 planejado |
+| [01 — Conta do cliente (mínimo viável)](phases/01-customer-account-mvp.md) | Header logado + `/meus-pedidos` + detalhe + `/api/me/orders` | 1 PR médio | ✅ entregue (PR #7) |
+| [02 — Dados pessoais e endereços salvos](phases/02-customer-profile-addresses.md) | Editar perfil + CRUD endereços + pré-popular checkout | 1 PR + migração | ✅ entregue (PR #7, junto da Fase 1) |
 | [03 — UX e descoberta](phases/03-ux-discovery.md) | Busca, wishlist, cupom no checkout, esqueci senha | 2-3 PRs | 📋 planejado |
 | [04 — Admin operacional](phases/04-admin-operational.md) | Dashboard, cupons CRUD, drill-down cliente, rastreio | 2 PRs | 📋 planejado |
 | [05 — Compliance + observability](phases/05-compliance-observability.md) | LGPD, Sentry, rate-limit, testes | 1-2 PRs | 📋 planejado |
 
 ## Documentos de apoio
 
+- **🤖 [PLATFORM_SNAPSHOT.md](PLATFORM_SNAPSHOT.md) — snapshot completo da plataforma para colar no ChatGPT** (use este arquivo quando quiser que o ChatGPT proponha novas features alinhadas ao código atual)
 - [Glossário de domínio](glossary.md) — termos do negócio + nome técnico
 - [Padrões de código](coding-standards.md) — estrutura de pastas, naming, tratamento de erros
 - [Modelagem completa do schema](schema-evolution.md) — todas as tabelas atuais + as que serão adicionadas
