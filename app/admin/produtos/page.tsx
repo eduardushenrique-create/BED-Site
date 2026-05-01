@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import { compressImageToDataUrl, ImageUploadError } from '@/lib/image-upload'
+import ProductGalleryEditor from '@/components/admin/ProductGalleryEditor'
 
 interface Product {
   id: string
@@ -353,6 +354,12 @@ export default function AdminProductsPage() {
               </div>
               <Input label="Ou URL da imagem" value={formData.imageUrl} onChange={(event) => { setFormData({ ...formData, imageUrl: event.target.value }); setImagePreview(event.target.value) }} placeholder="https://..." />
             </div>
+
+            {editingId && (
+              <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #EEF1F8' }}>
+                <ProductGalleryEditor productId={editingId} />
+              </div>
+            )}
 
             <div style={{ marginTop: '16px' }}>
               <Input label="Descricao" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} placeholder="Descricao do produto" />
