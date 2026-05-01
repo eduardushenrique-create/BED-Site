@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import BrandLogo from '@/components/BrandLogo'
 
 const navItems = [
   { href: '/admin/pedidos', label: 'Pedidos' },
@@ -15,11 +16,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F2EE' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F0F5FB' }}>
       <aside style={{
-        width: '240px',
-        backgroundColor: '#1C1917',
-        color: 'white',
+        width: '252px',
+        backgroundColor: '#1D2235',
+        color: '#F0F5FB',
         padding: '24px 0',
         flexShrink: 0,
         display: 'flex',
@@ -27,42 +28,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         minHeight: '100vh',
         position: 'sticky',
         top: 0,
+        borderRight: '1px solid rgba(240,245,251,0.08)',
       }}>
         <div style={{ padding: '0 24px', marginBottom: '32px' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: 700, color: '#C8552A' }}>
-            Forma 3D
-          </Link>
-          <span style={{ fontSize: '12px', color: '#A8A29E', display: 'block', marginTop: '4px' }}>
-            Admin
+          <BrandLogo href="/" dark={false} size="md" />
+          <span style={{ fontSize: '12px', color: 'rgba(240,245,251,0.64)', display: 'block', marginTop: '10px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Admin B&D
           </span>
         </div>
 
-        <nav>
-          {navItems.map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                display: 'block',
-                padding: '12px 24px',
-                color: pathname.startsWith(item.href) ? 'white' : '#A8A29E',
-                backgroundColor: pathname.startsWith(item.href) ? '#333' : 'transparent',
-                borderLeft: pathname.startsWith(item.href) ? '3px solid #C8552A' : '3px solid transparent',
-              }}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <nav style={{ display: 'grid', gap: '6px', padding: '0 12px' }}>
+          {navItems.map(item => {
+            const active = pathname.startsWith(item.href)
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                style={{
+                  display: 'block',
+                  padding: '12px 16px',
+                  color: active ? '#F0F5FB' : 'rgba(240,245,251,0.72)',
+                  backgroundColor: active ? 'rgba(187,207,235,0.14)' : 'transparent',
+                  borderLeft: active ? '3px solid #D4849A' : '3px solid transparent',
+                  borderRadius: '0 12px 12px 0',
+                  fontWeight: active ? 700 : 500,
+                }}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
         </nav>
 
         <div style={{ marginTop: 'auto', padding: '24px' }}>
-          <Link href="/" style={{ color: '#A8A29E', fontSize: '14px' }}>
-            ← Voltar para loja
+          <Link href="/" style={{ color: 'rgba(240,245,251,0.72)', fontSize: '14px' }}>
+            Voltar para a loja
           </Link>
         </div>
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, padding: '32px', backgroundColor: '#F5F2EE' }}>
+      <main style={{ flex: 1, minWidth: 0, padding: '32px', backgroundColor: '#F0F5FB' }}>
         <div style={{ width: '100%', maxWidth: '1240px', margin: '0 auto' }}>
           {children}
         </div>

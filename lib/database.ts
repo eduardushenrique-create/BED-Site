@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { readDB, writeDB, Product, Category, Order, Banner, User, WebhookEvent } from '@/lib/localDb'
 
@@ -728,7 +729,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
               amount: data.amount || 0,
               pixQrCode: data.pixQrCodeBase64 || null,
               pixCopyPaste: data.pixCopyPaste || null,
-              rawPayload: data.rawPayload || undefined,
+              rawPayload: data.rawPayload as Prisma.InputJsonValue | undefined,
             },
             update: {
               provider: data.provider,
@@ -737,7 +738,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
               status: data.paymentStatus,
               pixQrCode: data.pixQrCodeBase64 || null,
               pixCopyPaste: data.pixCopyPaste || null,
-              rawPayload: data.rawPayload || undefined,
+              rawPayload: data.rawPayload as Prisma.InputJsonValue | undefined,
             },
           },
         },

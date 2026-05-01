@@ -2,14 +2,17 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
-import { getLocalCatalogProducts } from '@/lib/catalog'
+import { getLocalCatalogProducts, getPublicCatalogCategories } from '@/lib/catalog'
 
 export const dynamic = 'force-dynamic'
 
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
 export default async function Home() {
-  const products = await getLocalCatalogProducts({ featured: true })
+  const [products, categories] = await Promise.all([
+    getLocalCatalogProducts({ featured: true }),
+    getPublicCatalogCategories(),
+  ])
   const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
   const featuredProducts = allProducts.slice(0, 4)
 
@@ -22,10 +25,10 @@ export default async function Home() {
           Categorias
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-          {['Decoração', 'Cozinha', 'Escritório', 'Infantil', 'Pets', 'Casamento', 'Aniversário'].map((cat) => (
+          {categories.map((category) => (
             <Link
-              key={cat}
-              href={`/produtos?categoria=${cat.toLowerCase()}`}
+              key={category.id}
+              href={`/produtos?categoria=${category.slug}`}
               style={{
                 backgroundColor: 'white',
                 padding: '24px',
@@ -37,10 +40,15 @@ export default async function Home() {
                 color: '#1D2235',
               }}
             >
-              <span style={{ fontWeight: 500 }}>{cat}</span>
+              <span style={{ fontWeight: 500 }}>{category.name}</span>
             </Link>
           ))}
         </div>
+        {categories.length === 0 && (
+          <p style={{ marginTop: '20px', textAlign: 'center', color: '#6B7494' }}>
+            Cadastre categorias ativas com produtos publicados para exibi-las aqui.
+          </p>
+        )}
       </section>
 
       <section>
@@ -61,7 +69,9 @@ export default async function Home() {
             </div>
           </>
         ) : (
-          <p style={{ textAlign: 'center', color: '#6B7494' }}>Marque produtos como destaque no admin para exibi-los aqui.</p>
+          <p style={{ textAlign: 'center', color: '#6B7494' }}>
+            Nenhum produto publicado com estoque ou sob encomenda foi encontrado no banco.
+          </p>
         )}
       </section>
     </main>

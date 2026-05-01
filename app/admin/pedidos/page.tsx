@@ -60,7 +60,7 @@ function StatusCard({ label, count, color }: { label: string; count: number; col
   return (
     <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px' }}>
       <span style={{ fontSize: '24px', fontWeight: 700, color }}>{count}</span>
-      <span style={{ fontSize: '12px', color: '#78716C', marginTop: '4px' }}>{label}</span>
+      <span style={{ fontSize: '12px', color: '#6B7494', marginTop: '4px' }}>{label}</span>
     </div>
   )
 }
@@ -340,13 +340,13 @@ export default function AdminOrdersPage() {
       <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700 }}>Pedidos</h1>
-          <p style={{ color: '#78716C' }}>Gerencie os pedidos da loja</p>
+          <p style={{ color: '#6B7494' }}>Gerencie os pedidos da loja</p>
         </div>
-        <button onClick={openCreateModal} style={{ padding: '12px 24px', backgroundColor: '#1C1917', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>+ Novo Pedido</button>
+        <button onClick={openCreateModal} style={{ padding: '12px 24px', backgroundColor: '#1D2235', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>+ Novo Pedido</button>
       </header>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <StatusCard label="Total" count={statusCounts.total} color="#1C1917" />
+        <StatusCard label="Total" count={statusCounts.total} color="#1D2235" />
         <StatusCard label="Pendentes" count={statusCounts.pending} color="#F59E0B" />
         <StatusCard label="Pagos" count={statusCounts.paid} color="#10B981" />
         <StatusCard label="Produção" count={statusCounts.production} color="#3B82F6" />
@@ -358,11 +358,11 @@ export default function AdminOrdersPage() {
         <div style={{ flex: 1, minWidth: '250px' }}>
           <Input placeholder="Buscar por cliente, e-mail ou pedido..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
-        <select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #E8E2DA', fontSize: '14px' }}>
+        <select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}>
           <option value="">Todos Status</option>
           {fulfillmentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #E8E2DA', fontSize: '14px' }}>
+        <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}>
           <option value="">Todos Pagamentos</option>
           {paymentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
@@ -370,14 +370,14 @@ export default function AdminOrdersPage() {
 
       {orders.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '48px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
-          <p style={{ color: '#78716C', marginBottom: '16px' }}>Nenhum pedido encontrado</p>
+          <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhum pedido encontrado</p>
           <Button onClick={openCreateModal}>+ Criar Primeiro Pedido</Button>
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#F5F2EE', borderBottom: '1px solid #E8E2DA' }}>
+              <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Pedido</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Cliente</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Total</th>
@@ -389,11 +389,11 @@ export default function AdminOrdersPage() {
             </thead>
             <tbody>
               {filteredOrders.map(order => (
-                <tr key={order.id} style={{ borderBottom: '1px solid #E8E2DA' }}>
+                <tr key={order.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
                   <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px' }}>{order.orderNumber}</td>
                   <td style={{ padding: '16px' }}>
                     <div style={{ fontWeight: 500 }}>{order.customerName}</div>
-                    <div style={{ fontSize: '12px', color: '#78716C' }}>{order.customerEmail}</div>
+                    <div style={{ fontSize: '12px', color: '#6B7494' }}>{order.customerEmail}</div>
                   </td>
                   <td style={{ padding: '16px', fontWeight: 600 }}>R$ {order.total.toFixed(2).replace('.', ',')}</td>
                   <td style={{ padding: '16px' }}>
@@ -406,9 +406,9 @@ export default function AdminOrdersPage() {
                       {fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.label || order.fulfillmentStatus}
                     </span>
                   </td>
-                  <td style={{ padding: '16px', fontSize: '13px', color: '#78716C' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
+                  <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
                   <td style={{ padding: '16px' }}>
-                    <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #E8E2DA', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
+                    <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
                   </td>
                 </tr>
               ))}
@@ -424,7 +424,7 @@ export default function AdminOrdersPage() {
             
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Itens do Pedido</h3>
-              <div style={{ border: '1px solid #E8E2DA', borderRadius: '10px', padding: '12px', backgroundColor: '#FFFEFC' }}>
+              <div style={{ border: '1px solid #D8DCE8', borderRadius: '10px', padding: '12px', backgroundColor: '#FFFEFC' }}>
                 <Input
                   placeholder="Filtrar produtos pelo nome..."
                   value={searchProduct}
@@ -442,24 +442,24 @@ export default function AdminOrdersPage() {
                           style={{
                             padding: '12px',
                             borderRadius: '8px',
-                            border: selected ? '1px solid #C8552A' : '1px solid #E8E2DA',
-                            backgroundColor: selected ? '#C8552A12' : 'white',
+                            border: selected ? '1px solid #D4849A' : '1px solid #D8DCE8',
+                            backgroundColor: selected ? '#D4849A12' : 'white',
                             cursor: 'pointer',
                             textAlign: 'left',
                           }}
                         >
                           <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
-                          <span style={{ display: 'block', color: '#78716C', fontSize: '13px', marginTop: '2px' }}>
+                          <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
                             R$ {product.price.toFixed(2).replace('.', ',')} {product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}
                           </span>
-                          <span style={{ display: 'block', color: '#C8552A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
+                          <span style={{ display: 'block', color: '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
                             {selected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
                           </span>
                         </button>
                       )
                     })
                   ) : (
-                    <div style={{ padding: '16px', color: '#78716C', textAlign: 'center', gridColumn: '1 / -1' }}>
+                    <div style={{ padding: '16px', color: '#6B7494', textAlign: 'center', gridColumn: '1 / -1' }}>
                       Nenhum produto disponivel para este filtro.
                     </div>
                   )}
@@ -468,21 +468,21 @@ export default function AdminOrdersPage() {
               {newOrderItems.length > 0 && (
                 <div style={{ marginTop: '12px' }}>
                   {newOrderItems.map(item => (
-                    <div key={item.productId} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#F5F2EE', borderRadius: '8px', marginBottom: '8px' }}>
+                    <div key={item.productId} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px', marginBottom: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span style={{ flex: 1, fontWeight: 500 }}>{item.productName}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #E8E2DA', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>−</button>
+                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>−</button>
                           <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
-                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #E8E2DA', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>+</button>
+                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>+</button>
                         </div>
                         <span style={{ fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</span>
                         <button type="button" onClick={() => handleRemoveItem(item.productId)} style={{ width: '32px', height: '32px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '4px', cursor: 'pointer', color: '#EF4444', fontSize: '16px' }}>×</button>
                       </div>
-                      <input type="text" placeholder="Observações (ex:/cor gravado, cor verde, etc)" value={item.observation || ''} onChange={(e) => handleUpdateObservation(item.productId, e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #E8E2DA', fontSize: '14px' }} />
+                      <input type="text" placeholder="Observações (ex:/cor gravado, cor verde, etc)" value={item.observation || ''} onChange={(e) => handleUpdateObservation(item.productId, e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', fontSize: '14px' }} />
                     </div>
                   ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', fontWeight: 700, fontSize: '18px', borderTop: '2px solid #E8E2DA', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', fontWeight: 700, fontSize: '18px', borderTop: '2px solid #D8DCE8', marginTop: '12px' }}>
                     <span>Total:</span>
                     <span>R$ {orderSubtotal.toFixed(2).replace('.', ',')}</span>
                   </div>
@@ -504,16 +504,16 @@ export default function AdminOrdersPage() {
                     }} 
                   />
                   {showCustomerDropdown && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #E8E2DA', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                     {foundCustomers.length > 0 ? (
                       foundCustomers.map(customer => (
-                        <div key={customer.id} onClick={() => handleSelectCustomer(customer)} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #F5F2EE' }}>
+                        <div key={customer.id} onClick={() => handleSelectCustomer(customer)} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #F0F5FB' }}>
                           <div style={{ fontWeight: 500 }}>{customer.name}</div>
-                          <div style={{ fontSize: '12px', color: '#78716C' }}>{customer.email}</div>
+                          <div style={{ fontSize: '12px', color: '#6B7494' }}>{customer.email}</div>
                         </div>
                       ))
                     ) : searchCustomer.length >= 2 && (
-                      <div onClick={handleCreateNewCustomer} style={{ padding: '12px 16px', cursor: 'pointer', backgroundColor: '#F5F2EE', fontWeight: 500 }}>
+                      <div onClick={handleCreateNewCustomer} style={{ padding: '12px 16px', cursor: 'pointer', backgroundColor: '#F0F5FB', fontWeight: 500 }}>
                         + Criar novo cliente: {searchCustomer}
                       </div>
                     )}
@@ -538,8 +538,8 @@ export default function AdminOrdersPage() {
               <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
             </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowAddModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #E8E2DA', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleCreateOrder} style={{ padding: '10px 20px', backgroundColor: '#1C1917', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', fontWeight: 500 }}>Criar Pedido</button>
+              <button onClick={() => setShowAddModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleCreateOrder} style={{ padding: '10px 20px', backgroundColor: '#1D2235', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', fontWeight: 500 }}>Criar Pedido</button>
             </div>
           </div>
         </div>
@@ -547,3 +547,4 @@ export default function AdminOrdersPage() {
     </div>
   )
 }
+

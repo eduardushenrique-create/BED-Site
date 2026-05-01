@@ -44,7 +44,7 @@ export default function AdminBannersPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700 }}>Banners</h1>
-          <p style={{ color: '#78716C' }}>Gerencie os banners da homepage</p>
+          <p style={{ color: '#6B7494' }}>Gerencie os banners da homepage</p>
         </div>
         <Link href="/admin/banners/novo">
           <Button>+ Novo Banner</Button>
@@ -59,7 +59,7 @@ export default function AdminBannersPage() {
           textAlign: 'center',
           boxShadow: '0 1px 3px rgba(0,0,0,0.07)' 
         }}>
-          <p style={{ fontSize: '18px', color: '#78716C', marginBottom: '24px' }}>
+          <p style={{ fontSize: '18px', color: '#6B7494', marginBottom: '24px' }}>
             Nenhum banner encontrado
           </p>
           <Link href="/admin/banners/novo">
@@ -103,11 +103,11 @@ export default function AdminBannersPage() {
               <div style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>{banner.title}</h3>
                 {banner.subtitle && (
-                  <p style={{ fontSize: '14px', color: '#78716C', marginBottom: '12px' }}>
+                  <p style={{ fontSize: '14px', color: '#6B7494', marginBottom: '12px' }}>
                     {banner.subtitle}
                   </p>
                 )}
-                <div style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#78716C', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
                   <span>CTA: {banner.ctaText || 'Nenhum'}</span>
                   <span>|</span>
                   <span>Link: {banner.ctaLink || 'Nenhum'}</span>
@@ -118,7 +118,7 @@ export default function AdminBannersPage() {
                     style={{
                       padding: '8px 16px',
                       borderRadius: '6px',
-                      border: '1px solid #E8E2DA',
+                      border: '1px solid #D8DCE8',
                       backgroundColor: 'white',
                       cursor: 'pointer',
                       fontSize: '13px',
@@ -131,7 +131,7 @@ export default function AdminBannersPage() {
                     style={{
                       padding: '8px 16px',
                       borderRadius: '6px',
-                      border: '1px solid #E8E2DA',
+                      border: '1px solid #D8DCE8',
                       backgroundColor: 'white',
                       cursor: 'pointer',
                       fontSize: '13px',

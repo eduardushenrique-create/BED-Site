@@ -103,7 +103,7 @@ export default function AdminClientesPage() {
       <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700 }}>Clientes</h1>
-          <p style={{ color: '#78716C' }}>Gerencie os clientes da loja</p>
+          <p style={{ color: '#6B7494' }}>Gerencie os clientes da loja</p>
         </div>
         <Button onClick={() => { setFormError(''); setShowCreateModal(true) }}>
           + Novo Cliente
@@ -120,14 +120,14 @@ export default function AdminClientesPage() {
 
       {users.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '48px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
-          <p style={{ color: '#78716C', marginBottom: '16px' }}>Nenhum cliente encontrado</p>
+          <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhum cliente encontrado</p>
           <Button onClick={() => { setFormError(''); setShowCreateModal(true) }}>+ Criar primeiro cliente</Button>
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#F5F2EE', borderBottom: '1px solid #E8E2DA' }}>
+              <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Nome</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>E-mail</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Telefone</th>
@@ -137,19 +137,19 @@ export default function AdminClientesPage() {
             </thead>
             <tbody>
               {filteredUsers.map(user => (
-                <tr key={user.id} style={{ borderBottom: '1px solid #E8E2DA' }}>
+                <tr key={user.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
                   <td style={{ padding: '16px' }}>
                     <div style={{ fontWeight: 500 }}>{user.name}</div>
                   </td>
-                  <td style={{ padding: '16px', color: '#78716C' }}>{user.email}</td>
-                  <td style={{ padding: '16px', color: '#78716C' }}>{user.phone || '-'}</td>
-                  <td style={{ padding: '16px', fontSize: '13px', color: '#78716C' }}>
+                  <td style={{ padding: '16px', color: '#6B7494' }}>{user.email}</td>
+                  <td style={{ padding: '16px', color: '#6B7494' }}>{user.phone || '-'}</td>
+                  <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>
                     {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                   </td>
                   <td style={{ padding: '16px' }}>
                     <Link 
                       href={`/admin/clientes/${user.id}`} 
-                      style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #E8E2DA', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}
+                      style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}
                     >
                       Ver detalhes
                     </Link>
@@ -161,7 +161,7 @@ export default function AdminClientesPage() {
         </div>
       )}
 
-      <div style={{ marginTop: '24px', color: '#78716C', fontSize: '14px' }}>
+      <div style={{ marginTop: '24px', color: '#6B7494', fontSize: '14px' }}>
         Total de clientes: {filteredUsers.length}
       </div>
 
@@ -169,7 +169,7 @@ export default function AdminClientesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', width: '100%', maxWidth: '520px', boxShadow: '0 8px 40px rgba(0,0,0,0.14)' }}>
             <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>Novo Cliente</h2>
-            <p style={{ color: '#78716C', marginBottom: '24px' }}>Cadastre um cliente para pedidos manuais e acompanhamento no admin.</p>
+            <p style={{ color: '#6B7494', marginBottom: '24px' }}>Cadastre um cliente para pedidos manuais e acompanhamento no admin.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <Input
@@ -196,7 +196,7 @@ export default function AdminClientesPage() {
             </div>
 
             {formError && (
-              <p style={{ color: '#C8552A', fontSize: '14px', marginTop: '16px' }}>{formError}</p>
+              <p style={{ color: '#D4849A', fontSize: '14px', marginTop: '16px' }}>{formError}</p>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px', flexWrap: 'wrap' }}>
@@ -219,3 +219,4 @@ export default function AdminClientesPage() {
     </div>
   )
 }
+

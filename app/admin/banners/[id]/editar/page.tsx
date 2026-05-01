@@ -71,7 +71,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
       <div style={{ marginBottom: '24px' }}>
         <Link 
           href="/admin/banners" 
-          style={{ color: '#78716C', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          style={{ color: '#6B7494', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
         >
           ← Voltar aos banners
         </Link>
@@ -80,7 +80,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>Editar Banner</h1>
-          <p style={{ color: '#78716C', marginBottom: '32px' }}>Altere os dados do banner</p>
+          <p style={{ color: '#6B7494', marginBottom: '32px' }}>Altere os dados do banner</p>
 
           <form onSubmit={handleSubmit}>
             <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
@@ -122,7 +122,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
                   placeholder="/personalizados"
                 />
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: '#F5F2EE', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
                   <input
                     type="checkbox"
                     id="isActive"
@@ -153,8 +153,8 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
             height: '300px', 
             borderRadius: '12px', 
             overflow: 'hidden',
-            backgroundColor: '#E8E2DA',
-            border: '1px solid #E8E2DA'
+            backgroundColor: '#D8DCE8',
+            border: '1px solid #D8DCE8'
           }}>
             {formData.imageUrl && !previewError ? (
               <>
@@ -196,7 +196,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
                   {formData.ctaText && (
                     <button style={{
                       padding: '10px 20px',
-                      backgroundColor: '#C8552A',
+                      backgroundColor: '#D4849A',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
@@ -210,7 +210,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
                 </div>
               </>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#78716C' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6B7494' }}>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ fontSize: '14px', marginBottom: '8px' }}>Adicione uma URL de imagem para ver o preview</p>
                   <p style={{ fontSize: '12px' }}>Tamanho recomendado: 1200x600px</p>

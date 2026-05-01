@@ -1,6 +1,10 @@
 import prisma from './prisma'
 
 async function seed() {
+  if (!prisma) {
+    throw new Error('DATABASE_URL nao configurado para seed.')
+  }
+
   console.log('Starting database seed...')
 
   const categories = [
@@ -123,5 +127,7 @@ seed()
     process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect()
+    if (prisma) {
+      await prisma.$disconnect()
+    }
   })
