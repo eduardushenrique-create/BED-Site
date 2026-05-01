@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic'
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
 export default async function Home() {
-  const featuredProducts: ProductCardProduct[] = (
-    await getLocalCatalogProducts({ featured: true })
-  ).slice(0, 4)
+  const products = await getLocalCatalogProducts({ featured: true })
+  const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
+  const featuredProducts = allProducts.slice(0, 4)
 
   return (
     <main className="container" style={{ paddingTop: '32px', paddingBottom: '64px' }}>

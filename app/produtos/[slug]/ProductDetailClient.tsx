@@ -8,10 +8,19 @@ import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types'
 
 interface ProductDetailClientProps {
-  product: Product
+  product: Product | null | undefined
 }
 
 export default function ProductDetailClient({ product }: ProductDetailClientProps) {
+  if (!product) {
+    return (
+      <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px', textAlign: 'center' }}>
+        <h1>Produto não encontrado</h1>
+        <p style={{ color: '#78716C' }}>Este produto não está disponível.</p>
+      </main>
+    )
+  }
+
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState(product.variants[0]?.id || null)
   const [quantity, setQuantity] = useState(1)

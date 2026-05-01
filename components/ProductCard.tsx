@@ -30,7 +30,11 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const mainImage = product.images[0]
+  if (!product) {
+    return null
+  }
+
+  const mainImage = product.images?.[0]
   const hasDiscount = product.compareAtPrice && product.compareAtPrice > product.price
   const discountPercent = hasDiscount && product.compareAtPrice
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
