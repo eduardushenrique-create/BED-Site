@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentDetails, verifyWebhookSignature } from '@/lib/mercadopago'
 import { ensureProductionTasksForOrder, getOrderByNumber, registerWebhookEvent, updateOrderPaymentByNumber, updateWebhookEvent } from '@/lib/database'
 import { mapMercadoPagoStatus, resolvePaymentTransition } from '@/lib/payment'
+import { captureException } from '@/lib/observability'
 
 type MercadoPagoWebhookPayment = {
   payment_method_id?: string
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Webhook error:', error)
+    captureException(error, { context: 'webhook.mercadopago', detail: 'POST handler failed' })
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }
@@ -184,7 +185,11 @@ async function handlePaymentUpdate(input: {
       const result = await ensureProductionTasksForOrder(order.id)
       console.info(`[webhook] production tasks ensured for ${order.orderNumber}: created=${result.created}`)
     } catch (err) {
-      console.error(`[webhook] failed to ensure production tasks for ${order.orderNumber}:`, err)
+      captureException(err, {
+        context: 'webhook.mercadopago',
+        detail: 'ensureProductionTasksForOrder failed',
+        orderNumber: order.orderNumber,
+      })
     }
   }
 }

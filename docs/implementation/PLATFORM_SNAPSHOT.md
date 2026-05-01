@@ -500,7 +500,7 @@ export async function GET(request: NextRequest) {
 - ❌ Banner de cookies LGPD
 - ❌ "Excluir minha conta" (anonimização)
 - ❌ "Exportar meus dados" (LGPD)
-- ❌ Sentry / observability
+- ✅ Sentry / observability (DSN-opcional — sem DSN o app funciona normal; com DSN setado começa a reportar automaticamente). Helpers `captureException`/`captureMessage` em `lib/observability.ts`. Adotado em webhook MP, `lib/mercadopago.ts`, `app/api/orders` e `app/api/producao/[id]`. PII scrub best-effort em `lib/sentry-scrub.ts`. Smoke test admin em `GET /api/admin/sentry-test?type=error|message`. Setup do stakeholder em `docs/implementation/setup-sentry.md`.
 - ❌ Rate limit nos demais endpoints sensíveis (Upstash Redis)
 - ❌ Captcha (Turnstile)
 - ❌ Logs estruturados (pino)

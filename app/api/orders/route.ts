@@ -10,6 +10,7 @@ import { getLocalCatalogProducts } from '@/lib/catalog'
 import { calculateShipping, SHIPPING_CONFIG } from '@/lib/shipping'
 import { createPaymentForOrder, mapMercadoPagoStatus } from '@/lib/payment'
 import { validateCEP, validateCPF, validateEmail } from '@/lib/validation'
+import { captureException } from '@/lib/observability'
 
 interface OrderItem {
   productId: string
@@ -271,7 +272,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
-    console.error('Error creating order:', error)
+    captureException(error, { context: 'api.orders', detail: 'POST createOrder failed' })
     return NextResponse.json(
       { error: 'Erro ao criar pedido' },
       { status: 500 }
