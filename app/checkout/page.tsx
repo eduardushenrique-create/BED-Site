@@ -29,6 +29,20 @@ type ShippingOption = {
   company: { name: string; picture: string }
 }
 
+type SavedAddress = {
+  id: string
+  label?: string
+  recipient: string
+  zipCode: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+  isDefault: boolean
+}
+
 type FormErrors = Record<string, string>
 
 const initialForm: FormData = {
@@ -56,10 +70,86 @@ export default function CheckoutPage() {
   const [cepLoading, setCepLoading] = useState(false)
   const [shippingLoading, setShippingLoading] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
 
   useEffect(() => {
     if (items.length === 0) router.push('/produtos')
   }, [items.length, router])
+
+  useEffect(() => {
+    let cancelled = false
+    async function preload() {
+      const [meRes, addrRes] = await Promise.all([
+        fetch('/api/me', { cache: 'no-store' }),
+        fetch('/api/me/addresses', { cache: 'no-store' }),
+      ])
+      if (cancelled) return
+
+      if (meRes.ok) {
+        const me = await meRes.json()
+        setFormData(prev => ({
+          ...prev,
+          customerName: prev.customerName || me.name || '',
+          customerEmail: prev.customerEmail || me.email || '',
+          customerPhone: prev.customerPhone || (me.phone ? formatPhone(me.phone) : ''),
+          customerCpf: prev.customerCpf || (me.cpf ? formatCPF(me.cpf) : ''),
+        }))
+      }
+
+      if (addrRes.ok) {
+        const list: SavedAddress[] = await addrRes.json()
+        if (!Array.isArray(list)) return
+        setSavedAddresses(list)
+        const def = list.find(a => a.isDefault) || list[0]
+        if (def) {
+          setSelectedAddressId(def.id)
+          setFormData(prev => ({
+            ...prev,
+            zipCode: formatCEP(def.zipCode),
+            street: def.street,
+            number: def.number,
+            complement: def.complement || '',
+            neighborhood: def.neighborhood,
+            city: def.city,
+            state: def.state,
+          }))
+        }
+      }
+    }
+    preload()
+    return () => { cancelled = true }
+  }, [])
+
+  function handleAddressSelect(id: string) {
+    setSelectedAddressId(id)
+    if (id === 'new') {
+      setFormData(prev => ({
+        ...prev,
+        zipCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+      }))
+      return
+    }
+    const addr = savedAddresses.find(a => a.id === id)
+    if (addr) {
+      setFormData(prev => ({
+        ...prev,
+        zipCode: formatCEP(addr.zipCode),
+        street: addr.street,
+        number: addr.number,
+        complement: addr.complement || '',
+        neighborhood: addr.neighborhood,
+        city: addr.city,
+        state: addr.state,
+      }))
+    }
+  }
 
   useEffect(() => {
     const zip = formData.zipCode.replace(/\D/g, '')
@@ -253,6 +343,23 @@ export default function CheckoutPage() {
 
               <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
                 <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '20px', color: '#1D2235' }}>Endereço de entrega</h2>
+                {savedAddresses.length > 0 && (
+                  <div style={{ display: 'grid', gap: '8px', marginBottom: '20px', padding: '14px', background: '#F0F5FB', borderRadius: '10px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>Usar endereço salvo</label>
+                    <select
+                      value={selectedAddressId}
+                      onChange={(e) => handleAddressSelect(e.target.value)}
+                      style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235' }}
+                    >
+                      {savedAddresses.map(addr => (
+                        <option key={addr.id} value={addr.id}>
+                          {addr.label || addr.recipient} — {addr.street}, {addr.number} ({addr.city}-{addr.state}){addr.isDefault ? ' · padrão' : ''}
+                        </option>
+                      ))}
+                      <option value="new">Usar outro endereço (preencher manualmente)</option>
+                    </select>
+                  </div>
+                )}
                 <div style={{ display: 'grid', gap: '16px' }}>
                   <Input label={cepLoading ? 'CEP * (consultando...)' : 'CEP *'} name="zipCode" value={formData.zipCode} onChange={handleInputChange} error={errors.zipCode} placeholder="00000-000" required aria-required="true" />
                   <Input label="Rua/Avenida *" name="street" value={formData.street} onChange={handleInputChange} error={errors.street} required aria-required="true" />
