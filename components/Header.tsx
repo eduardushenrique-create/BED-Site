@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import BrandLogo from '@/components/BrandLogo'
+import SearchOverlay from '@/components/SearchOverlay'
 
 const navLinks = [
   { href: '/', label: 'Início' },
@@ -18,6 +19,7 @@ const navLinks = [
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const { itemCount, setIsOpen } = useCart()
@@ -115,6 +117,7 @@ export default function Header() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
+            onClick={() => setSearchOpen(true)}
             style={{
               background: 'none',
               border: 'none',
@@ -124,6 +127,7 @@ export default function Header() {
               borderRadius: '8px',
             }}
             aria-label="Buscar"
+            aria-expanded={searchOpen}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
               <circle cx="11" cy="11" r="8" />
@@ -326,6 +330,8 @@ export default function Header() {
           ))}
         </nav>
       )}
+
+      <SearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <style>{`
         @media (min-width: 768px) {
