@@ -23,6 +23,7 @@
 | `CartItem` | id, cartId, productId, variantId, quantity, unitPrice | ← Cart, ← Product (NÃO USADO HOJE) |
 | `Coupon` | id, code (uniq), type, value, minSubtotal, startsAt, endsAt, usageLimit, usedCount, isActive | (USO PLANEJADO FASE 3) |
 | `AuthCode` | id, email, codeHash, ipHash, attempts, expiresAt, usedAt | — |
+| `RateLimitBucket` | key (PK), count, resetAt, updatedAt | — (bucket compartilhado para `request-code`, `verify-code`, `password-login`) |
 | `WebhookEvent` | id, provider, deliveryKey (uniq), topic, status, payloadHash | — |
 
 ## Fase 1 — Conta cliente MVP

@@ -300,6 +300,15 @@ model AuthCode {
   @@index([email, usedAt, expiresAt])
 }
 
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
 model WebhookEvent {
   id          String    @id @default(cuid())
   provider    String

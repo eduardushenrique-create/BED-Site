@@ -166,6 +166,20 @@ export type ProductionSettingsRecord = {
   updatedAt: string
 }
 
+export type CouponRecord = {
+  id: string
+  code: string
+  type: 'fixed' | 'percentage'
+  value: number
+  minSubtotal: number | null
+  startsAt: string | null
+  endsAt: string | null
+  usageLimit: number | null
+  usedCount: number
+  isActive: boolean
+  createdAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
@@ -177,6 +191,7 @@ export type Database = {
   productionTasks: ProductionTaskRecord[]
   productionLogs: ProductionLogRecord[]
   productionSettings: ProductionSettingsRecord[]
+  coupons: CouponRecord[]
 }
 
 const defaultData: Database = {
@@ -210,6 +225,7 @@ const defaultData: Database = {
       updatedAt: new Date(0).toISOString(),
     },
   ],
+  coupons: [],
 }
 
 function ensureDir() {
@@ -244,6 +260,7 @@ export function readDB(): Database {
         Array.isArray(parsed.productionSettings) && parsed.productionSettings.length > 0
           ? parsed.productionSettings
           : defaultData.productionSettings,
+      coupons: parsed.coupons || [],
     }
   } catch {
     return defaultData

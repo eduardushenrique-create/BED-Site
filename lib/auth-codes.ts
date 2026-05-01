@@ -48,7 +48,12 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
 }
 
-function assertRateLimit(email: string, ip: string) {
+/**
+ * @deprecated Rate limit moved to `lib/rate-limit.ts` (`consumeRateLimit`),
+ * applied at the route level. Kept only for backwards compatibility with
+ * the legacy fs-based JSON store; no longer invoked from the auth flow.
+ */
+function assertRateLimitLegacy(email: string, ip: string) {
   const store = readStore()
   const now = Date.now()
   const key = hash(`${normalizeEmail(email)}:${ip}`)
@@ -64,6 +69,7 @@ function assertRateLimit(email: string, ip: string) {
 
   writeStore(store)
 }
+void assertRateLimitLegacy
 
 export function generateAccessCode() {
   return crypto.randomInt(100000, 999999).toString()
@@ -71,7 +77,6 @@ export function generateAccessCode() {
 
 export async function storeAccessCode(emailInput: string, code: string, ip: string) {
   const email = normalizeEmail(emailInput)
-  assertRateLimit(email, ip)
 
   if (hasDatabase && prisma?.authCode) {
     await prisma.authCode.create({

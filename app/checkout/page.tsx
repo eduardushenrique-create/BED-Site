@@ -72,6 +72,10 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
+  const [couponInput, setCouponInput] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
+  const [couponData, setCouponData] = useState<{ code: string; discount: number; type: 'fixed' | 'percentage'; value: number } | null>(null)
 
   useEffect(() => {
     if (items.length === 0) router.push('/produtos')
@@ -263,6 +267,70 @@ export default function CheckoutPage() {
     return Object.keys(nextErrors).length === 0
   }
 
+  async function applyCoupon() {
+    const code = couponInput.trim()
+    if (!code) {
+      setCouponError('Informe um código de cupom.')
+      return
+    }
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const response = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal }),
+      })
+      const data = await response.json()
+      if (!data.valid) {
+        setCouponData(null)
+        setCouponError(data.error || 'Cupom inválido.')
+        return
+      }
+      setCouponData({ code: data.code, discount: Number(data.discount) || 0, type: data.type, value: Number(data.value) || 0 })
+      setCouponInput(data.code)
+    } catch {
+      setCouponError('Erro ao validar cupom. Tente novamente.')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  function removeCoupon() {
+    setCouponData(null)
+    setCouponInput('')
+    setCouponError('')
+  }
+
+  // Revalidate (or auto-remove) coupon when subtotal changes (item add/remove).
+  useEffect(() => {
+    if (!couponData) return
+    let cancelled = false
+    async function revalidate() {
+      try {
+        const response = await fetch('/api/coupons/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: couponData!.code, subtotal }),
+        })
+        const data = await response.json()
+        if (cancelled) return
+        if (!data.valid) {
+          setCouponData(null)
+          setCouponError(data.error || 'Cupom não é mais aplicável.')
+          return
+        }
+        setCouponData(prev =>
+          prev ? { ...prev, discount: Number(data.discount) || 0, type: data.type, value: Number(data.value) || 0 } : prev,
+        )
+      } catch {
+        // keep current state on transient errors
+      }
+    }
+    revalidate()
+    return () => { cancelled = true }
+  }, [subtotal, couponData?.code])
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!validateForm()) return
@@ -285,6 +353,7 @@ export default function CheckoutPage() {
           })),
           shippingMethod: selectedShipping,
           paymentMethod,
+          couponCode: couponData?.code || undefined,
         }),
       })
       const data = await response.json()
@@ -309,7 +378,8 @@ export default function CheckoutPage() {
 
   const selectedShippingOption = shippingOptions.find(option => option.id === selectedShipping)
   const shippingTotal = selectedShippingOption?.price || 0
-  const total = subtotal + shippingTotal
+  const couponDiscount = couponData?.discount || 0
+  const total = Math.max(0, subtotal + shippingTotal - couponDiscount)
 
   if (items.length === 0) return null
 
@@ -453,11 +523,64 @@ export default function CheckoutPage() {
                 <div style={{ display: 'grid', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Subtotal</span><span style={{ color: '#1D2235' }}>R$ {subtotal.toFixed(2).replace('.', ',')}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Frete</span><span style={{ color: '#1D2235' }}>{selectedShipping ? `R$ ${shippingTotal.toFixed(2).replace('.', ',')}` : '-'}</span></div>
+                  {couponData && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#1D7A72' }}>Desconto ({couponData.code})</span>
+                      <span style={{ color: '#1D7A72' }}>-R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 700, paddingTop: '12px', borderTop: '1px solid #E3E9F4', color: '#1D2235' }}>
                     <span>Total estimado</span><span>R$ {total.toFixed(2).replace('.', ',')}</span>
                   </div>
                   <p style={{ color: '#6B7494', fontSize: '13px', margin: 0 }}>Os totais são recalculados no servidor antes da criação do pedido.</p>
                 </div>
+
+                <div style={{ marginTop: '20px', padding: '14px', background: '#F0F5FB', borderRadius: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1D2235', marginBottom: '8px' }}>
+                    Cupom de desconto
+                  </label>
+                  {couponData ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ fontSize: '14px', color: '#1D7A72', fontWeight: 600 }}>
+                        {couponData.code} aplicado
+                        <div style={{ fontSize: '12px', color: '#6B7494', fontWeight: 400 }}>
+                          {couponData.type === 'percentage'
+                            ? `${couponData.value}% de desconto`
+                            : `R$ ${couponData.value.toFixed(2).replace('.', ',')} de desconto`}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeCoupon}
+                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235', cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => { setCouponInput(e.target.value); if (couponError) setCouponError('') }}
+                        placeholder="Ex: BEMVINDO10"
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235', textTransform: 'uppercase' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={applyCoupon}
+                        disabled={couponLoading}
+                        style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #1D2235', background: '#1D2235', color: 'white', cursor: couponLoading ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, opacity: couponLoading ? 0.7 : 1 }}
+                      >
+                        {couponLoading ? '...' : 'Aplicar'}
+                      </button>
+                    </div>
+                  )}
+                  {couponError && (
+                    <p role="alert" style={{ color: '#A3526A', fontSize: '13px', margin: '8px 0 0 0' }}>{couponError}</p>
+                  )}
+                </div>
+
                 {errors.submit && <p role="alert" style={{ color: '#A3526A', marginTop: '16px' }}>{errors.submit}</p>}
                 <div style={{ marginTop: '24px' }}>
                   <Button type="submit" fullWidth disabled={loading || shippingLoading}>
