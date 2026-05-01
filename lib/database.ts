@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { readDB, writeDB, Product, Category, Order, Banner, User, WebhookEvent } from '@/lib/localDb'
+import { readDB, writeDB, Product, Category, Order, Banner, User, CustomerAddress, WebhookEvent } from '@/lib/localDb'
 
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
@@ -68,9 +68,30 @@ function serializeCustomer(customer: any): User {
     name: customer.name,
     email: customer.email,
     phone: customer.phone || undefined,
+    cpf: customer.cpf || undefined,
     isVerified: customer.isVerified,
     createdAt: customer.createdAt instanceof Date ? customer.createdAt.toISOString() : customer.createdAt,
     updatedAt: customer.updatedAt instanceof Date ? customer.updatedAt.toISOString() : customer.updatedAt,
+  }
+}
+
+function serializeAddress(address: any): CustomerAddress {
+  return {
+    id: address.id,
+    customerId: address.customerId,
+    label: address.label || undefined,
+    recipient: address.recipient,
+    zipCode: address.zipCode,
+    street: address.street,
+    number: address.number,
+    complement: address.complement || undefined,
+    neighborhood: address.neighborhood,
+    city: address.city,
+    state: address.state,
+    country: address.country,
+    isDefault: address.isDefault,
+    createdAt: address.createdAt instanceof Date ? address.createdAt.toISOString() : address.createdAt,
+    updatedAt: address.updatedAt instanceof Date ? address.updatedAt.toISOString() : address.updatedAt,
   }
 }
 
@@ -434,7 +455,7 @@ export async function updateCustomer(id: string, data: Partial<User>) {
   try {
     return serializeCustomer(await prisma.customer.update({
       where: { id },
-      data: { name: data.name, email: data.email, phone: data.phone },
+      data: { name: data.name, email: data.email, phone: data.phone, cpf: data.cpf },
     }))
   } catch (error) {
     console.error('[database] updateCustomer Prisma failed, using fallback:', error)
@@ -444,6 +465,295 @@ export async function updateCustomer(id: string, data: Partial<User>) {
     db.users[index] = { ...db.users[index], ...data, updatedAt: new Date().toISOString() }
     writeDB(db)
     return db.users[index]
+  }
+}
+
+export async function getCustomerById(id: string): Promise<User | null> {
+  if (!hasDatabase || !prisma?.customer) {
+    return readDB().users.find(user => user.id === id) || null
+  }
+  try {
+    const customer = await prisma.customer.findUnique({ where: { id } })
+    return customer ? serializeCustomer(customer) : null
+  } catch (error) {
+    console.error('[database] getCustomerById Prisma failed, using fallback:', error)
+    return readDB().users.find(user => user.id === id) || null
+  }
+}
+
+export async function getCustomerByEmail(email: string): Promise<User | null> {
+  const normalized = email.trim().toLowerCase()
+  if (!hasDatabase || !prisma?.customer) {
+    return readDB().users.find(user => user.email.toLowerCase() === normalized) || null
+  }
+  try {
+    const customer = await prisma.customer.findUnique({ where: { email: normalized } })
+    return customer ? serializeCustomer(customer) : null
+  } catch (error) {
+    console.error('[database] getCustomerByEmail Prisma failed, using fallback:', error)
+    return readDB().users.find(user => user.email.toLowerCase() === normalized) || null
+  }
+}
+
+export type ListOrdersByEmailOpts = {
+  status?: string
+  limit?: number
+  offset?: number
+}
+
+export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersByEmailOpts = {}) {
+  const normalized = email.trim().toLowerCase()
+  const limit = Math.min(Math.max(opts.limit || 20, 1), 50)
+  const offset = Math.max(opts.offset || 0, 0)
+
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    let filtered = db.orders.filter(o => o.customerEmail.toLowerCase() === normalized)
+    if (opts.status) filtered = filtered.filter(o => o.status === opts.status)
+    return {
+      orders: filtered.slice(offset, offset + limit),
+      total: filtered.length,
+      limit,
+      offset,
+    }
+  }
+
+  try {
+    const where: any = { customerEmail: { equals: normalized, mode: 'insensitive' } }
+    if (opts.status) where.status = opts.status
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: { address: true, payment: true, items: true },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.order.count({ where }),
+    ])
+
+    return {
+      orders: orders.map(serializeOrder),
+      total,
+      limit,
+      offset,
+    }
+  } catch (error) {
+    console.error('[database] listOrdersByCustomerEmail Prisma failed, using fallback:', error)
+    const db = readDB()
+    let filtered = db.orders.filter(o => o.customerEmail.toLowerCase() === normalized)
+    if (opts.status) filtered = filtered.filter(o => o.status === opts.status)
+    return {
+      orders: filtered.slice(offset, offset + limit),
+      total: filtered.length,
+      limit,
+      offset,
+    }
+  }
+}
+
+export async function listAddressesByCustomerId(customerId: string): Promise<CustomerAddress[]> {
+  if (!hasDatabase || !prisma?.customerAddress) {
+    const db = readDB()
+    return db.customerAddresses
+      .filter(addr => addr.customerId === customerId)
+      .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || b.createdAt.localeCompare(a.createdAt))
+  }
+  try {
+    const addresses = await prisma.customerAddress.findMany({
+      where: { customerId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    })
+    return addresses.map(serializeAddress)
+  } catch (error) {
+    console.error('[database] listAddressesByCustomerId Prisma failed, using fallback:', error)
+    const db = readDB()
+    return db.customerAddresses
+      .filter(addr => addr.customerId === customerId)
+      .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || b.createdAt.localeCompare(a.createdAt))
+  }
+}
+
+export type AddressInput = {
+  label?: string
+  recipient: string
+  zipCode: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+  country?: string
+  isDefault?: boolean
+}
+
+const MAX_ADDRESSES = 5
+
+export async function createAddress(customerId: string, data: AddressInput): Promise<{ address: CustomerAddress | null; error?: string }> {
+  const existing = await listAddressesByCustomerId(customerId)
+  if (existing.length >= MAX_ADDRESSES) {
+    return { address: null, error: `Limite de ${MAX_ADDRESSES} endereços por conta atingido.` }
+  }
+
+  const shouldBeDefault = data.isDefault === true || existing.length === 0
+
+  if (!hasDatabase || !prisma?.customerAddress) {
+    const db = readDB()
+    if (shouldBeDefault) {
+      db.customerAddresses.forEach(addr => {
+        if (addr.customerId === customerId) addr.isDefault = false
+      })
+    }
+    const now = new Date().toISOString()
+    const newAddress: CustomerAddress = {
+      id: `addr_${Date.now()}`,
+      customerId,
+      label: data.label,
+      recipient: data.recipient,
+      zipCode: data.zipCode,
+      street: data.street,
+      number: data.number,
+      complement: data.complement,
+      neighborhood: data.neighborhood,
+      city: data.city,
+      state: data.state,
+      country: data.country || 'BR',
+      isDefault: shouldBeDefault,
+      createdAt: now,
+      updatedAt: now,
+    }
+    db.customerAddresses.push(newAddress)
+    writeDB(db)
+    return { address: newAddress }
+  }
+
+  try {
+    const created = await prisma.$transaction(async tx => {
+      if (shouldBeDefault) {
+        await tx.customerAddress.updateMany({
+          where: { customerId, isDefault: true },
+          data: { isDefault: false },
+        })
+      }
+      return tx.customerAddress.create({
+        data: {
+          customerId,
+          label: data.label,
+          recipient: data.recipient,
+          zipCode: data.zipCode,
+          street: data.street,
+          number: data.number,
+          complement: data.complement,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+          country: data.country || 'BR',
+          isDefault: shouldBeDefault,
+        },
+      })
+    })
+    return { address: serializeAddress(created) }
+  } catch (error) {
+    console.error('[database] createAddress Prisma failed:', error)
+    return { address: null, error: 'Não foi possível salvar o endereço.' }
+  }
+}
+
+export async function updateAddress(customerId: string, id: string, data: Partial<AddressInput>): Promise<CustomerAddress | null> {
+  if (!hasDatabase || !prisma?.customerAddress) {
+    const db = readDB()
+    const idx = db.customerAddresses.findIndex(a => a.id === id && a.customerId === customerId)
+    if (idx === -1) return null
+    if (data.isDefault === true) {
+      db.customerAddresses.forEach(addr => {
+        if (addr.customerId === customerId) addr.isDefault = false
+      })
+    }
+    db.customerAddresses[idx] = {
+      ...db.customerAddresses[idx],
+      ...data,
+      country: data.country || db.customerAddresses[idx].country,
+      isDefault: data.isDefault ?? db.customerAddresses[idx].isDefault,
+      updatedAt: new Date().toISOString(),
+    }
+    writeDB(db)
+    return db.customerAddresses[idx]
+  }
+
+  try {
+    const owned = await prisma.customerAddress.findFirst({ where: { id, customerId } })
+    if (!owned) return null
+
+    const updated = await prisma.$transaction(async tx => {
+      if (data.isDefault === true) {
+        await tx.customerAddress.updateMany({
+          where: { customerId, isDefault: true, NOT: { id } },
+          data: { isDefault: false },
+        })
+      }
+      return tx.customerAddress.update({
+        where: { id },
+        data: {
+          label: data.label,
+          recipient: data.recipient,
+          zipCode: data.zipCode,
+          street: data.street,
+          number: data.number,
+          complement: data.complement,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+          country: data.country,
+          isDefault: data.isDefault,
+        },
+      })
+    })
+    return serializeAddress(updated)
+  } catch (error) {
+    console.error('[database] updateAddress Prisma failed:', error)
+    return null
+  }
+}
+
+export async function deleteAddress(customerId: string, id: string): Promise<boolean> {
+  if (!hasDatabase || !prisma?.customerAddress) {
+    const db = readDB()
+    const idx = db.customerAddresses.findIndex(a => a.id === id && a.customerId === customerId)
+    if (idx === -1) return false
+    const wasDefault = db.customerAddresses[idx].isDefault
+    db.customerAddresses.splice(idx, 1)
+    if (wasDefault) {
+      const remaining = db.customerAddresses
+        .filter(a => a.customerId === customerId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      if (remaining[0]) remaining[0].isDefault = true
+    }
+    writeDB(db)
+    return true
+  }
+
+  try {
+    const owned = await prisma.customerAddress.findFirst({ where: { id, customerId } })
+    if (!owned) return false
+
+    await prisma.$transaction(async tx => {
+      await tx.customerAddress.delete({ where: { id } })
+      if (owned.isDefault) {
+        const next = await tx.customerAddress.findFirst({
+          where: { customerId },
+          orderBy: { createdAt: 'desc' },
+        })
+        if (next) {
+          await tx.customerAddress.update({ where: { id: next.id }, data: { isDefault: true } })
+        }
+      }
+    })
+    return true
+  } catch (error) {
+    console.error('[database] deleteAddress Prisma failed:', error)
+    return false
   }
 }
 

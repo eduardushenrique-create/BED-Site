@@ -6,12 +6,19 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 
+type Tab = 'login' | 'signup'
+type Mode = 'code' | 'password'
+
 export default function LoginClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = useMemo(() => searchParams.get('redirect') || '/checkout', [searchParams])
-  const [mode, setMode] = useState<'code' | 'password'>('code')
+  const redirectTo = useMemo(() => searchParams.get('redirect') || '/minha-conta', [searchParams])
+  const initialTab = (searchParams.get('tab') as Tab) || 'login'
+
+  const [tab, setTab] = useState<Tab>(initialTab)
+  const [mode, setMode] = useState<Mode>('code')
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
@@ -20,11 +27,19 @@ export default function LoginClient() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  async function requestCode(event: React.FormEvent) {
-    event.preventDefault()
-    setLoading(true)
+  function resetMessages() {
     setError('')
     setMessage('')
+  }
+
+  async function requestCode(event: React.FormEvent) {
+    event.preventDefault()
+    if (tab === 'signup' && (!name.trim() || name.trim().length < 2)) {
+      setError('Informe seu nome completo.')
+      return
+    }
+    setLoading(true)
+    resetMessages()
 
     const response = await fetch('/api/auth/request-code', {
       method: 'POST',
@@ -35,12 +50,12 @@ export default function LoginClient() {
     setLoading(false)
 
     if (!response.ok) {
-      setError(data.error || 'Nao foi possivel enviar o codigo.')
+      setError(data.error || 'Não foi possível enviar o código.')
       return
     }
 
     setStep('code')
-    setMessage(data.message || 'Codigo enviado para o seu e-mail.')
+    setMessage(data.message || 'Código enviado para o seu e-mail.')
   }
 
   async function verifyCode(event: React.FormEvent) {
@@ -51,16 +66,29 @@ export default function LoginClient() {
     const response = await fetch('/api/auth/verify-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code, name }),
+      body: JSON.stringify({ email, code, name: tab === 'signup' ? name : undefined }),
     })
     const data = await response.json()
-    setLoading(false)
 
     if (!response.ok) {
-      setError(data.error || 'Codigo invalido.')
+      setLoading(false)
+      setError(data.error || 'Código inválido.')
       return
     }
 
+    if (tab === 'signup' && phone.trim()) {
+      try {
+        await fetch('/api/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone.replace(/\D/g, '') }),
+        })
+      } catch {
+        // Falha no PATCH não bloqueia o login
+      }
+    }
+
+    setLoading(false)
     router.push(redirectTo)
     router.refresh()
   }
@@ -68,8 +96,7 @@ export default function LoginClient() {
   async function loginWithPassword(event: React.FormEvent) {
     event.preventDefault()
     setLoading(true)
-    setError('')
-    setMessage('')
+    resetMessages()
 
     const response = await fetch('/api/auth/password-login', {
       method: 'POST',
@@ -80,7 +107,7 @@ export default function LoginClient() {
     setLoading(false)
 
     if (!response.ok) {
-      setError(data.error || 'Nao foi possivel entrar com senha.')
+      setError(data.error || 'Não foi possível entrar com senha.')
       return
     }
 
@@ -88,93 +115,83 @@ export default function LoginClient() {
     router.refresh()
   }
 
+  function switchTab(next: Tab) {
+    setTab(next)
+    setStep('email')
+    setName('')
+    setPhone('')
+    setCode('')
+    resetMessages()
+  }
+
   return (
     <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '520px' }}>
-      <Link href="/" style={{ color: '#1D2235', fontWeight: 600 }}>Voltar para a loja</Link>
+      <Link href="/" style={{ color: '#1D2235', fontWeight: 600 }}>← Voltar para a loja</Link>
       <section style={{ marginTop: '24px', backgroundColor: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '34px', color: '#1D2235', marginBottom: '8px' }}>
-          Entrar ou criar conta
-        </h1>
-        <p style={{ color: '#5F6678', marginBottom: '24px' }}>
-          Use codigo por e-mail para clientes ou senha para acessar a area administrativa.
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-          <button
-            type="button"
-            onClick={() => { setMode('code'); setError(''); setMessage('') }}
-            style={{
-              padding: '12px 16px',
-              borderRadius: '10px',
-              border: mode === 'code' ? '2px solid #1D2235' : '1px solid #BBCFEB',
-              backgroundColor: mode === 'code' ? '#F0F5FB' : 'white',
-              color: '#1D2235',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Codigo por e-mail
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #E3E9F4', marginBottom: '24px' }}>
+          <button type="button" onClick={() => switchTab('login')} style={tabStyle(tab === 'login')}>
+            Entrar
           </button>
-          <button
-            type="button"
-            onClick={() => { setMode('password'); setError(''); setMessage('') }}
-            style={{
-              padding: '12px 16px',
-              borderRadius: '10px',
-              border: mode === 'password' ? '2px solid #1D2235' : '1px solid #BBCFEB',
-              backgroundColor: mode === 'password' ? '#F0F5FB' : 'white',
-              color: '#1D2235',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            E-mail e senha
+          <button type="button" onClick={() => switchTab('signup')} style={tabStyle(tab === 'signup')}>
+            Criar conta
           </button>
         </div>
 
-        {mode === 'password' ? (
-          <form onSubmit={loginWithPassword} style={{ display: 'grid', gap: '16px' }}>
-            <Input label="E-mail" name="email" type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required aria-required="true" />
-            <Input label="Senha" name="password" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required aria-required="true" />
-            {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                backgroundColor: '#1D2235',
-                color: 'white',
-                fontFamily: 'var(--font-body)',
-                fontSize: '16px',
-                fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-                minHeight: '48px',
-              }}
-            >
-              {loading ? 'Entrando...' : 'Entrar com senha'}
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: '#1D2235', marginBottom: '8px' }}>
+          {tab === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}
+        </h1>
+        <p style={{ color: '#5F6678', marginBottom: '24px', fontSize: '14px' }}>
+          {tab === 'login'
+            ? 'Acesse seus pedidos, endereços e dados pessoais.'
+            : 'Cadastre-se para acompanhar seus pedidos com mais facilidade.'}
+        </p>
+
+        {tab === 'login' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+            <button type="button" onClick={() => { setMode('code'); resetMessages() }} style={modeBtnStyle(mode === 'code')}>
+              Código por e-mail
             </button>
+            <button type="button" onClick={() => { setMode('password'); resetMessages() }} style={modeBtnStyle(mode === 'password')}>
+              E-mail e senha
+            </button>
+          </div>
+        )}
+
+        {tab === 'login' && mode === 'password' ? (
+          <form onSubmit={loginWithPassword} style={{ display: 'grid', gap: '16px' }}>
+            <Input label="E-mail" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+            <Input label="Senha" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
+            {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
+            <Button type="submit" fullWidth disabled={loading}>{loading ? 'Entrando...' : 'Entrar com senha'}</Button>
           </form>
         ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>
-            <Input label="Nome completo" name="name" value={name} onChange={event => setName(event.target.value)} autoComplete="name" />
-            <Input label="E-mail" name="email" type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required aria-required="true" />
+            {tab === 'signup' && (
+              <>
+                <Input label="Nome completo *" name="name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required />
+                <Input label="Telefone (opcional)" name="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" placeholder="(11) 99999-9999" />
+              </>
+            )}
+            <Input label="E-mail *" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Enviando...' : 'Receber codigo por e-mail'}
+              {loading ? 'Enviando...' : tab === 'signup' ? 'Criar conta e receber código' : 'Receber código por e-mail'}
             </Button>
           </form>
         ) : (
           <form onSubmit={verifyCode} style={{ display: 'grid', gap: '16px' }}>
             {message && <p role="status" style={{ color: '#1D7A72', margin: 0 }}>{message}</p>}
-            <Input label="Codigo de acesso" name="code" value={code} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" required aria-required="true" />
+            <Input
+              label="Código de acesso"
+              name="code"
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+            />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Validando...' : 'Entrar'}
-            </Button>
+            <Button type="submit" fullWidth disabled={loading}>{loading ? 'Validando...' : 'Entrar'}</Button>
             <button type="button" onClick={() => setStep('email')} style={{ border: 'none', background: 'transparent', color: '#1D2235', cursor: 'pointer', fontWeight: 600 }}>
               Usar outro e-mail
             </button>
@@ -182,11 +199,50 @@ export default function LoginClient() {
         )}
 
         <div style={{ borderTop: '1px solid #E3E9F4', marginTop: '24px', paddingTop: '24px' }}>
-          <a href={`/api/auth/google/start?redirect=${encodeURIComponent(redirectTo)}`} style={{ display: 'block', textAlign: 'center', padding: '12px 16px', border: '1px solid #BBCFEB', borderRadius: '8px', color: '#1D2235', fontWeight: 700 }}>
+          <a
+            href={`/api/auth/google/start?redirect=${encodeURIComponent(redirectTo)}`}
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              padding: '12px 16px',
+              border: '1px solid #BBCFEB',
+              borderRadius: '8px',
+              color: '#1D2235',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
             Entrar com Google
           </a>
         </div>
       </section>
     </main>
   )
+}
+
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '14px 0',
+    background: 'none',
+    border: 'none',
+    borderBottom: active ? '3px solid #1D2235' : '3px solid transparent',
+    color: active ? '#1D2235' : '#6B7494',
+    fontWeight: 700,
+    fontSize: '15px',
+    cursor: 'pointer',
+    marginBottom: '-1px',
+  }
+}
+
+function modeBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '12px 16px',
+    borderRadius: '10px',
+    border: active ? '2px solid #1D2235' : '1px solid #BBCFEB',
+    backgroundColor: active ? '#F0F5FB' : 'white',
+    color: '#1D2235',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontSize: '13px',
+  }
 }

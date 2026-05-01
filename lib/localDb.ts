@@ -83,9 +83,28 @@ export type User = {
   name: string
   email: string
   phone?: string
+  cpf?: string
   passwordHash?: string
   googleId?: string
   isVerified: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type CustomerAddress = {
+  id: string
+  customerId: string
+  label?: string
+  recipient: string
+  zipCode: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+  country: string
+  isDefault: boolean
   createdAt: string
   updatedAt: string
 }
@@ -115,6 +134,7 @@ export type Database = {
   orders: Order[]
   banners: Banner[]
   users: User[]
+  customerAddresses: CustomerAddress[]
   webhookEvents: WebhookEvent[]
 }
 
@@ -135,6 +155,7 @@ const defaultData: Database = {
     },
   ],
   users: [],
+  customerAddresses: [],
   webhookEvents: [],
 }
 

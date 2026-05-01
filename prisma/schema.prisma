@@ -55,13 +55,37 @@ model Product {
 }
 
 model Customer {
-  id         String   @id @default(cuid())
+  id         String            @id @default(cuid())
   name       String
-  email      String   @unique
+  email      String            @unique
   phone      String?
-  isVerified Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  cpf        String?
+  isVerified Boolean           @default(false)
+  addresses  CustomerAddress[]
+  orders     Order[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model CustomerAddress {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label        String?
+  recipient    String
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  country      String   @default("BR")
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([customerId])
 }
 
 model Banner {
@@ -163,6 +187,9 @@ model Order {
   trackingCode       String?
   productionDeadline DateTime?
 
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
   items    OrderItem[]
   address  Address?
   payment  Payment?
@@ -170,6 +197,9 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([customerEmail])
+  @@index([customerId])
 }
 
 model OrderItem {
