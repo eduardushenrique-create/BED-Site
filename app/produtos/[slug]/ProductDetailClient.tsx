@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Button from '@/components/Button'
-import Badge from '@/components/Badge'
 import Input from '@/components/Input'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types'
@@ -12,6 +11,12 @@ interface ProductDetailClientProps {
 }
 
 export default function ProductDetailClient({ product }: ProductDetailClientProps) {
+  const [selectedImage, setSelectedImage] = useState(0)
+  const [selectedVariant, setSelectedVariant] = useState(product?.variants[0]?.id || null)
+  const [quantity, setQuantity] = useState(1)
+  const [personalization, setPersonalization] = useState<Record<string, string>>({})
+  const { addItem } = useCart()
+
   if (!product) {
     return (
       <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px', textAlign: 'center' }}>
@@ -20,12 +25,6 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
       </main>
     )
   }
-
-  const [selectedImage, setSelectedImage] = useState(0)
-  const [selectedVariant, setSelectedVariant] = useState(product.variants[0]?.id || null)
-  const [quantity, setQuantity] = useState(1)
-  const [personalization, setPersonalization] = useState<Record<string, string>>({})
-  const { addItem } = useCart()
 
   const currentPrice = product.price + (product.variants.find(v => v.id === selectedVariant)?.priceDelta || 0)
 

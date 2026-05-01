@@ -34,6 +34,7 @@ export type Order = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  customerCpf?: string
   shippingAddress: {
     street: string
     number: string

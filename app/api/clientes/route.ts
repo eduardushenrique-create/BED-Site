@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCustomer, listCustomers, updateCustomer } from '@/lib/database'
+import { requireApiAdmin } from '@/lib/api-auth'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { searchParams } = new URL(request.url)
   const q = searchParams.get('q') || ''
   return NextResponse.json(await listCustomers(q))
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const body = await request.json()
   const newUser = await createCustomer(body)
 
@@ -19,6 +24,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { id, ...data } = await request.json()
   const user = await updateCustomer(id, data)
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { calculateShipping } from '@/lib/shipping'
+import { getLocalCatalogProducts } from '@/lib/catalog'
 
 interface ShippingRequest {
   fromPostalCode: string
@@ -12,13 +13,15 @@ interface ShippingRequest {
       length: number
     }
   }
+  items?: Array<{ productId: string; quantity: number }>
 }
 
 export async function POST(request: Request) {
   try {
     const body: ShippingRequest = await request.json()
 
-    const { fromPostalCode, toPostalCode, packageInfo } = body
+    const { fromPostalCode, toPostalCode } = body
+    let { packageInfo } = body
 
     if (!fromPostalCode || !toPostalCode) {
       return NextResponse.json(
@@ -33,6 +36,36 @@ export async function POST(request: Request) {
     if (fromZip.length !== 8 || toZip.length !== 8) {
       return NextResponse.json(
         { error: 'CEP inválido' },
+        { status: 400 }
+      )
+    }
+
+    if (!packageInfo && body.items?.length) {
+      const catalog = await getLocalCatalogProducts()
+      let weight = 0
+      let width = 11
+      let height = 2
+      let length = 16
+
+      for (const item of body.items) {
+        const product = catalog.find(productItem => productItem.id === item.productId)
+        if (!product) continue
+        const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1))
+        weight += (product.weightGrams || 200) * quantity
+        width = Math.max(width, product.widthCm || 11)
+        height += (product.heightCm || 2) * quantity
+        length = Math.max(length, product.depthCm || 16)
+      }
+
+      packageInfo = {
+        weight: Math.max(weight / 1000, 0.1),
+        dimensions: { width, height, length },
+      }
+    }
+
+    if (!packageInfo) {
+      return NextResponse.json(
+        { error: 'Itens do carrinho são obrigatórios para calcular frete' },
         { status: 400 }
       )
     }

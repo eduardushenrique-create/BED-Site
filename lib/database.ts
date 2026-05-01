@@ -511,6 +511,7 @@ export async function createOrder(data: Order) {
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,
+        customerCpf: data.customerCpf,
         subtotal: data.subtotal,
         shippingTotal: data.shippingCost,
         total: data.total,

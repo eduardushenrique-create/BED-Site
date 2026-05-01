@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '@/lib/database'
+import { requireApiAdmin } from '@/lib/api-auth'
 
 export async function GET() {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   return NextResponse.json(await listCategories())
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const body = await request.json()
   const newCategory = await createCategory(body)
   return NextResponse.json(newCategory, { status: 201 })
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { id, ...data } = await request.json()
   const category = await updateCategory(id, data)
 
@@ -23,6 +30,8 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 

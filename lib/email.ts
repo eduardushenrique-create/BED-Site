@@ -112,6 +112,35 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<boole
   }
 }
 
+export async function sendAccessCodeEmail(email: string, code: string): Promise<boolean> {
+  if (!resend) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[auth] Código de acesso para ${email}: ${code}`)
+    }
+    return true
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Seu código de acesso - B&D Artes & Impressões',
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235;">
+          <h2>Seu código de acesso</h2>
+          <p>Use o código abaixo para entrar na loja. Ele expira em 10 minutos.</p>
+          <p style="font-size: 28px; letter-spacing: 6px; font-weight: 700;">${code}</p>
+          <p>Se você não solicitou este acesso, ignore este e-mail.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending access code email:', error)
+    return false
+  }
+}
+
 export async function sendPaymentApproved(data: OrderEmailData): Promise<boolean> {
   if (!resend) return true
 

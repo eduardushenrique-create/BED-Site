@@ -251,3 +251,16 @@ model AdminUser {
   passwordHash String
   createdAt    DateTime @default(now())
 }
+
+model AuthCode {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String
+  ipHash    String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, usedAt, expiresAt])
+}

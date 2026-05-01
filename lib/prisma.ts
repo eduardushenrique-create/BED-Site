@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 const globalForPrisma = globalThis as unknown as {
   prisma: any
   prismaPool?: any
@@ -22,7 +23,7 @@ if (hasValidDb) {
       globalForPrisma.prisma = prisma
       globalForPrisma.prismaPool = pool
     }
-  } catch (e) {
+  } catch {
     console.warn('Prisma not available, using mock fallback')
     prisma = null
   }

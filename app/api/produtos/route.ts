@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '@/lib/database'
+import { requireApiAdmin } from '@/lib/api-auth'
 
 export async function GET() {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   return NextResponse.json(await listProducts())
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const body = await request.json()
   const newProduct = await createProduct(body)
   return NextResponse.json(newProduct, { status: 201 })
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { id, ...data } = await request.json()
   const product = await updateProduct(id, data)
 
@@ -23,6 +30,8 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 

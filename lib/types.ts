@@ -47,6 +47,8 @@ export interface Product {
   status?: string
   isActive?: boolean
   isFeatured?: boolean
+  stock?: number
+  underOrder?: boolean
   weightGrams?: number
   widthCm?: number | null
   heightCm?: number | null

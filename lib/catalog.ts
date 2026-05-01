@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readDB, Product as LocalProduct } from '@/lib/localDb'
 import { Product } from '@/lib/types'
 import prisma from '@/lib/prisma'
@@ -24,6 +25,8 @@ function serializeLocalProduct(product: LocalProduct): Product {
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isPersonalizable: product.isPersonalizable,
+    stock: product.stock || 0,
+    underOrder: product.underOrder || false,
     productionTimeMinDays: 1,
     productionTimeMaxDays: product.underOrder ? 7 : 3,
     weightGrams: 200,
@@ -57,6 +60,8 @@ function serializePrismaProduct(product: any): Product {
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isPersonalizable: product.isPersonalizable,
+    stock: product.stock || 0,
+    underOrder: product.underOrder || false,
     productionTimeMinDays: product.productionTimeMinDays,
     productionTimeMaxDays: product.productionTimeMaxDays,
     weightGrams: product.weightGrams,
@@ -111,6 +116,8 @@ function normalizeMockProduct(product: any): Product {
     isActive: product.isActive ?? true,
     isFeatured: product.isFeatured ?? false,
     isPersonalizable: product.isPersonalizable ?? false,
+    stock: product.stock || 0,
+    underOrder: product.underOrder ?? false,
     productionTimeMinDays: product.productionTimeMinDays || 1,
     productionTimeMaxDays: product.productionTimeMaxDays || 3,
     weightGrams: product.weightGrams || 200,
