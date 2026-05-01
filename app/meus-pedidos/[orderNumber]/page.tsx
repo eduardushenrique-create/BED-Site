@@ -43,11 +43,39 @@ type OrderDetail = {
   }
 }
 
+type ProductionItem = {
+  productName: string
+  requiredQuantity: number
+  producedQuantity: number
+  remainingQuantity: number
+  progressPercent: number
+  status: string
+  label: string
+  updatedAt: string | null
+}
+
+type ProductionOverall = {
+  requiredQuantity: number
+  producedQuantity: number
+  remainingQuantity: number
+  progressPercent: number
+  status: string
+  label: string
+}
+
+type ProductionData = {
+  orderNumber: string
+  hasProduction: boolean
+  overall: ProductionOverall | null
+  items: ProductionItem[]
+}
+
 export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orderNumber: string }> }) {
   const { orderNumber } = use(params)
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [order, setOrder] = useState<OrderDetail | null>(null)
+  const [production, setProduction] = useState<ProductionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -64,13 +92,27 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
 
     async function load() {
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, { cache: 'no-store' })
+        const [res, prodRes] = await Promise.all([
+          fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, { cache: 'no-store' }),
+          fetch(`/api/me/orders/${encodeURIComponent(orderNumber)}/production`, { cache: 'no-store' }).catch(() => null),
+        ])
         if (!res.ok) {
           if (!cancelled) setError(res.status === 404 ? 'Pedido não encontrado.' : 'Você não tem acesso a este pedido.')
           return
         }
         const data = await res.json()
         if (!cancelled) setOrder(data)
+
+        if (prodRes && prodRes.ok) {
+          try {
+            const prodData = (await prodRes.json()) as ProductionData
+            if (!cancelled && prodData && prodData.hasProduction) {
+              setProduction(prodData)
+            }
+          } catch {
+            // silencioso
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -96,7 +138,7 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
     )
   }
 
-  const timeline = buildTimeline(order)
+  const timeline = buildTimeline(order, production)
 
   return (
     <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '960px' }}>
@@ -149,6 +191,50 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
               ))}
             </ul>
           </Section>
+
+          {production && production.hasProduction && (
+            <Section title="📦 Produção do seu pedido">
+              <p style={{ margin: '0 0 18px', color: '#6B7494', fontSize: '14px', lineHeight: 1.6 }}>
+                Estamos produzindo os itens personalizados do seu pedido. O progresso abaixo é uma estimativa operacional e pode ser atualizado durante a produção.
+              </p>
+
+              {production.overall && (
+                <div style={{ marginBottom: '20px', padding: '14px 16px', background: '#F6F9FC', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                    <strong style={{ color: '#1D2235', fontSize: '14px' }}>Visão geral · {production.overall.label}</strong>
+                    <span style={{ color: '#6B7494', fontSize: '13px' }}>
+                      {production.overall.producedQuantity} de {production.overall.requiredQuantity} unidades produzidas ({production.overall.progressPercent}%)
+                    </span>
+                  </div>
+                  <ProgressBar percent={production.overall.progressPercent} />
+                </div>
+              )}
+
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '14px' }}>
+                {production.items.map((item, idx) => (
+                  <li
+                    key={idx}
+                    style={{
+                      padding: '14px 16px',
+                      border: '1px solid #EEF1F8',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: '#1D2235', marginBottom: '4px' }}>{item.productName}</div>
+                    <div style={{ fontSize: '13px', color: '#6B7494', marginBottom: '8px' }}>
+                      Status: {item.label} · {item.producedQuantity} de {item.requiredQuantity} unidades produzidas
+                    </div>
+                    <ProgressBar percent={item.progressPercent} />
+                    {item.updatedAt && (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6B7494' }}>
+                        Última atualização: {formatDate(item.updatedAt)}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           <Section title="Endereço de entrega">
             <p style={{ margin: 0, lineHeight: 1.6 }}>
@@ -211,6 +297,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+function ProgressBar({ percent }: { percent: number }) {
+  const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0))
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={safe}
+      style={{
+        width: '100%',
+        height: '8px',
+        background: '#E4EDF8',
+        borderRadius: '999px',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          width: `${safe}%`,
+          height: '100%',
+          background: '#1D7A72',
+          borderRadius: '999px',
+          transition: 'width 0.3s ease',
+        }}
+      />
+    </div>
+  )
+}
+
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontWeight: bold ? 700 : 400, borderTop: bold ? '1px solid #EEF1F8' : 'none', marginTop: bold ? '6px' : 0 }}>
@@ -220,21 +335,38 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   )
 }
 
-function buildTimeline(order: OrderDetail) {
+function buildTimeline(order: OrderDetail, production: ProductionData | null) {
   const paid = order.paymentStatus === 'paid' || order.status === 'paid'
   const cancelled = order.status === 'cancelled'
   const refunded = order.status === 'refunded' || order.paymentStatus === 'refunded'
-  const inProduction = order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered'
+  const fulfillmentInProduction = order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered'
   const shipped = order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered'
   const delivered = order.fulfillmentStatus === 'delivered'
+
+  const productionActive = !!(production && production.hasProduction && production.overall && production.overall.status !== 'completed')
+  const productionCompleted = !!(production && production.hasProduction && production.overall && production.overall.status === 'completed')
+
+  // Não regredir etapas: produção considerada "feita" quando webhook avançou OU quando produção operacional completou.
+  const inProduction = fulfillmentInProduction || productionActive || productionCompleted
+  const readyOrShipped = shipped || (productionCompleted && !shipped)
 
   if (cancelled) return [{ label: 'Pedido cancelado', detail: undefined, done: true }]
   if (refunded) return [{ label: 'Pedido reembolsado', detail: undefined, done: true }]
 
+  const productionLabel = productionCompleted && !shipped ? 'Pronto para envio' : 'Em produção'
+  let productionDetail: string | undefined
+  if (productionCompleted && !shipped) {
+    productionDetail = 'Itens prontos, aguardando envio'
+  } else if (productionActive && production?.overall) {
+    productionDetail = `${production.overall.label} · ${production.overall.progressPercent}%`
+  } else if (!inProduction) {
+    productionDetail = 'Inicia após pagamento'
+  }
+
   return [
     { label: 'Pedido recebido', detail: formatDate(order.createdAt), done: true },
     { label: 'Pagamento confirmado', detail: paid ? undefined : 'Aguardando confirmação', done: paid },
-    { label: 'Em produção', detail: inProduction ? undefined : 'Inicia após pagamento', done: inProduction },
+    { label: productionLabel, detail: productionDetail, done: inProduction || readyOrShipped },
     { label: 'Enviado', detail: shipped ? (order.trackingCode || undefined) : undefined, done: shipped },
     { label: 'Entregue', detail: undefined, done: delivered },
   ]

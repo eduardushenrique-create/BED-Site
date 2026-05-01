@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentDetails, verifyWebhookSignature } from '@/lib/mercadopago'
-import { getOrderByNumber, registerWebhookEvent, updateOrderPaymentByNumber, updateWebhookEvent } from '@/lib/database'
+import { ensureProductionTasksForOrder, getOrderByNumber, registerWebhookEvent, updateOrderPaymentByNumber, updateWebhookEvent } from '@/lib/database'
 import { mapMercadoPagoStatus, resolvePaymentTransition } from '@/lib/payment'
 
 type MercadoPagoWebhookPayment = {
@@ -177,6 +177,15 @@ async function handlePaymentUpdate(input: {
 
   if (!resolved.shouldPersistStatus) {
     console.info(`Webhook ${input.deliveryKey} received duplicate or regressive status ${input.status} for order ${order.orderNumber}.`)
+  }
+
+  if (updated && resolved.shouldPersistStatus && mapped.paymentStatus === 'paid') {
+    try {
+      const result = await ensureProductionTasksForOrder(order.id)
+      console.info(`[webhook] production tasks ensured for ${order.orderNumber}: created=${result.created}`)
+    } catch (err) {
+      console.error(`[webhook] failed to ensure production tasks for ${order.orderNumber}:`, err)
+    }
   }
 }
 

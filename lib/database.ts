@@ -1,7 +1,43 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { readDB, writeDB, Product, Category, Order, Banner, User, CustomerAddress, WebhookEvent } from '@/lib/localDb'
+import {
+  readDB,
+  writeDB,
+  Product,
+  Category,
+  Order,
+  Banner,
+  User,
+  CustomerAddress,
+  WebhookEvent,
+  ProductionTaskRecord,
+  ProductionLogRecord,
+  ProductionSettingsRecord,
+} from '@/lib/localDb'
+import {
+  serializeProductionTask,
+  serializeCustomerProduction,
+  calculateProductionRisk,
+  calculateProductionProgress,
+  getProductionUnitMinutes,
+  type ProductionTaskStatus,
+  type ProductionPriority,
+  type ProductionRiskLevel,
+  type ProductionSettingsLike,
+  type SerializedProductionTaskAdmin,
+  type SerializedCustomerProduction,
+} from '@/lib/production'
+import type {
+  ProductionTaskFilters,
+  ProductionTaskSummary,
+  ProductionPagination,
+  ProductionLogEntry,
+  ProductionSettingsDto,
+  UpdateProductionTaskInput,
+  UpdateProductionTaskActor,
+  UpdateProductionSettingsInput,
+} from '@/lib/types'
 
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
@@ -1417,4 +1453,1157 @@ export async function deleteOrder(id: string) {
     console.error('[database] deleteOrder Prisma failed:', error)
     return false
   }
+}
+
+// ===========================================================================
+// Production control (see brief sections 5–7)
+// ===========================================================================
+
+const VALID_TASK_STATUSES: ProductionTaskStatus[] = [
+  'pending',
+  'in_production',
+  'paused',
+  'completed',
+  'cancelled',
+]
+const VALID_PRIORITIES: ProductionPriority[] = ['low', 'normal', 'high', 'urgent']
+const VALID_RISK_LEVELS: ProductionRiskLevel[] = [
+  'on_track',
+  'attention',
+  'at_risk',
+  'overdue',
+  'completed',
+]
+
+const TASK_INCLUDE = {
+  order: true,
+  orderItem: {
+    include: {
+      product: true,
+      variant: true,
+    },
+  },
+} as const
+
+function serializeSettings(record: any): ProductionSettingsRecord {
+  return {
+    id: record.id || 'default',
+    dailyCapacityMinutes: Number(record.dailyCapacityMinutes ?? 480),
+    riskBufferHours: Number(record.riskBufferHours ?? 24),
+    businessDaysOnly: Boolean(record.businessDaysOnly ?? false),
+    createdAt:
+      record.createdAt instanceof Date
+        ? record.createdAt.toISOString()
+        : String(record.createdAt ?? new Date(0).toISOString()),
+    updatedAt:
+      record.updatedAt instanceof Date
+        ? record.updatedAt.toISOString()
+        : String(record.updatedAt ?? new Date(0).toISOString()),
+  }
+}
+
+function settingsForDomain(record: ProductionSettingsRecord): ProductionSettingsLike {
+  return {
+    dailyCapacityMinutes: record.dailyCapacityMinutes,
+    riskBufferHours: record.riskBufferHours,
+    businessDaysOnly: record.businessDaysOnly,
+  }
+}
+
+function toTaskWithRelations(task: any) {
+  return {
+    id: task.id,
+    status: task.status,
+    priority: task.priority,
+    requiredQuantity: task.requiredQuantity,
+    producedQuantity: task.producedQuantity,
+    dueAt: task.dueAt ?? null,
+    startedAt: task.startedAt ?? null,
+    completedAt: task.completedAt ?? null,
+    notes: task.notes ?? null,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    order: {
+      id: task.order.id,
+      orderNumber: task.order.orderNumber,
+      customerName: task.order.customerName ?? null,
+      customerEmail: task.order.customerEmail ?? null,
+      fulfillmentStatus: task.order.fulfillmentStatus ?? null,
+      productionDeadline: task.order.productionDeadline ?? null,
+    },
+    orderItem: {
+      id: task.orderItem.id,
+      productNameSnapshot: task.orderItem.productNameSnapshot ?? null,
+      skuSnapshot: task.orderItem.skuSnapshot ?? null,
+      quantity: task.orderItem.quantity,
+      variantId: task.orderItem.variantId ?? null,
+    },
+    product: task.orderItem.product
+      ? { productionMinutesPerUnit: task.orderItem.product.productionMinutesPerUnit ?? null }
+      : null,
+    variant: task.orderItem.variant
+      ? { productionMinutesPerUnit: task.orderItem.variant.productionMinutesPerUnit ?? null }
+      : null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+async function readSettingsRecord(): Promise<ProductionSettingsRecord> {
+  if (!hasDatabase || !prisma?.productionSettings) {
+    const db = readDB()
+    return db.productionSettings[0] || {
+      id: 'default',
+      dailyCapacityMinutes: 480,
+      riskBufferHours: 24,
+      businessDaysOnly: false,
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    }
+  }
+
+  try {
+    let row = await prisma.productionSettings.findUnique({ where: { id: 'default' } })
+    if (!row) {
+      row = await prisma.productionSettings.create({ data: { id: 'default' } })
+    }
+    return serializeSettings(row)
+  } catch (error) {
+    console.error('[database] readSettingsRecord Prisma failed, using fallback:', error)
+    const db = readDB()
+    return db.productionSettings[0] || {
+      id: 'default',
+      dailyCapacityMinutes: 480,
+      riskBufferHours: 24,
+      businessDaysOnly: false,
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    }
+  }
+}
+
+export async function getProductionSettings(): Promise<ProductionSettingsDto> {
+  const record = await readSettingsRecord()
+  return record
+}
+
+export async function updateProductionSettings(
+  input: UpdateProductionSettingsInput
+): Promise<{ ok: true; settings: ProductionSettingsDto } | { ok: false; error: string }> {
+  if (
+    typeof input.dailyCapacityMinutes === 'number' &&
+    !(Number.isFinite(input.dailyCapacityMinutes) && input.dailyCapacityMinutes > 0)
+  ) {
+    return { ok: false, error: 'Capacidade diária deve ser maior que zero.' }
+  }
+  if (
+    typeof input.riskBufferHours === 'number' &&
+    !(Number.isFinite(input.riskBufferHours) && input.riskBufferHours >= 0)
+  ) {
+    return { ok: false, error: 'Buffer de risco deve ser zero ou positivo.' }
+  }
+
+  if (!hasDatabase || !prisma?.productionSettings) {
+    const db = readDB()
+    const existing = db.productionSettings[0] || {
+      id: 'default',
+      dailyCapacityMinutes: 480,
+      riskBufferHours: 24,
+      businessDaysOnly: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const next: ProductionSettingsRecord = {
+      ...existing,
+      dailyCapacityMinutes:
+        typeof input.dailyCapacityMinutes === 'number'
+          ? Math.floor(input.dailyCapacityMinutes)
+          : existing.dailyCapacityMinutes,
+      riskBufferHours:
+        typeof input.riskBufferHours === 'number'
+          ? Math.floor(input.riskBufferHours)
+          : existing.riskBufferHours,
+      businessDaysOnly:
+        typeof input.businessDaysOnly === 'boolean'
+          ? input.businessDaysOnly
+          : existing.businessDaysOnly,
+      updatedAt: new Date().toISOString(),
+    }
+    db.productionSettings = [next]
+    writeDB(db)
+    return { ok: true, settings: next }
+  }
+
+  try {
+    const row = await prisma.productionSettings.upsert({
+      where: { id: 'default' },
+      update: {
+        dailyCapacityMinutes:
+          typeof input.dailyCapacityMinutes === 'number'
+            ? Math.floor(input.dailyCapacityMinutes)
+            : undefined,
+        riskBufferHours:
+          typeof input.riskBufferHours === 'number'
+            ? Math.floor(input.riskBufferHours)
+            : undefined,
+        businessDaysOnly:
+          typeof input.businessDaysOnly === 'boolean' ? input.businessDaysOnly : undefined,
+      },
+      create: {
+        id: 'default',
+        dailyCapacityMinutes:
+          typeof input.dailyCapacityMinutes === 'number'
+            ? Math.floor(input.dailyCapacityMinutes)
+            : 480,
+        riskBufferHours:
+          typeof input.riskBufferHours === 'number' ? Math.floor(input.riskBufferHours) : 24,
+        businessDaysOnly:
+          typeof input.businessDaysOnly === 'boolean' ? input.businessDaysOnly : false,
+      },
+    })
+    return { ok: true, settings: serializeSettings(row) }
+  } catch (error) {
+    console.error('[database] updateProductionSettings Prisma failed:', error)
+    return { ok: false, error: 'Erro ao salvar configurações de produção.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Listing & detail
+// ---------------------------------------------------------------------------
+
+export interface ListProductionTasksResult {
+  items: SerializedProductionTaskAdmin[]
+  summary: ProductionTaskSummary
+  pagination: ProductionPagination
+}
+
+function emptySummary(): ProductionTaskSummary {
+  return {
+    totalOpen: 0,
+    pending: 0,
+    inProduction: 0,
+    paused: 0,
+    atRisk: 0,
+    overdue: 0,
+    completedToday: 0,
+  }
+}
+
+function startOfTodayIso(now: Date): Date {
+  const d = new Date(now.getTime())
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+export async function listProductionTasks(
+  filters: ProductionTaskFilters = {}
+): Promise<ListProductionTasksResult> {
+  const limit = Math.min(Math.max(filters.limit || 20, 1), 50)
+  const offset = Math.max(filters.offset || 0, 0)
+  const now = new Date()
+  const settings = await readSettingsRecord()
+
+  const status = filters.status && VALID_TASK_STATUSES.includes(filters.status as ProductionTaskStatus)
+    ? (filters.status as ProductionTaskStatus)
+    : undefined
+  const priority = filters.priority && VALID_PRIORITIES.includes(filters.priority as ProductionPriority)
+    ? (filters.priority as ProductionPriority)
+    : undefined
+  const risk = filters.risk && VALID_RISK_LEVELS.includes(filters.risk as ProductionRiskLevel)
+    ? (filters.risk as ProductionRiskLevel)
+    : undefined
+  const q = (filters.q || '').trim()
+
+  if (!hasDatabase || !prisma?.productionTask) {
+    const db = readDB()
+    const all = db.productionTasks
+    // Hydrate relations from local DB (best-effort: orders/items are stored
+    // inline in localDb's Order; production fallback is intentionally simple).
+    const hydrated = all.map((t) => {
+      const order = db.orders.find((o) => o.id === t.orderId)
+      const item = order?.items.find((it: any) => it.id === t.orderItemId) as any
+      const product = item ? db.products.find((p) => p.id === item.productId) : null
+      const taskRel = {
+        id: t.id,
+        status: t.status,
+        priority: t.priority,
+        requiredQuantity: t.requiredQuantity,
+        producedQuantity: t.producedQuantity,
+        dueAt: t.dueAt ?? null,
+        startedAt: t.startedAt ?? null,
+        completedAt: t.completedAt ?? null,
+        notes: t.notes ?? null,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        order: {
+          id: order?.id || t.orderId,
+          orderNumber: order?.orderNumber || '',
+          customerName: order?.customerName || null,
+          customerEmail: order?.customerEmail || null,
+          fulfillmentStatus: order?.fulfillmentStatus || null,
+          productionDeadline: null,
+        },
+        orderItem: {
+          id: item?.id || t.orderItemId,
+          productNameSnapshot: item?.productName || null,
+          skuSnapshot: null,
+          quantity: item?.quantity ?? t.requiredQuantity,
+          variantId: null,
+        },
+        product: product
+          ? { productionMinutesPerUnit: (product as any).productionMinutesPerUnit ?? null }
+          : null,
+        variant: null,
+      }
+      return serializeProductionTask(taskRel as any, { settings: settingsForDomain(settings), now })
+    })
+
+    let filtered = hydrated
+    if (status) filtered = filtered.filter((i) => i.status === status)
+    if (priority) filtered = filtered.filter((i) => i.priority === priority)
+    if (risk) filtered = filtered.filter((i) => i.risk.level === risk)
+    if (q) {
+      const lower = q.toLowerCase()
+      filtered = filtered.filter((i) =>
+        i.order.orderNumber.toLowerCase().includes(lower) ||
+        (i.order.customerName || '').toLowerCase().includes(lower) ||
+        (i.order.customerEmail || '').toLowerCase().includes(lower) ||
+        (i.item.productNameSnapshot || '').toLowerCase().includes(lower) ||
+        (i.item.skuSnapshot || '').toLowerCase().includes(lower)
+      )
+    }
+
+    const summary = emptySummary()
+    const todayStart = startOfTodayIso(now).getTime()
+    for (const i of hydrated) {
+      if (i.status !== 'completed' && i.status !== 'cancelled') summary.totalOpen += 1
+      if (i.status === 'pending') summary.pending += 1
+      if (i.status === 'in_production') summary.inProduction += 1
+      if (i.status === 'paused') summary.paused += 1
+      if (i.risk.level === 'at_risk') summary.atRisk += 1
+      if (i.risk.level === 'overdue') summary.overdue += 1
+      if (i.status === 'completed' && i.completedAt) {
+        const t = new Date(i.completedAt).getTime()
+        if (Number.isFinite(t) && t >= todayStart) summary.completedToday += 1
+      }
+    }
+
+    return {
+      items: filtered.slice(offset, offset + limit),
+      summary,
+      pagination: { limit, offset, total: filtered.length },
+    }
+  }
+
+  try {
+    const where: any = {}
+    if (status) where.status = status
+    if (priority) where.priority = priority
+    if (q) {
+      where.OR = [
+        { order: { orderNumber: { contains: q, mode: 'insensitive' } } },
+        { order: { customerName: { contains: q, mode: 'insensitive' } } },
+        { order: { customerEmail: { contains: q, mode: 'insensitive' } } },
+        { orderItem: { productNameSnapshot: { contains: q, mode: 'insensitive' } } },
+        { orderItem: { skuSnapshot: { contains: q, mode: 'insensitive' } } },
+      ]
+    }
+
+    // Risk is computed in memory (no column), so when a risk filter is set we
+    // must page over the *filtered* set. We fetch the whole `where` set first
+    // (capped reasonably), serialize, then filter and slice. Without a risk
+    // filter we use SQL pagination to keep things efficient.
+    if (risk) {
+      const all = await prisma.productionTask.findMany({
+        where,
+        include: TASK_INCLUDE,
+        orderBy: [{ priority: 'desc' }, { dueAt: 'asc' }, { createdAt: 'asc' }],
+        take: 500,
+      })
+      const serialized = all.map((t) =>
+        serializeProductionTask(toTaskWithRelations(t), {
+          settings: settingsForDomain(settings),
+          now,
+        })
+      )
+      const filtered = serialized.filter((i) => i.risk.level === risk)
+      const summary = await computeSummary(now)
+      return {
+        items: filtered.slice(offset, offset + limit),
+        summary,
+        pagination: { limit, offset, total: filtered.length },
+      }
+    }
+
+    const [tasks, total] = await Promise.all([
+      prisma.productionTask.findMany({
+        where,
+        include: TASK_INCLUDE,
+        orderBy: [{ priority: 'desc' }, { dueAt: 'asc' }, { createdAt: 'asc' }],
+        take: limit,
+        skip: offset,
+      }),
+      prisma.productionTask.count({ where }),
+    ])
+
+    const items = tasks.map((t) =>
+      serializeProductionTask(toTaskWithRelations(t), {
+        settings: settingsForDomain(settings),
+        now,
+      })
+    )
+    const summary = await computeSummary(now)
+    return { items, summary, pagination: { limit, offset, total } }
+  } catch (error) {
+    console.error('[database] listProductionTasks Prisma failed, using fallback:', error)
+    return {
+      items: [],
+      summary: emptySummary(),
+      pagination: { limit, offset, total: 0 },
+    }
+  }
+}
+
+async function computeSummary(now: Date): Promise<ProductionTaskSummary> {
+  const summary = emptySummary()
+  if (!hasDatabase || !prisma?.productionTask) return summary
+
+  try {
+    const todayStart = startOfTodayIso(now)
+    const settings = await readSettingsRecord()
+    const [pending, inProduction, paused, completedToday, openTasks] = await Promise.all([
+      prisma.productionTask.count({ where: { status: 'pending' } }),
+      prisma.productionTask.count({ where: { status: 'in_production' } }),
+      prisma.productionTask.count({ where: { status: 'paused' } }),
+      prisma.productionTask.count({
+        where: { status: 'completed', completedAt: { gte: todayStart } },
+      }),
+      prisma.productionTask.findMany({
+        where: { status: { in: ['pending', 'in_production', 'paused'] } },
+        include: TASK_INCLUDE,
+        take: 500,
+      }),
+    ])
+
+    summary.pending = pending
+    summary.inProduction = inProduction
+    summary.paused = paused
+    summary.completedToday = completedToday
+    summary.totalOpen = pending + inProduction + paused
+
+    for (const t of openTasks) {
+      const minutesPerUnit = getProductionUnitMinutes({
+        product: t.orderItem.product,
+        variant: t.orderItem.variant,
+      })
+      const risk = calculateProductionRisk({
+        requiredQuantity: t.requiredQuantity,
+        producedQuantity: t.producedQuantity,
+        createdAt: t.createdAt,
+        startedAt: t.startedAt,
+        dueAt: t.dueAt,
+        productionMinutesPerUnit: minutesPerUnit,
+        settings: settingsForDomain(settings),
+        now,
+        status: (t.status as ProductionTaskStatus) || 'pending',
+      })
+      if (risk.level === 'at_risk') summary.atRisk += 1
+      if (risk.level === 'overdue') summary.overdue += 1
+    }
+
+    return summary
+  } catch (error) {
+    console.error('[database] computeSummary Prisma failed:', error)
+    return summary
+  }
+}
+
+export async function getProductionTask(
+  id: string
+): Promise<(SerializedProductionTaskAdmin & { logs?: ProductionLogEntry[] }) | null> {
+  if (!id) return null
+  const settings = await readSettingsRecord()
+  const now = new Date()
+
+  if (!hasDatabase || !prisma?.productionTask) {
+    const db = readDB()
+    const t = db.productionTasks.find((x) => x.id === id)
+    if (!t) return null
+    const order = db.orders.find((o) => o.id === t.orderId)
+    const item = order?.items.find((it: any) => it.id === t.orderItemId) as any
+    const product = item ? db.products.find((p) => p.id === item.productId) : null
+    const rel = {
+      id: t.id,
+      status: t.status,
+      priority: t.priority,
+      requiredQuantity: t.requiredQuantity,
+      producedQuantity: t.producedQuantity,
+      dueAt: t.dueAt ?? null,
+      startedAt: t.startedAt ?? null,
+      completedAt: t.completedAt ?? null,
+      notes: t.notes ?? null,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      order: {
+        id: order?.id || t.orderId,
+        orderNumber: order?.orderNumber || '',
+        customerName: order?.customerName || null,
+        customerEmail: order?.customerEmail || null,
+        fulfillmentStatus: order?.fulfillmentStatus || null,
+        productionDeadline: null,
+      },
+      orderItem: {
+        id: item?.id || t.orderItemId,
+        productNameSnapshot: item?.productName || null,
+        skuSnapshot: null,
+        quantity: item?.quantity ?? t.requiredQuantity,
+        variantId: null,
+      },
+      product: product
+        ? { productionMinutesPerUnit: (product as any).productionMinutesPerUnit ?? null }
+        : null,
+      variant: null,
+    }
+    const serialized = serializeProductionTask(rel as any, {
+      settings: settingsForDomain(settings),
+      now,
+    })
+    const logs: ProductionLogEntry[] = db.productionLogs
+      .filter((l) => l.taskId === id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((l) => ({
+        id: l.id,
+        quantityDelta: l.quantityDelta,
+        quantityAfter: l.quantityAfter,
+        statusBefore: l.statusBefore ?? null,
+        statusAfter: l.statusAfter ?? null,
+        note: l.note ?? null,
+        createdByEmail: l.createdByEmail ?? null,
+        createdByName: l.createdByName ?? null,
+        createdAt: l.createdAt,
+      }))
+    return { ...serialized, logs }
+  }
+
+  try {
+    const task = await prisma.productionTask.findUnique({
+      where: { id },
+      include: {
+        ...TASK_INCLUDE,
+        logs: { orderBy: { createdAt: 'desc' } },
+      },
+    })
+    if (!task) return null
+    const serialized = serializeProductionTask(toTaskWithRelations(task), {
+      settings: settingsForDomain(settings),
+      now,
+    })
+    const logs: ProductionLogEntry[] = (task as any).logs.map((l: any) => ({
+      id: l.id,
+      quantityDelta: l.quantityDelta,
+      quantityAfter: l.quantityAfter,
+      statusBefore: l.statusBefore ?? null,
+      statusAfter: l.statusAfter ?? null,
+      note: l.note ?? null,
+      createdByEmail: l.createdByEmail ?? null,
+      createdByName: l.createdByName ?? null,
+      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : String(l.createdAt),
+    }))
+    return { ...serialized, logs }
+  } catch (error) {
+    console.error('[database] getProductionTask Prisma failed:', error)
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Update task
+// ---------------------------------------------------------------------------
+
+export type UpdateProductionTaskResult =
+  | { ok: true; task: SerializedProductionTaskAdmin }
+  | { ok: false; error: string }
+
+export async function updateProductionTask(
+  id: string,
+  input: UpdateProductionTaskInput,
+  actor: UpdateProductionTaskActor = {}
+): Promise<UpdateProductionTaskResult> {
+  if (!id) return { ok: false, error: 'ID da tarefa é obrigatório.' }
+
+  // Validate status/priority shape early.
+  if (
+    typeof input.status === 'string' &&
+    !VALID_TASK_STATUSES.includes(input.status as ProductionTaskStatus)
+  ) {
+    return { ok: false, error: `Status inválido: ${input.status}` }
+  }
+  if (
+    typeof input.priority === 'string' &&
+    !VALID_PRIORITIES.includes(input.priority as ProductionPriority)
+  ) {
+    return { ok: false, error: `Prioridade inválida: ${input.priority}` }
+  }
+
+  const settings = await readSettingsRecord()
+  const now = new Date()
+
+  // ---- Fallback path (localDb) ----
+  if (!hasDatabase || !prisma?.productionTask) {
+    const db = readDB()
+    const idx = db.productionTasks.findIndex((t) => t.id === id)
+    if (idx === -1) return { ok: false, error: 'Tarefa não encontrada.' }
+    const current = db.productionTasks[idx]
+
+    const computed = computeQuantityAndStatus(current, input)
+    if (!computed.ok) return computed
+
+    const updated: ProductionTaskRecord = {
+      ...current,
+      producedQuantity: computed.nextQuantity,
+      status: computed.nextStatus,
+      startedAt:
+        computed.startedAt instanceof Date
+          ? computed.startedAt.toISOString()
+          : computed.startedAt ?? current.startedAt ?? null,
+      completedAt:
+        computed.completedAt === null
+          ? null
+          : computed.completedAt instanceof Date
+            ? computed.completedAt.toISOString()
+            : computed.completedAt ?? current.completedAt ?? null,
+      priority:
+        typeof input.priority === 'string'
+          ? (input.priority as ProductionPriority)
+          : current.priority,
+      dueAt:
+        input.dueAt === null
+          ? null
+          : typeof input.dueAt === 'string'
+            ? input.dueAt
+            : current.dueAt ?? null,
+      notes:
+        input.notes === null
+          ? null
+          : typeof input.notes === 'string'
+            ? input.notes
+            : current.notes ?? null,
+      updatedAt: new Date().toISOString(),
+    }
+
+    db.productionTasks[idx] = updated
+    db.productionLogs.unshift({
+      id: `plog_${Date.now()}`,
+      taskId: id,
+      quantityDelta: computed.delta,
+      quantityAfter: computed.nextQuantity,
+      statusBefore: current.status,
+      statusAfter: computed.nextStatus,
+      note: input.note || null,
+      createdByEmail: actor.email || null,
+      createdByName: actor.name || null,
+      createdAt: new Date().toISOString(),
+    })
+    writeDB(db)
+
+    await refreshOrderFulfillmentFromProduction(updated.orderId)
+
+    const serialized = await getProductionTask(id)
+    if (!serialized) return { ok: false, error: 'Falha ao reler tarefa após atualização.' }
+    return { ok: true, task: serialized }
+  }
+
+  // ---- Prisma path with transaction ----
+  let orderIdForRefresh: string | null = null
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.productionTask.findUnique({ where: { id } })
+      if (!current) return { ok: false as const, error: 'Tarefa não encontrada.' }
+
+      const computed = computeQuantityAndStatus(
+        {
+          producedQuantity: current.producedQuantity,
+          requiredQuantity: current.requiredQuantity,
+          status: current.status,
+          startedAt: current.startedAt ? current.startedAt.toISOString() : null,
+          completedAt: current.completedAt ? current.completedAt.toISOString() : null,
+        },
+        input
+      )
+      if (!computed.ok) return computed
+
+      const updateData: any = {
+        producedQuantity: computed.nextQuantity,
+        status: computed.nextStatus,
+        priority:
+          typeof input.priority === 'string'
+            ? (input.priority as ProductionPriority)
+            : undefined,
+      }
+      if (computed.startedAt instanceof Date) updateData.startedAt = computed.startedAt
+      if (computed.completedAt === null) {
+        updateData.completedAt = null
+      } else if (computed.completedAt instanceof Date) {
+        updateData.completedAt = computed.completedAt
+      }
+      if (input.dueAt === null) {
+        updateData.dueAt = null
+      } else if (typeof input.dueAt === 'string') {
+        const d = new Date(input.dueAt)
+        if (Number.isFinite(d.getTime())) updateData.dueAt = d
+      }
+      if (input.notes === null) updateData.notes = null
+      else if (typeof input.notes === 'string') updateData.notes = input.notes
+
+      const updated = await tx.productionTask.update({ where: { id }, data: updateData })
+
+      await tx.productionLog.create({
+        data: {
+          taskId: id,
+          quantityDelta: computed.delta,
+          quantityAfter: computed.nextQuantity,
+          statusBefore: current.status,
+          statusAfter: computed.nextStatus,
+          note: input.note || null,
+          createdByEmail: actor.email || null,
+          createdByName: actor.name || null,
+        },
+      })
+
+      orderIdForRefresh = updated.orderId
+      return { ok: true as const }
+    })
+
+    if (!result.ok) return { ok: false, error: result.error }
+
+    if (orderIdForRefresh) {
+      await refreshOrderFulfillmentFromProduction(orderIdForRefresh)
+    }
+
+    const refreshed = await getProductionTask(id)
+    if (!refreshed) return { ok: false, error: 'Tarefa não encontrada após atualização.' }
+    return { ok: true, task: refreshed }
+  } catch (error) {
+    console.error('[database] updateProductionTask Prisma failed:', error)
+    return { ok: false, error: 'Erro ao atualizar tarefa de produção.' }
+  }
+}
+
+interface QuantityStatusInput {
+  producedQuantity: number
+  requiredQuantity: number
+  status: string
+  startedAt?: string | Date | null
+  completedAt?: string | Date | null
+}
+
+interface QuantityStatusOk {
+  ok: true
+  nextQuantity: number
+  delta: number
+  nextStatus: ProductionTaskStatus
+  startedAt?: Date | string | null
+  completedAt?: Date | null
+}
+
+function computeQuantityAndStatus(
+  current: QuantityStatusInput,
+  input: UpdateProductionTaskInput
+): QuantityStatusOk | { ok: false; error: string } {
+  const required = Math.max(0, Math.floor(current.requiredQuantity))
+  const currentProduced = Math.max(0, Math.floor(current.producedQuantity))
+
+  let nextQuantity = currentProduced
+  if (typeof input.producedQuantity === 'number' && Number.isFinite(input.producedQuantity)) {
+    nextQuantity = Math.floor(input.producedQuantity)
+  } else if (typeof input.quantityDelta === 'number' && Number.isFinite(input.quantityDelta)) {
+    nextQuantity = currentProduced + Math.floor(input.quantityDelta)
+  }
+
+  if (nextQuantity < 0) {
+    return { ok: false, error: 'Quantidade produzida não pode ser negativa.' }
+  }
+  if (nextQuantity > required) {
+    return {
+      ok: false,
+      error: `Quantidade produzida (${nextQuantity}) excede o necessário (${required}).`,
+    }
+  }
+
+  const delta = nextQuantity - currentProduced
+
+  // Determine next status.
+  const currentStatus = (current.status as ProductionTaskStatus) || 'pending'
+  let nextStatus: ProductionTaskStatus = currentStatus
+
+  // Auto transition rules
+  if (currentProduced === 0 && nextQuantity > 0 && currentStatus === 'pending') {
+    nextStatus = 'in_production'
+  }
+  if (required > 0 && nextQuantity >= required) {
+    nextStatus = 'completed'
+  }
+  // Correction back from completed
+  let resetCompletedAt: Date | null | undefined = undefined
+  if (nextQuantity < required && currentStatus === 'completed') {
+    nextStatus = 'in_production'
+    resetCompletedAt = null
+  }
+
+  // Explicit status override (last word, if valid)
+  if (
+    typeof input.status === 'string' &&
+    VALID_TASK_STATUSES.includes(input.status as ProductionTaskStatus)
+  ) {
+    nextStatus = input.status as ProductionTaskStatus
+  }
+
+  // startedAt / completedAt
+  let startedAt: Date | undefined
+  if (
+    nextStatus !== 'pending' &&
+    !current.startedAt &&
+    (nextQuantity > 0 || nextStatus === 'in_production' || nextStatus === 'paused')
+  ) {
+    startedAt = new Date()
+  }
+  let completedAt: Date | null | undefined = resetCompletedAt
+  if (nextStatus === 'completed' && !current.completedAt) {
+    completedAt = new Date()
+  }
+
+  return {
+    ok: true,
+    nextQuantity,
+    delta,
+    nextStatus,
+    startedAt,
+    completedAt,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ensure & sync
+// ---------------------------------------------------------------------------
+
+export interface EnsureProductionResult {
+  created: number
+  skipped?: string
+}
+
+export async function ensureProductionTasksForOrder(
+  orderId: string
+): Promise<EnsureProductionResult> {
+  if (!orderId) return { created: 0, skipped: 'invalid_order_id' }
+
+  if (!hasDatabase || !prisma?.order || !prisma?.productionTask) {
+    const db = readDB()
+    const order = db.orders.find((o) => o.id === orderId)
+    if (!order) return { created: 0, skipped: 'order_not_found' }
+    if (order.status !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+
+    let created = 0
+    for (const item of (order.items as any[]) || []) {
+      const itemId = item.id || `${order.id}_${item.productId}`
+      if (db.productionTasks.some((t) => t.orderItemId === itemId)) continue
+      const product = db.products.find((p) => p.id === item.productId)
+      if (!product) continue
+      const eligible = product.underOrder === true || product.isPersonalizable === true
+      if (!eligible) continue
+
+      const dueAt = computeFallbackDueAt(product as any, null)
+      const priority = isUrgent(dueAt) ? 'urgent' : 'normal'
+
+      db.productionTasks.unshift({
+        id: `ptask_${Date.now()}_${created}`,
+        orderId: order.id,
+        orderItemId: itemId,
+        requiredQuantity: Math.max(1, Math.floor(item.quantity ?? 1)),
+        producedQuantity: 0,
+        status: 'pending',
+        priority,
+        dueAt: dueAt.toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      created += 1
+    }
+    if (created > 0) writeDB(db)
+    return { created }
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true } } },
+    })
+    if (!order) return { created: 0, skipped: 'order_not_found' }
+    if (order.status !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+
+    let created = 0
+    for (const item of order.items) {
+      const eligible =
+        Boolean(item.product?.underOrder) || Boolean(item.product?.isPersonalizable)
+      if (!eligible) continue
+
+      const exists = await prisma.productionTask.findUnique({
+        where: { orderItemId: item.id },
+      })
+      if (exists) continue
+
+      const dueAt =
+        order.productionDeadline ||
+        new Date(
+          Date.now() +
+            Math.max(1, Number(item.product?.productionTimeMaxDays ?? 3)) *
+              24 *
+              60 *
+              60 *
+              1000
+        )
+
+      const priority = isUrgent(dueAt) ? 'urgent' : 'normal'
+
+      try {
+        await prisma.productionTask.create({
+          data: {
+            orderId: order.id,
+            orderItemId: item.id,
+            requiredQuantity: Math.max(1, Math.floor(item.quantity)),
+            producedQuantity: 0,
+            status: 'pending',
+            priority,
+            dueAt,
+          },
+        })
+        created += 1
+      } catch (err: any) {
+        // Idempotent: ignore unique violation on orderItemId
+        if (err?.code !== 'P2002') {
+          console.error('[database] ensureProductionTasksForOrder create failed:', err)
+        }
+      }
+    }
+
+    return { created }
+  } catch (error) {
+    console.error('[database] ensureProductionTasksForOrder Prisma failed:', error)
+    return { created: 0, skipped: 'error' }
+  }
+}
+
+function computeFallbackDueAt(
+  product: { productionTimeMaxDays?: number | null } | null,
+  productionDeadline: Date | string | null
+): Date {
+  if (productionDeadline) {
+    const d = new Date(productionDeadline)
+    if (Number.isFinite(d.getTime())) return d
+  }
+  const days = Math.max(1, Number(product?.productionTimeMaxDays ?? 3))
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+}
+
+function isUrgent(dueAt: Date): boolean {
+  return dueAt.getTime() - Date.now() <= 24 * 60 * 60 * 1000
+}
+
+export interface SyncProductionResult {
+  created: number
+  skipped: number
+  ordersScanned: number
+}
+
+export async function syncProductionTasksForPaidOrders(input?: {
+  orderNumber?: string
+}): Promise<SyncProductionResult> {
+  const orderNumber = input?.orderNumber
+
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    const candidates = orderNumber
+      ? db.orders.filter((o) => o.orderNumber === orderNumber)
+      : db.orders.filter(
+          (o) =>
+            o.status === 'paid' &&
+            (o.fulfillmentStatus === 'pending' || o.fulfillmentStatus === 'in_production')
+        )
+
+    let created = 0
+    let skipped = 0
+    for (const o of candidates) {
+      const before = readDB().productionTasks.length
+      const r = await ensureProductionTasksForOrder(o.id)
+      created += r.created
+      const after = readDB().productionTasks.length
+      const itemCount = (o.items || []).length
+      skipped += Math.max(0, itemCount - (after - before))
+    }
+    return { created, skipped, ordersScanned: candidates.length }
+  }
+
+  try {
+    let candidates: { id: string }[]
+    if (orderNumber) {
+      const o = await prisma.order.findUnique({
+        where: { orderNumber },
+        select: { id: true },
+      })
+      candidates = o ? [o] : []
+    } else {
+      candidates = await prisma.order.findMany({
+        where: {
+          status: 'paid',
+          fulfillmentStatus: { in: ['pending', 'in_production'] },
+        },
+        select: { id: true },
+      })
+    }
+
+    let created = 0
+    let skipped = 0
+    for (const c of candidates) {
+      const result = await ensureProductionTasksForOrder(c.id)
+      created += result.created
+      // Approximate skipped count — items that already had a task or were ineligible.
+      const itemCount = await prisma.orderItem.count({ where: { orderId: c.id } })
+      skipped += Math.max(0, itemCount - result.created)
+    }
+
+    return { created, skipped, ordersScanned: candidates.length }
+  } catch (error) {
+    console.error('[database] syncProductionTasksForPaidOrders Prisma failed:', error)
+    return { created: 0, skipped: 0, ordersScanned: 0 }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Customer view
+// ---------------------------------------------------------------------------
+
+export async function getCustomerOrderProduction(
+  user: { email: string },
+  orderNumber: string
+): Promise<SerializedCustomerProduction | null> {
+  if (!user?.email || !orderNumber) return null
+  const normalizedEmail = user.email.toLowerCase()
+
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    const order = db.orders.find((o) => o.orderNumber === orderNumber)
+    if (!order) return null
+    if ((order.customerEmail || '').toLowerCase() !== normalizedEmail) return null
+
+    const tasks = db.productionTasks.filter((t) => t.orderId === order.id)
+    if (tasks.length === 0) {
+      return { orderNumber, hasProduction: false, overall: null, items: [] }
+    }
+    const inputs = tasks.map((t) => {
+      const item = order.items.find((it: any) => it.id === t.orderItemId) as any
+      return {
+        status: t.status,
+        requiredQuantity: t.requiredQuantity,
+        producedQuantity: t.producedQuantity,
+        updatedAt: t.updatedAt,
+        orderItem: { productNameSnapshot: item?.productName ?? null },
+      }
+    })
+    return serializeCustomerProduction(inputs, orderNumber)
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        productionTasks: {
+          include: { orderItem: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    })
+    if (!order) return null
+    if ((order.customerEmail || '').toLowerCase() !== normalizedEmail) return null
+
+    if (!order.productionTasks || order.productionTasks.length === 0) {
+      return { orderNumber, hasProduction: false, overall: null, items: [] }
+    }
+
+    const inputs = order.productionTasks.map((t: any) => ({
+      status: t.status,
+      requiredQuantity: t.requiredQuantity,
+      producedQuantity: t.producedQuantity,
+      updatedAt: t.updatedAt,
+      orderItem: { productNameSnapshot: t.orderItem?.productNameSnapshot ?? null },
+    }))
+    return serializeCustomerProduction(inputs, orderNumber)
+  } catch (error) {
+    console.error('[database] getCustomerOrderProduction Prisma failed:', error)
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Refresh order fulfillment
+// ---------------------------------------------------------------------------
+
+export async function refreshOrderFulfillmentFromProduction(
+  orderId: string
+): Promise<void> {
+  if (!orderId) return
+
+  if (!hasDatabase || !prisma?.order || !prisma?.productionTask) {
+    const db = readDB()
+    const order = db.orders.find((o) => o.id === orderId)
+    if (!order) return
+    if (order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered') return
+
+    const tasks = db.productionTasks.filter((t) => t.orderId === orderId)
+    if (tasks.length === 0) return
+
+    const next = computeFulfillmentFromTasks(tasks.map((t) => t.status))
+    if (next && next !== order.fulfillmentStatus) {
+      order.fulfillmentStatus = next
+      writeDB(db)
+    }
+    return
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { fulfillmentStatus: true },
+    })
+    if (!order) return
+    if (order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered') return
+
+    const tasks = await prisma.productionTask.findMany({
+      where: { orderId },
+      select: { status: true },
+    })
+    if (tasks.length === 0) return
+
+    const next = computeFulfillmentFromTasks(tasks.map((t) => t.status))
+    if (next && next !== order.fulfillmentStatus) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { fulfillmentStatus: next },
+      })
+    }
+  } catch (error) {
+    console.error('[database] refreshOrderFulfillmentFromProduction Prisma failed:', error)
+  }
+}
+
+function computeFulfillmentFromTasks(statuses: string[]): string | null {
+  if (statuses.length === 0) return null
+  // Ignore cancelled tasks for aggregation; if all cancelled, leave alone.
+  const active = statuses.filter((s) => s !== 'cancelled')
+  if (active.length === 0) return null
+  if (active.every((s) => s === 'completed')) return 'ready_to_ship'
+  if (active.some((s) => s === 'in_production' || s === 'paused')) return 'in_production'
+  if (active.every((s) => s === 'pending')) return 'pending'
+  return 'in_production'
 }

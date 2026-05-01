@@ -43,7 +43,8 @@ type Product = {
 
 const fulfillmentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'production', label: 'Em produção', color: '#3B82F6' },
+  { value: 'in_production', label: 'Em produção', color: '#3B82F6' },
+  { value: 'ready_to_ship', label: 'Pronto para envio', color: '#1D7A72' },
   { value: 'shipped', label: 'Enviado', color: '#8B5CF6' },
   { value: 'delivered', label: 'Entregue', color: '#10B981' },
   { value: 'cancelled', label: 'Cancelado', color: '#EF4444' },
@@ -181,7 +182,8 @@ export default function AdminOrdersPage() {
     total: orders.length,
     pending: orders.filter(o => o.paymentStatus === 'pending').length,
     paid: orders.filter(o => o.paymentStatus === 'paid').length,
-    production: orders.filter(o => o.fulfillmentStatus === 'production').length,
+    production: orders.filter(o => o.fulfillmentStatus === 'in_production' || o.fulfillmentStatus === 'production').length,
+    readyToShip: orders.filter(o => o.fulfillmentStatus === 'ready_to_ship').length,
     shipped: orders.filter(o => o.fulfillmentStatus === 'shipped').length,
     delivered: orders.filter(o => o.fulfillmentStatus === 'delivered').length,
     cancelled: orders.filter(o => o.status === 'cancelled').length,
@@ -408,7 +410,21 @@ export default function AdminOrdersPage() {
                   </td>
                   <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
                   <td style={{ padding: '16px' }}>
-                    <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
+                      {order.paymentStatus === 'paid' && order.fulfillmentStatus === 'ready_to_ship' ? (
+                        <span style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#DFF4EC', color: '#1D7A72' }}>
+                          ✅ Pronto para envio
+                        </span>
+                      ) : order.paymentStatus === 'paid' && (order.fulfillmentStatus === 'pending' || order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'production') ? (
+                        <Link
+                          href={`/admin/producao?q=${encodeURIComponent(order.orderNumber)}`}
+                          style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#E0EAFB', color: '#2A4F8A', textDecoration: 'none' }}
+                        >
+                          Acompanhar produção
+                        </Link>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
