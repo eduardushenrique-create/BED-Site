@@ -110,7 +110,7 @@ export default function AdminCategoriesPage() {
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#1D2235' }}>Categorias</h1>
           <p style={{ color: '#6B7494' }}>Gerencie as categorias de produtos</p>
         </div>
-        <Button onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', description: '' }) }}>
+        <Button variant={showForm ? 'outline' : 'blue'} onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', description: '' }) }}>
           {showForm ? 'Cancelar' : '+ Nova categoria'}
         </Button>
       </header>
@@ -126,7 +126,7 @@ export default function AdminCategoriesPage() {
               <Input label="Descricao" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} placeholder="Descricao opcional" />
             </div>
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-              <Button type="submit">{editingId ? 'Salvar' : 'Criar categoria'}</Button>
+              <Button type="submit" variant="blue">{editingId ? 'Salvar' : 'Criar categoria'}</Button>
               <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null) }}>Cancelar</Button>
             </div>
           </form>
@@ -136,7 +136,7 @@ export default function AdminCategoriesPage() {
       {categories.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '48px', textAlign: 'center', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhuma categoria cadastrada</p>
-          <Button onClick={() => setShowForm(true)}>+ Cadastrar primeira categoria</Button>
+          <Button variant="blue" onClick={() => setShowForm(true)}>+ Cadastrar primeira categoria</Button>
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>

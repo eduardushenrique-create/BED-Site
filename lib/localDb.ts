@@ -121,7 +121,17 @@ const defaultData: Database = {
   products: [],
   categories: [],
   orders: [],
-  banners: [],
+  banners: [
+    {
+      id: 'banner_default',
+      title: 'Presentes feitos para durar.',
+      subtitle: 'Cada peça é impressa sob demanda com filamento premium. Personalize com nome, data ou mensagem especial.',
+      imageUrl: '',
+      ctaText: 'Explorar coleção',
+      ctaLink: '/produtos',
+      isActive: true,
+    },
+  ],
   users: [],
   webhookEvents: [],
 }

@@ -105,7 +105,7 @@ export default function AdminClientesPage() {
           <h1 style={{ fontSize: '28px', fontWeight: 700 }}>Clientes</h1>
           <p style={{ color: '#6B7494' }}>Gerencie os clientes da loja</p>
         </div>
-        <Button onClick={() => { setFormError(''); setShowCreateModal(true) }}>
+        <Button variant="blue" onClick={() => { setFormError(''); setShowCreateModal(true) }}>
           + Novo Cliente
         </Button>
       </header>
@@ -121,7 +121,7 @@ export default function AdminClientesPage() {
       {users.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '48px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhum cliente encontrado</p>
-          <Button onClick={() => { setFormError(''); setShowCreateModal(true) }}>+ Criar primeiro cliente</Button>
+          <Button variant="blue" onClick={() => { setFormError(''); setShowCreateModal(true) }}>+ Criar primeiro cliente</Button>
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
@@ -209,7 +209,7 @@ export default function AdminClientesPage() {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleCreateClient} disabled={saving}>
+              <Button variant="blue" onClick={handleCreateClient} disabled={saving}>
                 {saving ? 'Criando...' : 'Criar Cliente'}
               </Button>
             </div>

@@ -2,7 +2,7 @@
 
 import { ButtonHTMLAttributes, CSSProperties, forwardRef } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'blue'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,23 +13,28 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, CSSProperties> = {
   primary: {
-    backgroundColor: 'var(--color-primary)',
+    backgroundColor: '#1D2235',
     color: 'white',
     border: 'none',
   },
   secondary: {
-    backgroundColor: 'var(--color-accent-blue)',
-    color: 'var(--color-dark)',
+    backgroundColor: '#BBCFEB',
+    color: '#1D2235',
     border: 'none',
   },
   outline: {
     backgroundColor: 'transparent',
-    color: 'var(--color-dark)',
-    border: '1px solid var(--color-neutral-light)',
+    color: '#1D2235',
+    border: '1px solid #D8DCE8',
   },
   ghost: {
     backgroundColor: 'transparent',
-    color: 'var(--color-dark)',
+    color: '#1D2235',
+    border: 'none',
+  },
+  blue: {
+    backgroundColor: '#4A7AB5',
+    color: 'white',
     border: 'none',
   },
 }

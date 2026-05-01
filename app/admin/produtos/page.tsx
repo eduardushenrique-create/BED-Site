@@ -217,7 +217,7 @@ export default function AdminProductsPage() {
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#1D2235' }}>Produtos</h1>
           <p style={{ color: '#6B7494' }}>Gerencie seus produtos</p>
         </div>
-        <Button onClick={() => (showForm ? resetForm() : setShowForm(true))}>
+        <Button variant={showForm ? 'outline' : 'blue'} onClick={() => (showForm ? resetForm() : setShowForm(true))}>
           {showForm ? 'Cancelar' : '+ Novo Produto'}
         </Button>
       </header>
@@ -301,7 +301,7 @@ export default function AdminProductsPage() {
             </div>
 
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-              <Button type="submit" disabled={!categories.length}>{editingId ? 'Salvar' : 'Criar produto'}</Button>
+              <Button type="submit" variant="blue" disabled={!categories.length}>{editingId ? 'Salvar' : 'Criar produto'}</Button>
               <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
             </div>
           </form>
@@ -311,7 +311,7 @@ export default function AdminProductsPage() {
       {products.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '48px', textAlign: 'center', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhum produto cadastrado</p>
-          <Button onClick={() => setShowForm(true)}>+ Cadastrar primeiro produto</Button>
+          <Button variant="blue" onClick={() => setShowForm(true)}>+ Cadastrar primeiro produto</Button>
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>

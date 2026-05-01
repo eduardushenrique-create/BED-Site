@@ -3,22 +3,25 @@ import Button from '@/components/Button'
 import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
 import { getLocalCatalogProducts, getPublicCatalogCategories } from '@/lib/catalog'
+import { listBanners } from '@/lib/database'
 
 export const dynamic = 'force-dynamic'
 
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
 export default async function Home() {
-  const [products, categories] = await Promise.all([
+  const [products, categories, allBanners] = await Promise.all([
     getLocalCatalogProducts({ featured: true }),
     getPublicCatalogCategories(),
+    listBanners(),
   ])
+  const activeBanners = allBanners.filter(b => b.isActive)
   const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
   const featuredProducts = allProducts.slice(0, 4)
 
   return (
     <main className="container" style={{ paddingTop: '20px', paddingBottom: '64px' }}>
-      <Banner />
+      <Banner banners={activeBanners.length > 0 ? activeBanners : undefined} />
 
       <section style={{ marginBottom: '64px' }}>
         <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>

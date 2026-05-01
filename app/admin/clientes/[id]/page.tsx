@@ -177,8 +177,8 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
 
         {!isEditing && (
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button onClick={() => setIsEditing(true)} style={{ padding: '10px 16px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>Editar</button>
-            <button onClick={handleSendEmail} style={{ padding: '10px 16px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>Enviar e-mail</button>
+            <button onClick={() => setIsEditing(true)} style={{ padding: '10px 16px', backgroundColor: '#4A7AB5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: 'white' }}>Editar</button>
+            <button onClick={handleSendEmail} style={{ padding: '10px 16px', backgroundColor: '#4A7AB5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: 'white' }}>Enviar e-mail</button>
             {user.phone && (
               <button onClick={handleSendWhatsApp} style={{ padding: '10px 16px', backgroundColor: '#25D366', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: 'white' }}>WhatsApp</button>
             )}
@@ -205,7 +205,7 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
                 </label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={() => { setIsEditing(false); setEditForm({ name: user.name, email: user.email, phone: user.phone || '' }) }} style={{ flex: 1, padding: '10px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '6px', cursor: 'pointer' }}>Cancelar</button>
-                  <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px', backgroundColor: '#1D2235', border: 'none', borderRadius: '6px', cursor: saving ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 600 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
+                  <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px', backgroundColor: '#4A7AB5', border: 'none', borderRadius: '6px', cursor: saving ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 600 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
                 </div>
               </div>
             ) : (
