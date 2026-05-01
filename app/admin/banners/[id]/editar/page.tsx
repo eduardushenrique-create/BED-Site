@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -14,37 +14,69 @@ type Banner = {
   ctaText: string
   ctaLink: string
   isActive: boolean
+  displayDurationSeconds: number
 }
 
-const mockBanners: Banner[] = [
-  {
-    id: '1',
-    title: 'Presentes Personalizados',
-    subtitle: 'Impressos em 3D com muito carinho',
-    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&h=600&fit=crop',
-    ctaText: 'Personalizar Agora',
-    ctaLink: '/personalizados',
-    isActive: true,
-  },
-]
+const emptyForm: Omit<Banner, 'id'> = {
+  title: '',
+  subtitle: '',
+  imageUrl: '',
+  ctaText: '',
+  ctaLink: '',
+  isActive: true,
+  displayDurationSeconds: 5,
+}
 
 export default function EditarBannerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const [banners, setBanners] = useState<Banner[]>(mockBanners)
-  const banner = banners.find(b => b.id === id)
-
-  const [formData, setFormData] = useState({
-    title: banner?.title || '',
-    subtitle: banner?.subtitle || '',
-    imageUrl: banner?.imageUrl || '',
-    ctaText: banner?.ctaText || '',
-    ctaLink: banner?.ctaLink || '',
-    isActive: banner?.isActive ?? true,
-  })
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState<Omit<Banner, 'id'>>(emptyForm)
   const [previewError, setPreviewError] = useState(false)
 
-  if (!banner) {
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/banners')
+        if (!res.ok) {
+          if (!cancelled) setNotFound(true)
+          return
+        }
+        const data: Banner[] = await res.json()
+        const banner = Array.isArray(data) ? data.find(b => b.id === id) : null
+        if (!banner) {
+          if (!cancelled) setNotFound(true)
+          return
+        }
+        if (!cancelled) {
+          setFormData({
+            title: banner.title || '',
+            subtitle: banner.subtitle || '',
+            imageUrl: banner.imageUrl || '',
+            ctaText: banner.ctaText || '',
+            ctaLink: banner.ctaLink || '',
+            isActive: banner.isActive,
+            displayDurationSeconds: banner.displayDurationSeconds || 5,
+          })
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  if (loading) {
+    return <div style={{ padding: '48px', textAlign: 'center', color: '#6B7494' }}>Carregando...</div>
+  }
+
+  if (notFound) {
     return (
       <div style={{ textAlign: 'center', padding: '48px' }}>
         <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>Banner não encontrado</h1>
@@ -55,24 +87,28 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
     )
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setBanners(prev => prev.map(b => b.id === id ? { ...formData, id } : b))
-    alert('Banner atualizado com sucesso!')
-    router.push('/admin/banners')
-  }
-
-  const handleImageError = () => {
-    setPreviewError(true)
+    setSaving(true)
+    try {
+      const res = await fetch('/api/banners', {
+        method: 'PUT',
+        body: JSON.stringify({ id, ...formData }),
+      })
+      if (!res.ok) {
+        alert('Erro ao salvar banner')
+        return
+      }
+      router.push('/admin/banners')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
-        <Link 
-          href="/admin/banners" 
-          style={{ color: '#6B7494', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-        >
+        <Link href="/admin/banners" style={{ color: '#6B7494', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
           ← Voltar aos banners
         </Link>
       </div>
@@ -122,6 +158,16 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
                   placeholder="/personalizados"
                 />
 
+                <Input
+                  label="Tempo de exibição no carrossel (segundos)"
+                  type="number"
+                  min={2}
+                  max={60}
+                  value={String(formData.displayDurationSeconds)}
+                  onChange={(e) => setFormData({ ...formData, displayDurationSeconds: Math.max(2, parseInt(e.target.value, 10) || 5) })}
+                  placeholder="5"
+                />
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
                   <input
                     type="checkbox"
@@ -137,7 +183,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
               </div>
 
               <div style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
-                <Button type="submit" style={{ flex: 1 }}>Salvar Alterações</Button>
+                <Button type="submit" disabled={saving} style={{ flex: 1 }}>{saving ? 'Salvando...' : 'Salvar Alterações'}</Button>
                 <Link href="/admin/banners">
                   <Button type="button" variant="outline" style={{ flex: 1 }}>Cancelar</Button>
                 </Link>
@@ -148,62 +194,19 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
 
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>Preview</h2>
-          <div style={{ 
-            position: 'relative', 
-            height: '300px', 
-            borderRadius: '12px', 
-            overflow: 'hidden',
-            backgroundColor: '#D8DCE8',
-            border: '1px solid #D8DCE8'
-          }}>
+          <div style={{ position: 'relative', height: '300px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#D8DCE8', border: '1px solid #D8DCE8' }}>
             {formData.imageUrl && !previewError ? (
               <>
-                <img 
-                  src={formData.imageUrl} 
-                  alt="Preview" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={handleImageError}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)',
-                }} />
-                <div style={{
-                  position: 'relative',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  padding: '0 24px',
-                }}>
-                  <h3 style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: 'white',
-                    marginBottom: '8px',
-                  }}>
-                    {formData.title || 'Título do banner'}
-                  </h3>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={formData.imageUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setPreviewError(true)} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)' }} />
+                <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px' }}>
+                  <h3 style={{ fontSize: '24px', fontWeight: 700, color: 'white', marginBottom: '8px' }}>{formData.title || 'Título do banner'}</h3>
                   {formData.subtitle && (
-                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', marginBottom: '16px' }}>
-                      {formData.subtitle}
-                    </p>
+                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', marginBottom: '16px' }}>{formData.subtitle}</p>
                   )}
                   {formData.ctaText && (
-                    <button style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#D4849A',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      width: 'fit-content',
-                    }}>
+                    <button type="button" style={{ padding: '10px 20px', backgroundColor: '#D4849A', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, width: 'fit-content' }}>
                       {formData.ctaText}
                     </button>
                   )}
@@ -213,7 +216,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6B7494' }}>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ fontSize: '14px', marginBottom: '8px' }}>Adicione uma URL de imagem para ver o preview</p>
-                  <p style={{ fontSize: '12px' }}>Tamanho recomendado: 1200x600px</p>
+                  <p style={{ fontSize: '12px' }}>Tamanho recomendado: 1920x600px</p>
                 </div>
               </div>
             )}
