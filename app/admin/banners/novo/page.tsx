@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+import { compressImageToDataUrl, ImageUploadError } from '@/lib/image-upload'
 
 export default function NovoBannerPage() {
   const router = useRouter()
@@ -21,16 +22,24 @@ export default function NovoBannerPage() {
   const [imagePreview, setImagePreview] = useState('')
   const [previewError, setPreviewError] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [imageProcessing, setImageProcessing] = useState(false)
+  const [imageError, setImageError] = useState('')
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-        setFormData({ ...formData, imageUrl: reader.result as string })
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    setImageError('')
+    setImageProcessing(true)
+    try {
+      const compressed = await compressImageToDataUrl(file, { maxWidth: 1920, maxHeight: 800, quality: 0.85 })
+      setImagePreview(compressed)
+      setFormData({ ...formData, imageUrl: compressed })
+    } catch (err) {
+      const msg = err instanceof ImageUploadError ? err.message : 'Erro ao processar a imagem.'
+      setImageError(msg)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } finally {
+      setImageProcessing(false)
     }
   }
 
@@ -42,11 +51,16 @@ export default function NovoBannerPage() {
     }
     setSaving(true)
     try {
-      await fetch('/api/banners', {
+      const res = await fetch('/api/banners', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      alert('Banner criado com sucesso!')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data?.error || 'Erro ao criar banner')
+        return
+      }
       router.push('/admin/banners')
     } catch (e) {
       console.error('Error creating banner:', e)
@@ -96,19 +110,26 @@ export default function NovoBannerPage() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>Imagem do Banner</label>
-                  <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                  <input type="file" ref={fileInputRef} accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} style={{ display: 'none' }} />
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button type="button" onClick={() => fileInputRef.current?.click()} style={{ padding: '10px 16px', backgroundColor: '#F0F5FB', border: '1px solid #D8DCE8', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>
-                      {imagePreview ? 'Trocar imagem' : 'Selecionar imagem'}
+                    <button type="button" disabled={imageProcessing} onClick={() => fileInputRef.current?.click()} style={{ padding: '10px 16px', backgroundColor: '#F0F5FB', border: '1px solid #D8DCE8', borderRadius: '6px', cursor: imageProcessing ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: imageProcessing ? 0.6 : 1 }}>
+                      {imageProcessing ? 'Processando...' : imagePreview ? 'Trocar imagem' : 'Selecionar imagem'}
                     </button>
-                    {imagePreview && (
-                      <button type="button" onClick={() => { setImagePreview(''); setFormData({ ...formData, imageUrl: '' }) }} style={{ padding: '10px 16px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', color: '#EF4444' }}>
+                    {imagePreview && !imageProcessing && (
+                      <button type="button" onClick={() => { setImagePreview(''); setFormData({ ...formData, imageUrl: '' }); setImageError('') }} style={{ padding: '10px 16px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', color: '#EF4444' }}>
                         Remover
                       </button>
                     )}
                   </div>
+                  <p style={{ marginTop: '6px', fontSize: '12px', color: '#6B7494' }}>
+                    JPG, PNG ou WebP até 10 MB. Será redimensionada para 1920×800.
+                  </p>
+                  {imageError && (
+                    <p role="alert" style={{ marginTop: '6px', fontSize: '13px', color: '#A3526A', fontWeight: 600 }}>{imageError}</p>
+                  )}
                   {imagePreview && (
                     <div style={{ marginTop: '12px' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={imagePreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', objectFit: 'cover' }} />
                     </div>
                   )}

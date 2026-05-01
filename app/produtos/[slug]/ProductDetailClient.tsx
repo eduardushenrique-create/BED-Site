@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+import SafeImage from '@/components/SafeImage'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types'
 
@@ -72,27 +73,11 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               boxShadow: 'var(--shadow-card)',
             }}
           >
-            {product.images[selectedImage] ? (
-              <img
-                src={product.images[selectedImage].url}
-                alt={product.images[selectedImage].alt || product.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#8AAFD8',
-                  fontWeight: 600,
-                }}
-              >
-                Sem imagem
-              </div>
-            )}
+            <SafeImage
+              src={product.images[selectedImage]?.url}
+              alt={product.images[selectedImage]?.alt || product.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
 
           {product.images.length > 1 && (
@@ -113,7 +98,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                     background: '#E4EDF8',
                   }}
                 >
-                  <img src={img.url} alt={img.alt || `${product.name} - ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <SafeImage src={img.url} alt={img.alt || `${product.name} - ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </button>
               ))}
             </div>
