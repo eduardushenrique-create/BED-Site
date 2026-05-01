@@ -36,12 +36,20 @@ function buildDeliveryKey(topic: string, notificationId: string | null, resource
 
 export async function POST(request: NextRequest) {
   try {
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
+    if (!webhookSecret || !webhookSecret.trim()) {
+      console.error('[webhook] MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 503 }
+      )
+    }
+
     const signature = request.headers.get('x-signature')
     const requestId = request.headers.get('x-request-id')
     const payload = await request.text()
     const payloadHash = buildPayloadHash(payload)
 
-    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
     const raw = JSON.parse(payload)
     const topic = raw.type || raw.topic || 'unknown'
     const notificationId = raw.id ? String(raw.id) : null
@@ -50,7 +58,7 @@ export async function POST(request: NextRequest) {
     const dataId = request.nextUrl.searchParams.get('data.id') || resourceId
     const deliveryKey = buildDeliveryKey(topic, notificationId, resourceId, action, payloadHash)
 
-    if (webhookSecret && !verifyWebhookSignature(signature, requestId, dataId, webhookSecret)) {
+    if (!verifyWebhookSignature(signature, requestId, dataId, webhookSecret)) {
       console.error('Invalid webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }

@@ -24,6 +24,12 @@ export interface PaymentPreference {
   }
   external_reference?: string
   notification_url?: string
+  backUrls?: {
+    success?: string
+    pending?: string
+    failure?: string
+  }
+  autoReturn?: 'approved' | 'all'
 }
 
 export interface PaymentResult {
@@ -50,22 +56,39 @@ export async function createPaymentPreference(data: PaymentPreference): Promise<
   }
 
   try {
+    const hasBackUrls = Boolean(
+      data.backUrls && (data.backUrls.success || data.backUrls.pending || data.backUrls.failure)
+    )
+
+    const body: Record<string, unknown> = {
+      items: data.items,
+      payer: data.payer,
+      payment_methods: data.payment_methods || {
+        installments: 12,
+      },
+      external_reference: data.external_reference,
+      notification_url: data.notification_url,
+      statement_descriptor: 'FORMA3D',
+    }
+
+    if (hasBackUrls && data.backUrls) {
+      body.back_urls = {
+        success: data.backUrls.success,
+        pending: data.backUrls.pending,
+        failure: data.backUrls.failure,
+      }
+      if (data.autoReturn) {
+        body.auto_return = data.autoReturn
+      }
+    }
+
     const response = await fetch(`${MERCADOPAGO_BASE_URL}/checkout/preferences`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({
-        items: data.items,
-        payer: data.payer,
-        payment_methods: data.payment_methods || {
-          installments: 12,
-        },
-        external_reference: data.external_reference,
-        notification_url: data.notification_url,
-        statement_descriptor: 'FORMA3D',
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {

@@ -35,6 +35,18 @@ function getNotificationUrl() {
   return appUrl ? `${appUrl}/api/webhooks/mercadopago` : undefined
 }
 
+function getBackUrls(orderNumber: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) return undefined
+
+  const encoded = encodeURIComponent(orderNumber)
+  return {
+    success: `${appUrl}/pedido-confirmado?pedido=${encoded}&status=success`,
+    pending: `${appUrl}/pedido-confirmado?pedido=${encoded}&status=pending`,
+    failure: `${appUrl}/pedido-confirmado?pedido=${encoded}&status=failure`,
+  }
+}
+
 export async function createPaymentForOrder(input: PaymentCreationInput): Promise<PaymentCreationResult> {
   const provider = process.env.PAYMENT_PROVIDER || 'mercadopago'
 
@@ -85,6 +97,8 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
     }
   }
 
+  const backUrls = getBackUrls(input.orderNumber)
+
   const preference = await createPaymentPreference({
     items: input.items.map(item => ({
       id: item.id,
@@ -103,6 +117,7 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
     },
     external_reference: input.orderNumber,
     notification_url: getNotificationUrl(),
+    ...(backUrls ? { backUrls, autoReturn: 'approved' as const } : {}),
   })
 
   if (!preference) {

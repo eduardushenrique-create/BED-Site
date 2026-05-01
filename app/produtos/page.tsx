@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ProductCard from '@/components/ProductCard'
 
 interface Product {
@@ -22,13 +22,20 @@ interface Category {
 }
 
 function ProductsContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const categoryParam = searchParams.get('categoria')
+  const searchParam = searchParams.get('busca') || ''
 
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam)
+
+  // Keep selected category in sync with URL changes (e.g. nav from header)
+  useEffect(() => {
+    setSelectedCategory(categoryParam)
+  }, [categoryParam])
 
   useEffect(() => {
     async function fetchCategories() {
@@ -52,6 +59,9 @@ function ProductsContent() {
         if (selectedCategory) {
           params.set('category', selectedCategory)
         }
+        if (searchParam) {
+          params.set('search', searchParam)
+        }
 
         const res = await fetch(`/api/products?${params.toString()}`)
         const data = await res.json()
@@ -64,10 +74,56 @@ function ProductsContent() {
     }
 
     fetchProducts()
-  }, [selectedCategory])
+  }, [selectedCategory, searchParam])
+
+  function clearSearch() {
+    const params = new URLSearchParams()
+    if (selectedCategory) {
+      params.set('categoria', selectedCategory)
+    }
+    const qs = params.toString()
+    router.push(qs ? `/produtos?${qs}` : '/produtos')
+  }
 
   return (
     <>
+      {searchParam && (
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '16px 20px',
+            background: '#F0F5FB',
+            border: '1px solid #D8DCE8',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ color: '#1D2235', fontSize: '15px' }}>
+            Resultados para: <strong>“{searchParam}”</strong>
+          </div>
+          <button
+            type="button"
+            onClick={clearSearch}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '8px',
+              border: '1px solid #1D2235',
+              background: 'white',
+              color: '#1D2235',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            Limpar busca
+          </button>
+        </div>
+      )}
+
       <div style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
@@ -111,10 +167,14 @@ function ProductsContent() {
       ) : products.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>
-            Nenhum produto encontrado.
+            {searchParam
+              ? `Nada encontrado para “${searchParam}”.`
+              : 'Nenhum produto encontrado.'}
           </p>
           <p style={{ color: '#6B7494' }}>
-            Publique produtos ativos no banco para exibi-los aqui.
+            {searchParam
+              ? 'Tente outras palavras-chave ou remova os filtros.'
+              : 'Publique produtos ativos no banco para exibi-los aqui.'}
           </p>
         </div>
       ) : (
