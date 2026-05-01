@@ -261,9 +261,32 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     })
 
     if (data.imageUrl !== undefined) {
-      await prisma.productImage.deleteMany({ where: { productId: id } })
+      // Substitui apenas a imagem principal existente; preserva as demais imagens da galeria
+      const existingMain = await prisma.productImage.findFirst({ where: { productId: id, isMain: true } })
       if (data.imageUrl) {
-        await prisma.productImage.create({ data: { productId: id, url: data.imageUrl, alt: product.name, isMain: true } })
+        if (existingMain) {
+          await prisma.productImage.update({
+            where: { id: existingMain.id },
+            data: { url: data.imageUrl, alt: product.name },
+          })
+        } else {
+          await prisma.productImage.create({
+            data: { productId: id, url: data.imageUrl, alt: product.name, isMain: true },
+          })
+        }
+      } else if (existingMain) {
+        const next = await prisma.productImage.findFirst({
+          where: { productId: id, NOT: { id: existingMain.id } },
+          orderBy: { sortOrder: 'asc' },
+        })
+        if (next) {
+          await prisma.$transaction([
+            prisma.productImage.delete({ where: { id: existingMain.id } }),
+            prisma.productImage.update({ where: { id: next.id }, data: { isMain: true } }),
+          ])
+        } else {
+          await prisma.productImage.delete({ where: { id: existingMain.id } })
+        }
       }
     }
 
@@ -276,6 +299,145 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     db.products[index] = { ...db.products[index], ...data }
     writeDB(db)
     return db.products[index]
+  }
+}
+
+export type ProductImageDto = {
+  id: string
+  url: string
+  alt: string | null
+  sortOrder: number
+  isMain: boolean
+}
+
+const MAX_PRODUCT_IMAGES = 8
+
+function serializeProductImage(img: any): ProductImageDto {
+  return {
+    id: img.id,
+    url: img.url,
+    alt: img.alt || null,
+    sortOrder: img.sortOrder,
+    isMain: img.isMain,
+  }
+}
+
+export async function listProductImages(productId: string): Promise<ProductImageDto[]> {
+  if (!hasDatabase || !prisma?.productImage) return []
+  try {
+    const images = await prisma.productImage.findMany({
+      where: { productId },
+      orderBy: [{ isMain: 'desc' }, { sortOrder: 'asc' }],
+    })
+    return images.map(serializeProductImage)
+  } catch (error) {
+    console.error('[database] listProductImages Prisma failed:', error)
+    return []
+  }
+}
+
+export async function addProductImage(productId: string, data: { url: string; alt?: string }): Promise<{ image: ProductImageDto | null; error?: string }> {
+  if (!hasDatabase || !prisma?.productImage || !prisma?.product) {
+    return { image: null, error: 'Banco de dados indisponível.' }
+  }
+
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId }, include: { _count: { select: { images: true } } } })
+    if (!product) return { image: null, error: 'Produto não encontrado.' }
+    if (product._count.images >= MAX_PRODUCT_IMAGES) {
+      return { image: null, error: `Limite de ${MAX_PRODUCT_IMAGES} imagens por produto.` }
+    }
+
+    const isFirst = product._count.images === 0
+    const maxSortOrder = await prisma.productImage.aggregate({ where: { productId }, _max: { sortOrder: true } })
+    const sortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1
+
+    const image = await prisma.productImage.create({
+      data: {
+        productId,
+        url: data.url,
+        alt: data.alt || product.name,
+        sortOrder,
+        isMain: isFirst,
+      },
+    })
+    return { image: serializeProductImage(image) }
+  } catch (error) {
+    console.error('[database] addProductImage Prisma failed:', error)
+    return { image: null, error: 'Erro ao salvar imagem.' }
+  }
+}
+
+export async function removeProductImage(productId: string, imageId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!hasDatabase || !prisma?.productImage) {
+    return { ok: false, error: 'Banco de dados indisponível.' }
+  }
+
+  try {
+    const image = await prisma.productImage.findFirst({ where: { id: imageId, productId } })
+    if (!image) return { ok: false, error: 'Imagem não encontrada.' }
+
+    await prisma.$transaction(async tx => {
+      await tx.productImage.delete({ where: { id: imageId } })
+      if (image.isMain) {
+        const next = await tx.productImage.findFirst({
+          where: { productId },
+          orderBy: { sortOrder: 'asc' },
+        })
+        if (next) {
+          await tx.productImage.update({ where: { id: next.id }, data: { isMain: true } })
+        }
+      }
+    })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] removeProductImage Prisma failed:', error)
+    return { ok: false, error: 'Erro ao remover imagem.' }
+  }
+}
+
+export async function setMainProductImage(productId: string, imageId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!hasDatabase || !prisma?.productImage) {
+    return { ok: false, error: 'Banco de dados indisponível.' }
+  }
+
+  try {
+    const image = await prisma.productImage.findFirst({ where: { id: imageId, productId } })
+    if (!image) return { ok: false, error: 'Imagem não encontrada.' }
+
+    await prisma.$transaction([
+      prisma.productImage.updateMany({ where: { productId, isMain: true }, data: { isMain: false } }),
+      prisma.productImage.update({ where: { id: imageId }, data: { isMain: true } }),
+    ])
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] setMainProductImage Prisma failed:', error)
+    return { ok: false, error: 'Erro ao definir imagem principal.' }
+  }
+}
+
+export async function reorderProductImages(productId: string, orderedIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (!hasDatabase || !prisma?.productImage) {
+    return { ok: false, error: 'Banco de dados indisponível.' }
+  }
+
+  try {
+    const owned = await prisma.productImage.findMany({ where: { productId }, select: { id: true } })
+    const ownedIds = new Set(owned.map(i => i.id))
+    if (orderedIds.length !== owned.length || orderedIds.some(id => !ownedIds.has(id))) {
+      return { ok: false, error: 'Lista de ordenação inválida.' }
+    }
+
+    const client = prisma
+    await client.$transaction(
+      orderedIds.map((id, index) =>
+        client.productImage.update({ where: { id }, data: { sortOrder: index } })
+      )
+    )
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] reorderProductImages Prisma failed:', error)
+    return { ok: false, error: 'Erro ao reordenar imagens.' }
   }
 }
 
