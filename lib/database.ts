@@ -100,18 +100,25 @@ function serializeOrder(order: any): Order {
 }
 
 export async function listProducts() {
-  if (!hasDatabase) return readDB().products
+  if (!hasDatabase || !prisma?.product) {
+    return readDB().products
+  }
 
-  const products = await prisma.product.findMany({
-    include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
-    orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-  })
+  try {
+    const products = await prisma.product.findMany({
+      include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
+      orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
+    })
 
-  return products.map(serializeProduct)
+    return products.map(serializeProduct)
+  } catch (error) {
+    console.error('[database] listProducts Prisma failed, using fallback:', error)
+    return readDB().products
+  }
 }
 
 export async function createProduct(data: Product) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.product) {
     const db = readDB()
     const newProduct: Product = { ...data, id: `prod_${Date.now()}` }
     db.products.push(newProduct)
@@ -119,37 +126,46 @@ export async function createProduct(data: Product) {
     return newProduct
   }
 
-  const category = data.category
-    ? await prisma.category.findUnique({ where: { slug: data.category } })
-    : null
+  try {
+    const category = data.category
+      ? await prisma.category.findUnique({ where: { slug: data.category } })
+      : null
 
-  const product = await prisma.product.create({
-    data: {
-      name: data.name,
-      slug: data.slug,
-      sku: data.sku || null,
-      description: data.description || null,
-      shortDescription: data.description || null,
-      price: data.price,
-      categoryId: category?.id || null,
-      isPersonalizable: data.isPersonalizable,
-      isFeatured: data.isFeatured,
-      isActive: data.isActive,
-      status: data.status,
-      stock: data.stock || 0,
-      underOrder: data.underOrder || false,
-      images: data.imageUrl
-        ? { create: [{ url: data.imageUrl, alt: data.name, isMain: true }] }
-        : undefined,
-    },
-    include: { category: true, images: true },
-  })
+    const product = await prisma.product.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        sku: data.sku || null,
+        description: data.description || null,
+        shortDescription: data.description || null,
+        price: data.price,
+        categoryId: category?.id || null,
+        isPersonalizable: data.isPersonalizable,
+        isFeatured: data.isFeatured,
+        isActive: data.isActive,
+        status: data.status,
+        stock: data.stock || 0,
+        underOrder: data.underOrder || false,
+        images: data.imageUrl
+          ? { create: [{ url: data.imageUrl, alt: data.name, isMain: true }] }
+          : undefined,
+      },
+      include: { category: true, images: true },
+    })
 
-  return serializeProduct(product)
+    return serializeProduct(product)
+  } catch (error) {
+    console.error('[database] createProduct Prisma failed, using fallback:', error)
+    const db = readDB()
+    const newProduct: Product = { ...data, id: `prod_${Date.now()}` }
+    db.products.push(newProduct)
+    writeDB(db)
+    return newProduct
+  }
 }
 
 export async function updateProduct(id: string, data: Partial<Product>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.product) {
     const db = readDB()
     const index = db.products.findIndex(product => product.id === id)
     if (index === -1) return null
@@ -158,42 +174,52 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     return db.products[index]
   }
 
-  const category = data.category
-    ? await prisma.category.findUnique({ where: { slug: data.category } })
-    : undefined
+  try {
+    const category = data.category
+      ? await prisma.category.findUnique({ where: { slug: data.category } })
+      : undefined
 
-  const product = await prisma.product.update({
-    where: { id },
-    data: {
-      name: data.name,
-      slug: data.slug,
-      sku: data.sku,
-      description: data.description,
-      shortDescription: data.description,
-      price: data.price,
-      categoryId: category ? category.id : undefined,
-      isPersonalizable: data.isPersonalizable,
-      isFeatured: data.isFeatured,
-      isActive: data.isActive,
-      status: data.status,
-      stock: data.stock,
-      underOrder: data.underOrder,
-    },
-    include: { category: true, images: true },
-  })
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        name: data.name,
+        slug: data.slug,
+        sku: data.sku,
+        description: data.description,
+        shortDescription: data.description,
+        price: data.price,
+        categoryId: category ? category.id : undefined,
+        isPersonalizable: data.isPersonalizable,
+        isFeatured: data.isFeatured,
+        isActive: data.isActive,
+        status: data.status,
+        stock: data.stock,
+        underOrder: data.underOrder,
+      },
+      include: { category: true, images: true },
+    })
 
-  if (data.imageUrl !== undefined) {
-    await prisma.productImage.deleteMany({ where: { productId: id } })
-    if (data.imageUrl) {
-      await prisma.productImage.create({ data: { productId: id, url: data.imageUrl, alt: product.name, isMain: true } })
+    if (data.imageUrl !== undefined) {
+      await prisma.productImage.deleteMany({ where: { productId: id } })
+      if (data.imageUrl) {
+        await prisma.productImage.create({ data: { productId: id, url: data.imageUrl, alt: product.name, isMain: true } })
+      }
     }
-  }
 
-  return serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true } }))
+    return serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true } }))
+  } catch (error) {
+    console.error('[database] updateProduct Prisma failed, using fallback:', error)
+    const db = readDB()
+    const index = db.products.findIndex(product => product.id === id)
+    if (index === -1) return null
+    db.products[index] = { ...db.products[index], ...data }
+    writeDB(db)
+    return db.products[index]
+  }
 }
 
 export async function deleteProduct(id: string) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.product) {
     const db = readDB()
     const index = db.products.findIndex(product => product.id === id)
     if (index === -1) return false
@@ -202,18 +228,28 @@ export async function deleteProduct(id: string) {
     return true
   }
 
-  await prisma.product.delete({ where: { id } })
-  return true
+  try {
+    await prisma.product.delete({ where: { id } })
+    return true
+  } catch (error) {
+    console.error('[database] deleteProduct Prisma failed:', error)
+    return false
+  }
 }
 
 export async function listCategories() {
-  if (!hasDatabase) return readDB().categories
-  const categories = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] })
-  return categories.map(serializeCategory)
+  if (!hasDatabase || !prisma?.category) return readDB().categories
+  try {
+    const categories = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] })
+    return categories.map(serializeCategory)
+  } catch (error) {
+    console.error('[database] listCategories Prisma failed, using fallback:', error)
+    return readDB().categories
+  }
 }
 
 export async function createCategory(data: Category) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.category) {
     const db = readDB()
     const newCategory: Category = { ...data, id: `cat_${Date.now()}` }
     db.categories.push(newCategory)
@@ -221,11 +257,20 @@ export async function createCategory(data: Category) {
     return newCategory
   }
 
-  return serializeCategory(await prisma.category.create({ data }))
+  try {
+    return serializeCategory(await prisma.category.create({ data }))
+  } catch (error) {
+    console.error('[database] createCategory Prisma failed, using fallback:', error)
+    const db = readDB()
+    const newCategory: Category = { ...data, id: `cat_${Date.now()}` }
+    db.categories.push(newCategory)
+    writeDB(db)
+    return newCategory
+  }
 }
 
 export async function updateCategory(id: string, data: Partial<Category>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.category) {
     const db = readDB()
     const index = db.categories.findIndex(category => category.id === id)
     if (index === -1) return null
@@ -234,11 +279,21 @@ export async function updateCategory(id: string, data: Partial<Category>) {
     return db.categories[index]
   }
 
-  return serializeCategory(await prisma.category.update({ where: { id }, data }))
+  try {
+    return serializeCategory(await prisma.category.update({ where: { id }, data }))
+  } catch (error) {
+    console.error('[database] updateCategory Prisma failed, using fallback:', error)
+    const db = readDB()
+    const index = db.categories.findIndex(category => category.id === id)
+    if (index === -1) return null
+    db.categories[index] = { ...db.categories[index], ...data }
+    writeDB(db)
+    return db.categories[index]
+  }
 }
 
 export async function deleteCategory(id: string) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.category) {
     const db = readDB()
     const index = db.categories.findIndex(category => category.id === id)
     if (index === -1) return false
@@ -247,12 +302,17 @@ export async function deleteCategory(id: string) {
     return true
   }
 
-  await prisma.category.delete({ where: { id } })
-  return true
+  try {
+    await prisma.category.delete({ where: { id } })
+    return true
+  } catch (error) {
+    console.error('[database] deleteCategory Prisma failed:', error)
+    return false
+  }
 }
 
 export async function listCustomers(q = '') {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.customer) {
     const users = readDB().users
     if (!q) return users
     const lower = q.toLowerCase()
@@ -263,24 +323,29 @@ export async function listCustomers(q = '') {
     )
   }
 
-  const customers = await prisma.customer.findMany({
-    where: q
-      ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { email: { contains: q, mode: 'insensitive' } },
-            { phone: { contains: q } },
-          ],
-        }
-      : undefined,
-    orderBy: { createdAt: 'desc' },
-  })
+  try {
+    const customers = await prisma.customer.findMany({
+      where: q
+        ? {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q } },
+            ],
+          }
+        : undefined,
+      orderBy: { createdAt: 'desc' },
+    })
 
-  return customers.map(serializeCustomer)
+    return customers.map(serializeCustomer)
+  } catch (error) {
+    console.error('[database] listCustomers Prisma failed, using fallback:', error)
+    return readDB().users
+  }
 }
 
 export async function createCustomer(data: Pick<User, 'name' | 'email' | 'phone'>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.customer) {
     const db = readDB()
     const existing = db.users.find(user => user.email === data.email)
     if (existing) return null
@@ -296,11 +361,28 @@ export async function createCustomer(data: Pick<User, 'name' | 'email' | 'phone'
     return newUser
   }
 
-  return serializeCustomer(await prisma.customer.create({ data }))
+  try {
+    return serializeCustomer(await prisma.customer.create({ data }))
+  } catch (error) {
+    console.error('[database] createCustomer Prisma failed, using fallback:', error)
+    const db = readDB()
+    const existing = db.users.find(user => user.email === data.email)
+    if (existing) return null
+    const newUser: User = {
+      ...data,
+      id: `user_${Date.now()}`,
+      isVerified: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    db.users.push(newUser)
+    writeDB(db)
+    return newUser
+  }
 }
 
 export async function updateCustomer(id: string, data: Partial<User>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.customer) {
     const db = readDB()
     const index = db.users.findIndex(user => user.id === id)
     if (index === -1) return null
@@ -309,20 +391,35 @@ export async function updateCustomer(id: string, data: Partial<User>) {
     return db.users[index]
   }
 
-  return serializeCustomer(await prisma.customer.update({
-    where: { id },
-    data: { name: data.name, email: data.email, phone: data.phone },
-  }))
+  try {
+    return serializeCustomer(await prisma.customer.update({
+      where: { id },
+      data: { name: data.name, email: data.email, phone: data.phone },
+    }))
+  } catch (error) {
+    console.error('[database] updateCustomer Prisma failed, using fallback:', error)
+    const db = readDB()
+    const index = db.users.findIndex(user => user.id === id)
+    if (index === -1) return null
+    db.users[index] = { ...db.users[index], ...data, updatedAt: new Date().toISOString() }
+    writeDB(db)
+    return db.users[index]
+  }
 }
 
 export async function listBanners() {
-  if (!hasDatabase) return readDB().banners
-  const banners = await prisma.banner.findMany({ orderBy: { createdAt: 'desc' } })
-  return banners.map(serializeBanner)
+  if (!hasDatabase || !prisma?.banner) return readDB().banners
+  try {
+    const banners = await prisma.banner.findMany({ orderBy: { createdAt: 'desc' } })
+    return banners.map(serializeBanner)
+  } catch (error) {
+    console.error('[database] listBanners Prisma failed, using fallback:', error)
+    return readDB().banners
+  }
 }
 
 export async function createBanner(data: Banner) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.banner) {
     const db = readDB()
     const newBanner: Banner = { ...data, id: `banner_${Date.now()}` }
     db.banners.push(newBanner)
@@ -330,11 +427,20 @@ export async function createBanner(data: Banner) {
     return newBanner
   }
 
-  return serializeBanner(await prisma.banner.create({ data }))
+  try {
+    return serializeBanner(await prisma.banner.create({ data }))
+  } catch (error) {
+    console.error('[database] createBanner Prisma failed, using fallback:', error)
+    const db = readDB()
+    const newBanner: Banner = { ...data, id: `banner_${Date.now()}` }
+    db.banners.push(newBanner)
+    writeDB(db)
+    return newBanner
+  }
 }
 
 export async function updateBanner(id: string, data: Partial<Banner>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.banner) {
     const db = readDB()
     const index = db.banners.findIndex(banner => banner.id === id)
     if (index === -1) return null
@@ -343,11 +449,21 @@ export async function updateBanner(id: string, data: Partial<Banner>) {
     return db.banners[index]
   }
 
-  return serializeBanner(await prisma.banner.update({ where: { id }, data }))
+  try {
+    return serializeBanner(await prisma.banner.update({ where: { id }, data }))
+  } catch (error) {
+    console.error('[database] updateBanner Prisma failed, using fallback:', error)
+    const db = readDB()
+    const index = db.banners.findIndex(banner => banner.id === id)
+    if (index === -1) return null
+    db.banners[index] = { ...db.banners[index], ...data }
+    writeDB(db)
+    return db.banners[index]
+  }
 }
 
 export async function deleteBanner(id: string) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.banner) {
     const db = readDB()
     const index = db.banners.findIndex(banner => banner.id === id)
     if (index === -1) return false
@@ -356,21 +472,31 @@ export async function deleteBanner(id: string) {
     return true
   }
 
-  await prisma.banner.delete({ where: { id } })
-  return true
+  try {
+    await prisma.banner.delete({ where: { id } })
+    return true
+  } catch (error) {
+    console.error('[database] deleteBanner Prisma failed:', error)
+    return false
+  }
 }
 
 export async function listOrders() {
-  if (!hasDatabase) return readDB().orders
-  const orders = await prisma.order.findMany({
-    include: { address: true, payment: true, items: true },
-    orderBy: { createdAt: 'desc' },
-  })
-  return orders.map(serializeOrder)
+  if (!hasDatabase || !prisma?.order) return readDB().orders
+  try {
+    const orders = await prisma.order.findMany({
+      include: { address: true, payment: true, items: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return orders.map(serializeOrder)
+  } catch (error) {
+    console.error('[database] listOrders Prisma failed, using fallback:', error)
+    return readDB().orders
+  }
 }
 
 export async function createOrder(data: Order) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
     db.orders.unshift(newOrder)
@@ -378,57 +504,66 @@ export async function createOrder(data: Order) {
     return newOrder
   }
 
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: data.orderNumber,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      customerPhone: data.customerPhone,
-      subtotal: data.subtotal,
-      shippingTotal: data.shippingCost,
-      total: data.total,
-      status: data.status,
-      paymentStatus: data.paymentStatus,
-      fulfillmentStatus: data.fulfillmentStatus,
-      trackingCode: data.trackingCode,
-      address: {
-        create: {
-          zipCode: data.shippingAddress.zipCode,
-          street: data.shippingAddress.street,
-          number: data.shippingAddress.number,
-          complement: data.shippingAddress.complement,
-          neighborhood: data.shippingAddress.neighborhood,
-          city: data.shippingAddress.city,
-          state: data.shippingAddress.state,
+  try {
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: data.orderNumber,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        customerPhone: data.customerPhone,
+        subtotal: data.subtotal,
+        shippingTotal: data.shippingCost,
+        total: data.total,
+        status: data.status,
+        paymentStatus: data.paymentStatus,
+        fulfillmentStatus: data.fulfillmentStatus,
+        trackingCode: data.trackingCode,
+        address: {
+          create: {
+            zipCode: data.shippingAddress.zipCode,
+            street: data.shippingAddress.street,
+            number: data.shippingAddress.number,
+            complement: data.shippingAddress.complement,
+            neighborhood: data.shippingAddress.neighborhood,
+            city: data.shippingAddress.city,
+            state: data.shippingAddress.state,
+          },
+        },
+        payment: {
+          create: {
+            provider: 'manual',
+            method: data.paymentMethod || 'manual',
+            status: data.paymentStatus,
+            amount: data.total,
+          },
+        },
+        items: {
+          create: data.items.map(item => ({
+            productId: item.productId,
+            productNameSnapshot: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.quantity * item.unitPrice,
+            personalizationJson: item.observation || null,
+          })),
         },
       },
-      payment: {
-        create: {
-          provider: 'manual',
-          method: data.paymentMethod || 'manual',
-          status: data.paymentStatus,
-          amount: data.total,
-        },
-      },
-      items: {
-        create: data.items.map(item => ({
-          productId: item.productId,
-          productNameSnapshot: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.quantity * item.unitPrice,
-          personalizationJson: item.observation || null,
-        })),
-      },
-    },
-    include: { address: true, payment: true, items: true },
-  })
+      include: { address: true, payment: true, items: true },
+    })
 
-  return serializeOrder(order)
+    return serializeOrder(order)
+  } catch (error) {
+    console.error('[database] createOrder Prisma failed, using fallback:', error)
+    const db = readDB()
+    const newOrder: Order = { ...data, id: `order_${Date.now()}` }
+    db.orders.unshift(newOrder)
+    writeDB(db)
+    return newOrder
+  }
 }
 
 export async function updateOrder(id: string, data: Partial<Order>) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
     if (index === -1) return null
@@ -437,44 +572,54 @@ export async function updateOrder(id: string, data: Partial<Order>) {
     return db.orders[index]
   }
 
-  const order = await prisma.order.update({
-    where: { id },
-    data: {
-      status: data.status,
-      paymentStatus: data.paymentStatus,
-      fulfillmentStatus: data.fulfillmentStatus,
-      trackingCode: data.trackingCode,
-      subtotal: data.subtotal,
-      shippingTotal: data.shippingCost,
-      total: data.total,
-    },
-    include: { address: true, payment: true, items: true },
-  })
-
-  if (data.paymentStatus) {
-    await prisma.payment.updateMany({ where: { orderId: id }, data: { status: data.paymentStatus } })
-  }
-
-  if (data.items) {
-    await prisma.orderItem.deleteMany({ where: { orderId: id } })
-    await prisma.orderItem.createMany({
-      data: data.items.map(item => ({
-        orderId: id,
-        productId: item.productId,
-        productNameSnapshot: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.quantity * item.unitPrice,
-        personalizationJson: item.observation || null,
-      })),
+  try {
+    const order = await prisma.order.update({
+      where: { id },
+      data: {
+        status: data.status,
+        paymentStatus: data.paymentStatus,
+        fulfillmentStatus: data.fulfillmentStatus,
+        trackingCode: data.trackingCode,
+        subtotal: data.subtotal,
+        shippingTotal: data.shippingCost,
+        total: data.total,
+      },
+      include: { address: true, payment: true, items: true },
     })
-  }
 
-  return serializeOrder(order)
+    if (data.paymentStatus) {
+      await prisma.payment.updateMany({ where: { orderId: id }, data: { status: data.paymentStatus } })
+    }
+
+    if (data.items) {
+      await prisma.orderItem.deleteMany({ where: { orderId: id } })
+      await prisma.orderItem.createMany({
+        data: data.items.map(item => ({
+          orderId: id,
+          productId: item.productId,
+          productNameSnapshot: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+          personalizationJson: item.observation || null,
+        })),
+      })
+    }
+
+    return serializeOrder(order)
+  } catch (error) {
+    console.error('[database] updateOrder Prisma failed, using fallback:', error)
+    const db = readDB()
+    const index = db.orders.findIndex(order => order.id === id)
+    if (index === -1) return null
+    db.orders[index] = { ...db.orders[index], ...data }
+    writeDB(db)
+    return db.orders[index]
+  }
 }
 
 export async function deleteOrder(id: string) {
-  if (!hasDatabase) {
+  if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
     if (index === -1) return false
@@ -483,6 +628,11 @@ export async function deleteOrder(id: string) {
     return true
   }
 
-  await prisma.order.delete({ where: { id } })
-  return true
+  try {
+    await prisma.order.delete({ where: { id } })
+    return true
+  } catch (error) {
+    console.error('[database] deleteOrder Prisma failed:', error)
+    return false
+  }
 }

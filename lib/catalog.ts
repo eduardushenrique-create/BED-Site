@@ -152,31 +152,35 @@ function normalizeMockProduct(product: any): Product {
 }
 
 export async function getLocalCatalogProducts(filters: CatalogFilters = {}): Promise<Product[]> {
-  if (hasDatabase) {
-    const products = await prisma.product.findMany({
-      where: {
-        isActive: true,
-        status: { not: 'draft' },
-        category: filters.category ? { slug: filters.category } : undefined,
-        isFeatured: filters.featured ? true : undefined,
-        isPersonalizable: filters.personalizable ? true : undefined,
-        OR: filters.search
-          ? [
-              { name: { contains: filters.search, mode: 'insensitive' } },
-              { description: { contains: filters.search, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: {
-        category: true,
-        images: { orderBy: { sortOrder: 'asc' } },
-        variants: true,
-        personalizationFields: { orderBy: { sortOrder: 'asc' } },
-      },
-      orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-    })
+  if (hasDatabase && prisma?.product) {
+    try {
+      const products = await prisma.product.findMany({
+        where: {
+          isActive: true,
+          status: { not: 'draft' },
+          category: filters.category ? { slug: filters.category } : undefined,
+          isFeatured: filters.featured ? true : undefined,
+          isPersonalizable: filters.personalizable ? true : undefined,
+          OR: filters.search
+            ? [
+                { name: { contains: filters.search, mode: 'insensitive' } },
+                { description: { contains: filters.search, mode: 'insensitive' } },
+              ]
+            : undefined,
+        },
+        include: {
+          category: true,
+          images: { orderBy: { sortOrder: 'asc' } },
+          variants: true,
+          personalizationFields: { orderBy: { sortOrder: 'asc' } },
+        },
+        orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
+      })
 
-    return products.map(serializePrismaProduct)
+      return products.map(serializePrismaProduct).filter(Boolean)
+    } catch (error) {
+      console.error('[catalog] Prisma failed, using fallback:', error)
+    }
   }
 
   const db = readDB()
@@ -359,18 +363,22 @@ export async function getLocalCatalogProducts(filters: CatalogFilters = {}): Pro
 }
 
 export async function getLocalCatalogProductBySlug(slug: string): Promise<Product | null> {
-  if (hasDatabase) {
-    const product = await prisma.product.findFirst({
-      where: { slug, isActive: true },
-      include: {
-        category: true,
-        images: { orderBy: { sortOrder: 'asc' } },
-        variants: true,
-        personalizationFields: { orderBy: { sortOrder: 'asc' } },
-      },
-    })
+  if (hasDatabase && prisma?.product) {
+    try {
+      const product = await prisma.product.findFirst({
+        where: { slug, isActive: true },
+        include: {
+          category: true,
+          images: { orderBy: { sortOrder: 'asc' } },
+          variants: true,
+          personalizationFields: { orderBy: { sortOrder: 'asc' } },
+        },
+      })
 
-    return product ? serializePrismaProduct(product) : null
+      return product ? serializePrismaProduct(product) : null
+    } catch (error) {
+      console.error('[catalog] Prisma failed on slug lookup, using fallback:', error)
+    }
   }
 
   const products = await getLocalCatalogProducts()
