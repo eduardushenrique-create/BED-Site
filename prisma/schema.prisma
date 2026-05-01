@@ -21,26 +21,27 @@ model Category {
 }
 
 model Product {
-  id                    String   @id @default(cuid())
-  name                  String
-  slug                  String   @unique
-  sku                   String?
-  shortDescription      String?
-  description           String?
-  price                 Decimal  @db.Decimal(10, 2)
-  compareAtPrice        Decimal? @db.Decimal(10, 2)
-  status                String   @default("draft")
-  isActive              Boolean  @default(true)
-  isFeatured            Boolean  @default(false)
-  isPersonalizable      Boolean  @default(false)
-  productionTimeMinDays Int      @default(1)
-  productionTimeMaxDays Int      @default(3)
-  weightGrams           Int?
-  widthCm               Decimal? @db.Decimal(10, 2)
-  heightCm              Decimal? @db.Decimal(10, 2)
-  depthCm               Decimal? @db.Decimal(10, 2)
-  stock                 Int      @default(0)
-  underOrder            Boolean  @default(false)
+  id                       String   @id @default(cuid())
+  name                     String
+  slug                     String   @unique
+  sku                      String?
+  shortDescription         String?
+  description              String?
+  price                    Decimal  @db.Decimal(10, 2)
+  compareAtPrice           Decimal? @db.Decimal(10, 2)
+  status                   String   @default("draft")
+  isActive                 Boolean  @default(true)
+  isFeatured               Boolean  @default(false)
+  isPersonalizable         Boolean  @default(false)
+  productionTimeMinDays    Int      @default(1)
+  productionTimeMaxDays    Int      @default(3)
+  weightGrams              Int?
+  widthCm                  Decimal? @db.Decimal(10, 2)
+  heightCm                 Decimal? @db.Decimal(10, 2)
+  depthCm                  Decimal? @db.Decimal(10, 2)
+  stock                    Int      @default(0)
+  underOrder               Boolean  @default(false)
+  productionMinutesPerUnit Int?
 
   categoryId            String?
   category              Category?              @relation(fields: [categoryId], references: [id])
@@ -112,18 +113,19 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id            String   @id @default(cuid())
-  productId     String
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name          String
-  sku           String?
-  color         String?
-  size          String?
-  material      String?
-  finish        String?
-  priceDelta    Decimal? @db.Decimal(10, 2)
-  stockQuantity Int      @default(0)
-  isAvailable   Boolean  @default(true)
+  id                       String   @id @default(cuid())
+  productId                String
+  product                  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name                     String
+  sku                      String?
+  color                    String?
+  size                     String?
+  material                 String?
+  finish                   String?
+  priceDelta               Decimal? @db.Decimal(10, 2)
+  stockQuantity            Int      @default(0)
+  isAvailable              Boolean  @default(true)
+  productionMinutesPerUnit Int?
 
   cartItems  CartItem[]
   orderItems OrderItem[]
@@ -190,10 +192,11 @@ model Order {
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  items    OrderItem[]
-  address  Address?
-  payment  Payment?
-  shipment Shipment?
+  items           OrderItem[]
+  address         Address?
+  payment         Payment?
+  shipment        Shipment?
+  productionTasks ProductionTask[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -216,6 +219,7 @@ model OrderItem {
   unitPrice           Decimal         @db.Decimal(10, 2)
   total               Decimal         @db.Decimal(10, 2)
   personalizationJson String?
+  productionTask      ProductionTask?
 }
 
 model Address {
@@ -315,4 +319,61 @@ model WebhookEvent {
   updatedAt   DateTime  @updatedAt
 
   @@index([provider, topic, resourceId])
+}
+
+model ProductionSettings {
+  id                   String   @id @default("default")
+  dailyCapacityMinutes Int      @default(480)
+  riskBufferHours      Int      @default(24)
+  businessDaysOnly     Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model ProductionTask {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId String    @unique
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  requiredQuantity Int
+  producedQuantity Int @default(0)
+
+  status   String @default("pending")
+  priority String @default("normal")
+
+  dueAt       DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logs ProductionLog[]
+
+  @@index([orderId])
+  @@index([status, dueAt])
+  @@index([priority, dueAt])
+}
+
+model ProductionLog {
+  id     String         @id @default(cuid())
+  taskId String
+  task   ProductionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  quantityDelta Int
+  quantityAfter Int
+
+  statusBefore String?
+  statusAfter  String?
+
+  note           String?
+  createdByEmail String?
+  createdByName  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
 }

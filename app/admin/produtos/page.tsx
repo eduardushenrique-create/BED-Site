@@ -21,6 +21,7 @@ interface Product {
   stock: number
   underOrder: boolean
   sku?: string
+  productionMinutesPerUnit?: number | null
 }
 
 interface Category {
@@ -41,6 +42,7 @@ const emptyForm = {
   sku: '',
   isPersonalizable: false,
   isFeatured: false,
+  productionMinutesPerUnit: '',
 }
 
 export default function AdminProductsPage() {
@@ -131,6 +133,10 @@ export default function AdminProductsPage() {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, '-')
 
+    const productionMinutes = formData.productionMinutesPerUnit
+      ? Number(formData.productionMinutesPerUnit)
+      : undefined
+
     const productData = {
       name: formData.name,
       slug,
@@ -145,6 +151,10 @@ export default function AdminProductsPage() {
       stock: parseInt(formData.stock, 10) || 0,
       underOrder: formData.underOrder,
       sku: formData.sku,
+      // TODO: backend POST/PUT precisa aceitar productionMinutesPerUnit
+      ...(typeof productionMinutes === 'number' && Number.isFinite(productionMinutes) && productionMinutes > 0
+        ? { productionMinutesPerUnit: productionMinutes }
+        : {}),
     }
 
     try {
@@ -180,6 +190,10 @@ export default function AdminProductsPage() {
       sku: product.sku || '',
       isPersonalizable: product.isPersonalizable,
       isFeatured: product.isFeatured,
+      productionMinutesPerUnit:
+        typeof product.productionMinutesPerUnit === 'number' && product.productionMinutesPerUnit > 0
+          ? String(product.productionMinutesPerUnit)
+          : '',
     })
     setImagePreview(product.imageUrl || '')
     setEditingId(product.id)
@@ -323,6 +337,15 @@ export default function AdminProductsPage() {
               </div>
               <Input label="Estoque" type="number" value={formData.stock} onChange={(event) => setFormData({ ...formData, stock: event.target.value })} placeholder="0" />
               <Input label="SKU" value={formData.sku} onChange={(event) => setFormData({ ...formData, sku: event.target.value })} placeholder="Codigo SKU (opcional)" />
+              <Input
+                label="Tempo estimado por unidade (minutos)"
+                type="number"
+                min="0"
+                step="1"
+                value={formData.productionMinutesPerUnit}
+                onChange={(event) => setFormData({ ...formData, productionMinutesPerUnit: event.target.value })}
+                placeholder="Opcional. Ex: 90"
+              />
             </div>
 
             <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

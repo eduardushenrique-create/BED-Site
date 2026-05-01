@@ -128,6 +128,44 @@ export type WebhookEvent = {
   updatedAt: string
 }
 
+export type ProductionTaskRecord = {
+  id: string
+  orderId: string
+  orderItemId: string
+  requiredQuantity: number
+  producedQuantity: number
+  status: string
+  priority: string
+  dueAt?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ProductionLogRecord = {
+  id: string
+  taskId: string
+  quantityDelta: number
+  quantityAfter: number
+  statusBefore?: string | null
+  statusAfter?: string | null
+  note?: string | null
+  createdByEmail?: string | null
+  createdByName?: string | null
+  createdAt: string
+}
+
+export type ProductionSettingsRecord = {
+  id: string
+  dailyCapacityMinutes: number
+  riskBufferHours: number
+  businessDaysOnly: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
@@ -136,6 +174,9 @@ export type Database = {
   users: User[]
   customerAddresses: CustomerAddress[]
   webhookEvents: WebhookEvent[]
+  productionTasks: ProductionTaskRecord[]
+  productionLogs: ProductionLogRecord[]
+  productionSettings: ProductionSettingsRecord[]
 }
 
 const defaultData: Database = {
@@ -157,6 +198,18 @@ const defaultData: Database = {
   users: [],
   customerAddresses: [],
   webhookEvents: [],
+  productionTasks: [],
+  productionLogs: [],
+  productionSettings: [
+    {
+      id: 'default',
+      dailyCapacityMinutes: 480,
+      riskBufferHours: 24,
+      businessDaysOnly: false,
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    },
+  ],
 }
 
 function ensureDir() {
@@ -184,6 +237,13 @@ export function readDB(): Database {
       banners: parsed.banners || [],
       users: parsed.users || [],
       webhookEvents: parsed.webhookEvents || [],
+      customerAddresses: parsed.customerAddresses || [],
+      productionTasks: parsed.productionTasks || [],
+      productionLogs: parsed.productionLogs || [],
+      productionSettings:
+        Array.isArray(parsed.productionSettings) && parsed.productionSettings.length > 0
+          ? parsed.productionSettings
+          : defaultData.productionSettings,
     }
   } catch {
     return defaultData

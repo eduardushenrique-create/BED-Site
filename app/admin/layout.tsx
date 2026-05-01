@@ -6,6 +6,7 @@ import BrandLogo from '@/components/BrandLogo'
 
 const navItems = [
   { href: '/admin/pedidos', label: 'Pedidos' },
+  { href: '/admin/producao', label: 'Produção' },
   { href: '/admin/clientes', label: 'Clientes' },
   { href: '/admin/produtos', label: 'Produtos' },
   { href: '/admin/categorias', label: 'Categorias' },
