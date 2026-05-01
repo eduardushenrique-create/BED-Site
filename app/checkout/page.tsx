@@ -205,6 +205,10 @@ export default function CheckoutPage() {
       }
 
       clearCart()
+      if (data.payment?.checkoutUrl) {
+        window.location.href = data.payment.checkoutUrl
+        return
+      }
       router.push(`/pedido-confirmado?pedido=${data.orderNumber}`)
     } catch {
       setErrors(prev => ({ ...prev, submit: 'Erro ao processar pedido. Tente novamente.' }))

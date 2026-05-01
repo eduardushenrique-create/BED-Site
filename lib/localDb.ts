@@ -51,6 +51,17 @@ export type Order = {
   paymentStatus: string
   fulfillmentStatus: string
   paymentMethod: string
+  paymentDetails?: {
+    provider: string
+    providerPaymentId?: string
+    method: string
+    status: string
+    statusDetail?: string
+    checkoutUrl?: string
+    pixQrCode?: string
+    pixQrCodeBase64?: string
+    pixCopyPaste?: string
+  }
   createdAt: string
   items: { productId: string; productName: string; quantity: number; unitPrice: number; observation?: string }[]
   trackingCode: string | null

@@ -1,5 +1,23 @@
 import { NextResponse } from 'next/server'
-import { verifyWebhookSignature } from '@/lib/mercadopago'
+import { getPaymentDetails, verifyWebhookSignature } from '@/lib/mercadopago'
+import { updateOrderPaymentByNumber } from '@/lib/database'
+import { mapMercadoPagoStatus } from '@/lib/payment'
+
+type MercadoPagoWebhookPayment = {
+  payment_method_id?: string
+  transaction_amount?: number
+  date_approved?: string | null
+  transaction_details?: {
+    external_resource_url?: string | null
+  }
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code_base64?: string | null
+      qr_code?: string | null
+    }
+  }
+  [key: string]: unknown
+}
 
 export async function POST(request: Request) {
   try {
@@ -22,13 +40,14 @@ export async function POST(request: Request) {
 
     switch (topic) {
       case 'payment':
-        const paymentStatus = data.status
-        const externalReference = data.external_reference
+        const paymentDetails = paymentId ? await getPaymentDetails(String(paymentId)) : null
+        const paymentStatus = paymentDetails?.status || data.status
+        const externalReference = paymentDetails?.external_reference || data.external_reference
 
         console.log(`Payment ${paymentId} status: ${paymentStatus}`)
         console.log(`External reference: ${externalReference}`)
 
-        await handlePaymentUpdate(paymentId, paymentStatus, externalReference)
+        await handlePaymentUpdate(String(paymentId), paymentStatus, externalReference, paymentDetails)
         break
 
       case 'merchant_order':
@@ -49,7 +68,8 @@ export async function POST(request: Request) {
 async function handlePaymentUpdate(
   paymentId: string,
   status: string,
-  externalReference?: string
+  externalReference?: string,
+  paymentDetails?: MercadoPagoWebhookPayment | null
 ) {
   console.log(`Updating payment ${paymentId} to status: ${status}`)
 
@@ -60,6 +80,25 @@ async function handlePaymentUpdate(
 
   const orderNumber = externalReference
   console.log(`Order to update: ${orderNumber}`)
+
+  const mapped = mapMercadoPagoStatus(status)
+  await updateOrderPaymentByNumber(orderNumber, {
+    status: mapped.orderStatus,
+    paymentStatus: mapped.paymentStatus,
+    provider: 'mercadopago',
+    method: paymentDetails?.payment_method_id === 'pix' ? 'pix' : 'card',
+    amount: typeof paymentDetails?.transaction_amount === 'number' ? paymentDetails.transaction_amount : undefined,
+    providerPaymentId: paymentId,
+    pixQrCodeBase64: paymentDetails?.point_of_interaction?.transaction_data?.qr_code_base64 || null,
+    pixCopyPaste: paymentDetails?.point_of_interaction?.transaction_data?.qr_code || null,
+    checkoutUrl: paymentDetails?.transaction_details?.external_resource_url || null,
+    rawPayload: paymentDetails
+      ? {
+          ...paymentDetails,
+          paidAt: paymentDetails.date_approved || null,
+        }
+      : null,
+  })
 
   switch (status) {
     case 'approved':

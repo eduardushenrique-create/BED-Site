@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createOrder } from '@/lib/database'
+import { createOrder, updateOrderPaymentByNumber } from '@/lib/database'
 import { requireApiUser } from '@/lib/api-auth'
 import { getLocalCatalogProducts } from '@/lib/catalog'
 import { calculateShipping, SHIPPING_CONFIG } from '@/lib/shipping'
+import { createPaymentForOrder, mapMercadoPagoStatus } from '@/lib/payment'
 import { validateCEP, validateCPF, validateEmail } from '@/lib/validation'
 
 interface OrderItem {
@@ -180,12 +181,44 @@ export async function POST(request: Request) {
       trackingCode: null,
     })
 
+    const payment = await createPaymentForOrder({
+      orderNumber,
+      amount: safeTotal,
+      method: paymentMethod || 'pix',
+      customer: {
+        name: customerName,
+        email: customerEmail,
+        cpf: customerCpf,
+      },
+      items: orderItems.map(item => ({
+        id: item.productId,
+        title: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    })
+
+    const mappedStatus = mapMercadoPagoStatus(payment.status)
+    const updatedOrder = await updateOrderPaymentByNumber(orderNumber, {
+      status: mappedStatus.orderStatus,
+      paymentStatus: mappedStatus.paymentStatus,
+      provider: payment.provider,
+      method: paymentMethod || 'pix',
+      amount: safeTotal,
+      providerPaymentId: payment.providerPaymentId || null,
+      pixQrCodeBase64: payment.pixQrCodeBase64 || null,
+      pixCopyPaste: payment.pixCopyPaste || null,
+      checkoutUrl: payment.checkoutUrl || null,
+      rawPayload: payment.rawPayload || null,
+    })
+
     console.log('Order created:', orderNumber)
 
     return NextResponse.json({
       success: true,
       orderNumber,
-      order,
+      order: updatedOrder || order,
+      payment,
       totals: {
         subtotal: safeSubtotal,
         shippingTotal: safeShippingTotal,

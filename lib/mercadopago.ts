@@ -39,6 +39,8 @@ export interface PaymentResult {
       qr_code_base64?: string
     }
   }
+  init_point?: string
+  sandbox_init_point?: string
 }
 
 export async function createPaymentPreference(data: PaymentPreference): Promise<PaymentResult | null> {
@@ -78,6 +80,71 @@ export async function createPaymentPreference(data: PaymentPreference): Promise<
     console.error('Error creating payment preference:', error)
     return null
   }
+}
+
+export type MercadoPagoPixRequest = {
+  amount: number
+  description: string
+  externalReference: string
+  notificationUrl?: string
+  payer: {
+    email: string
+    firstName?: string
+    lastName?: string
+    cpf?: string
+  }
+}
+
+export async function createPixPayment(data: MercadoPagoPixRequest) {
+  if (!MERCADOPAGO_ACCESS_TOKEN) return null
+
+  const response = await fetch(`${MERCADOPAGO_BASE_URL}/v1/payments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+      'X-Idempotency-Key': `${data.externalReference}-pix`,
+    },
+    body: JSON.stringify({
+      transaction_amount: data.amount,
+      description: data.description,
+      payment_method_id: 'pix',
+      external_reference: data.externalReference,
+      notification_url: data.notificationUrl,
+      payer: {
+        email: data.payer.email,
+        first_name: data.payer.firstName,
+        last_name: data.payer.lastName,
+        identification: data.payer.cpf
+          ? { type: 'CPF', number: data.payer.cpf.replace(/\D/g, '') }
+          : undefined,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    console.error('Mercado Pago PIX error:', await response.text())
+    return null
+  }
+
+  return await response.json()
+}
+
+export async function getPaymentDetails(paymentId: string) {
+  if (!MERCADOPAGO_ACCESS_TOKEN) return null
+
+  const response = await fetch(`${MERCADOPAGO_BASE_URL}/v1/payments/${paymentId}`, {
+    headers: {
+      'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+    },
+  })
+
+  if (!response.ok) {
+    console.error('Mercado Pago payment lookup failed:', await response.text())
+    return null
+  }
+
+  return await response.json()
 }
 
 export async function getPaymentStatus(paymentId: string): Promise<string | null> {

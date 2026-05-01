@@ -65,6 +65,10 @@ function serializeBanner(banner: any): Banner {
 }
 
 function serializeOrder(order: any): Order {
+  const paymentPayload = order.payment?.rawPayload && typeof order.payment.rawPayload === 'object'
+    ? order.payment.rawPayload
+    : null
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -87,6 +91,19 @@ function serializeOrder(order: any): Order {
     paymentStatus: order.paymentStatus,
     fulfillmentStatus: order.fulfillmentStatus,
     paymentMethod: order.payment?.method || order.paymentMethod || 'manual',
+    paymentDetails: order.payment
+      ? {
+          provider: order.payment.provider,
+          providerPaymentId: order.payment.providerPaymentId || undefined,
+          method: order.payment.method,
+          status: order.payment.status,
+          statusDetail: paymentPayload?.status_detail || undefined,
+          checkoutUrl: paymentPayload?.checkoutUrl || paymentPayload?.initPoint || undefined,
+          pixQrCode: paymentPayload?.pixQrCodeBase64 || undefined,
+          pixQrCodeBase64: paymentPayload?.pixQrCodeBase64 || undefined,
+          pixCopyPaste: order.payment.pixCopyPaste || paymentPayload?.pixCopyPaste || undefined,
+        }
+      : undefined,
     createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
     items: (order.items || []).map((item: any) => ({
       productId: item.productId,
@@ -495,6 +512,23 @@ export async function listOrders() {
   }
 }
 
+export async function getOrderByNumber(orderNumber: string) {
+  if (!hasDatabase || !prisma?.order) {
+    return readDB().orders.find(order => order.orderNumber === orderNumber) || null
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: { address: true, payment: true, items: true },
+    })
+    return order ? serializeOrder(order) : null
+  } catch (error) {
+    console.error('[database] getOrderByNumber Prisma failed, using fallback:', error)
+    return readDB().orders.find(order => order.orderNumber === orderNumber) || null
+  }
+}
+
 export async function createOrder(data: Order) {
   if (!hasDatabase || !prisma?.order) {
     const db = readDB()
@@ -616,6 +650,94 @@ export async function updateOrder(id: string, data: Partial<Order>) {
     db.orders[index] = { ...db.orders[index], ...data }
     writeDB(db)
     return db.orders[index]
+  }
+}
+
+export async function updateOrderPaymentByNumber(orderNumber: string, data: {
+  status: string
+  paymentStatus: string
+  provider: string
+  method: string
+  amount?: number
+  providerPaymentId?: string | null
+  pixQrCodeBase64?: string | null
+  pixCopyPaste?: string | null
+  checkoutUrl?: string | null
+  rawPayload?: Record<string, unknown> | null
+}) {
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    const index = db.orders.findIndex(order => order.orderNumber === orderNumber)
+    if (index === -1) return null
+
+    db.orders[index] = {
+      ...db.orders[index],
+      paymentStatus: data.paymentStatus,
+      status: data.status,
+      paymentMethod: data.method,
+      paymentDetails: {
+        provider: data.provider,
+        providerPaymentId: data.providerPaymentId || undefined,
+        method: data.method,
+        status: data.paymentStatus,
+        statusDetail: typeof data.rawPayload?.status_detail === 'string' ? data.rawPayload.status_detail : undefined,
+        checkoutUrl: data.checkoutUrl || undefined,
+        pixQrCodeBase64: data.pixQrCodeBase64 || undefined,
+        pixQrCode: data.pixQrCodeBase64 || undefined,
+        pixCopyPaste: data.pixCopyPaste || undefined,
+      },
+    }
+    writeDB(db)
+    return db.orders[index]
+  }
+
+  try {
+    const order = await prisma.order.update({
+      where: { orderNumber },
+      data: {
+        status: data.status,
+        paymentStatus: data.paymentStatus,
+        payment: {
+          upsert: {
+            create: {
+              provider: data.provider,
+              providerPaymentId: data.providerPaymentId || null,
+              method: data.method,
+              status: data.paymentStatus,
+              amount: data.amount || 0,
+              pixQrCode: data.pixQrCodeBase64 || null,
+              pixCopyPaste: data.pixCopyPaste || null,
+              rawPayload: data.rawPayload || undefined,
+            },
+            update: {
+              provider: data.provider,
+              providerPaymentId: data.providerPaymentId || null,
+              method: data.method,
+              status: data.paymentStatus,
+              pixQrCode: data.pixQrCodeBase64 || null,
+              pixCopyPaste: data.pixCopyPaste || null,
+              rawPayload: data.rawPayload || undefined,
+            },
+          },
+        },
+      },
+      include: { address: true, payment: true, items: true },
+    })
+
+    if (data.rawPayload?.paidAt && order.payment?.id) {
+      await prisma.payment.update({
+        where: { id: order.payment.id },
+        data: { paidAt: new Date(String(data.rawPayload.paidAt)) },
+      })
+    }
+
+    return serializeOrder(await prisma.order.findUniqueOrThrow({
+      where: { orderNumber },
+      include: { address: true, payment: true, items: true },
+    }))
+  } catch (error) {
+    console.error('[database] updateOrderPaymentByNumber Prisma failed:', error)
+    return null
   }
 }
 
