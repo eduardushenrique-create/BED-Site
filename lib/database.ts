@@ -83,6 +83,7 @@ function serializeBanner(banner: any): Banner {
     ctaText: banner.ctaText || '',
     ctaLink: banner.ctaLink || '',
     isActive: banner.isActive,
+    displayDurationSeconds: typeof banner.displayDurationSeconds === 'number' ? banner.displayDurationSeconds : 5,
   }
 }
 

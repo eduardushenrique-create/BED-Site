@@ -75,6 +75,7 @@ export type Banner = {
   ctaText: string
   ctaLink: string
   isActive: boolean
+  displayDurationSeconds: number
 }
 
 export type User = {
@@ -130,6 +131,7 @@ const defaultData: Database = {
       ctaText: 'Explorar coleção',
       ctaLink: '/produtos',
       isActive: true,
+      displayDurationSeconds: 5,
     },
   ],
   users: [],

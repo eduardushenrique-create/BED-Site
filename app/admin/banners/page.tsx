@@ -12,6 +12,7 @@ type Banner = {
   ctaText: string
   ctaLink: string
   isActive: boolean
+  displayDurationSeconds: number
 }
 
 export default function AdminBannersPage() {
@@ -137,10 +138,13 @@ export default function AdminBannersPage() {
                     {banner.subtitle}
                   </p>
                 )}
-                <div style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#6B7494', marginBottom: '8px', flexWrap: 'wrap' }}>
                   <span>CTA: {banner.ctaText || 'Nenhum'}</span>
                   <span>|</span>
                   <span>Link: {banner.ctaLink || 'Nenhum'}</span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
+                  Tempo no carrossel: {banner.displayDurationSeconds || 5}s
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button

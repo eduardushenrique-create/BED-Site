@@ -16,6 +16,7 @@ export default function NovoBannerPage() {
     ctaText: '',
     ctaLink: '',
     isActive: true,
+    displayDurationSeconds: 5,
   })
   const [imagePreview, setImagePreview] = useState('')
   const [previewError, setPreviewError] = useState(false)
@@ -132,6 +133,16 @@ export default function NovoBannerPage() {
                   value={formData.ctaLink}
                   onChange={(e) => setFormData({ ...formData, ctaLink: e.target.value })}
                   placeholder="/personalizados"
+                />
+
+                <Input
+                  label="Tempo de exibição no carrossel (segundos)"
+                  type="number"
+                  min={2}
+                  max={60}
+                  value={String(formData.displayDurationSeconds)}
+                  onChange={(e) => setFormData({ ...formData, displayDurationSeconds: Math.max(2, parseInt(e.target.value, 10) || 5) })}
+                  placeholder="5"
                 />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
