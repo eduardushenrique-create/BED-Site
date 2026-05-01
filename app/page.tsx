@@ -14,28 +14,11 @@ export default async function Home() {
   const featuredProducts = allProducts.slice(0, 4)
 
   return (
-    <main className="container" style={{ paddingTop: '32px', paddingBottom: '64px' }}>
+    <main className="container" style={{ paddingTop: '20px', paddingBottom: '64px' }}>
       <Banner />
 
-      <section style={{ textAlign: 'center', marginBottom: '96px' }}>
-        <h1 style={{ fontSize: '48px', fontWeight: 700, marginBottom: '16px' }}>
-          Presentes feitos para durar.
-        </h1>
-        <p style={{ fontSize: '18px', color: '#78716C', maxWidth: '600px', margin: '0 auto 32px' }}>
-          Objetos personalizados impressos em 3D. Criamos presentes únicos e memoráveis para você dar às pessoas que ama.
-        </p>
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/produtos">
-            <Button>Ver produtos</Button>
-          </Link>
-          <Link href="/personalizados">
-            <Button variant="outline">Personalizar</Button>
-          </Link>
-        </div>
-      </section>
-
       <section style={{ marginBottom: '64px' }}>
-        <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>
           Categorias
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
@@ -48,19 +31,20 @@ export default async function Home() {
                 padding: '24px',
                 borderRadius: '12px',
                 textAlign: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+                boxShadow: '0 1px 4px rgba(29,34,53,0.07), 0 4px 12px rgba(29,34,53,0.05)',
                 cursor: 'pointer',
                 transition: 'transform var(--transition-fast)',
+                color: '#1D2235',
               }}
             >
-              <span style={{ fontWeight: 500, color: '#1C1917' }}>{cat}</span>
+              <span style={{ fontWeight: 500 }}>{cat}</span>
             </Link>
           ))}
         </div>
       </section>
 
       <section>
-        <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>
           Produtos em destaque
         </h2>
         {featuredProducts.length > 0 ? (
@@ -77,9 +61,7 @@ export default async function Home() {
             </div>
           </>
         ) : (
-          <p style={{ textAlign: 'center', color: '#78716C' }}>
-            Marque produtos como destaque no admin para exibi-los aqui.
-          </p>
+          <p style={{ textAlign: 'center', color: '#6B7494' }}>Marque produtos como destaque no admin para exibi-los aqui.</p>
         )}
       </section>
     </main>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface ShippingQuote {
   id: string
@@ -53,12 +53,12 @@ export default function ShippingSelector({ address, cartItems, onSelect, selecte
 
       try {
         const packageInfo = {
-          weight: cartItems.reduce((sum, item) => sum + (item.weightGrams * item.quantity), 0),
+          weight: cartItems.reduce((sum, item) => sum + item.weightGrams * item.quantity, 0),
           dimensions: {
             width: Math.max(...cartItems.map(i => i.widthCm), 10),
             height: Math.max(...cartItems.map(i => i.heightCm), 10),
             length: Math.max(...cartItems.map(i => i.depthCm), 10),
-          }
+          },
         }
 
         const response = await fetch('/api/shipping/calculate', {
@@ -101,27 +101,15 @@ export default function ShippingSelector({ address, cartItems, onSelect, selecte
   }
 
   if (loading) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', color: '#78716C' }}>
-        Calculando frete...
-      </div>
-    )
+    return <div style={{ padding: '24px', textAlign: 'center', color: '#6B7494' }}>Calculando frete...</div>
   }
 
   if (error) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', color: '#EF4444' }}>
-        {error}
-      </div>
-    )
+    return <div style={{ padding: '24px', textAlign: 'center', color: '#A3526A' }}>{error}</div>
   }
 
   if (!canCalculateShipping || quotes.length === 0) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', color: '#78716C' }}>
-        Informe o CEP para calcular o frete
-      </div>
-    )
+    return <div style={{ padding: '24px', textAlign: 'center', color: '#6B7494' }}>Informe o CEP para calcular o frete</div>
   }
 
   return (
@@ -134,9 +122,9 @@ export default function ShippingSelector({ address, cartItems, onSelect, selecte
             alignItems: 'center',
             gap: '16px',
             padding: '16px',
-            borderRadius: '8px',
-            border: selectedShippingId === quote.id ? '2px solid #C8552A' : '1px solid #E8E2DA',
-            backgroundColor: selectedShippingId === quote.id ? '#FFF5F2' : 'white',
+            borderRadius: '12px',
+            border: selectedShippingId === quote.id ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+            backgroundColor: selectedShippingId === quote.id ? '#FAFCFE' : 'white',
             cursor: 'pointer',
           }}
         >
@@ -146,17 +134,13 @@ export default function ShippingSelector({ address, cartItems, onSelect, selecte
             value={quote.id}
             checked={selectedShippingId === quote.id}
             onChange={() => onSelect(quote)}
-            style={{ accentColor: '#C8552A' }}
+            style={{ accentColor: '#1D2235' }}
           />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 500 }}>{quote.company.name} - {quote.name}</div>
-            <div style={{ fontSize: '14px', color: '#78716C' }}>
-              {formatDeliveryTime(quote)}
-            </div>
+            <div style={{ fontSize: '14px', color: '#6B7494' }}>{formatDeliveryTime(quote)}</div>
           </div>
-          <div style={{ fontWeight: 600 }}>
-            R$ {quote.price.toFixed(2).replace('.', ',')}
-          </div>
+          <div style={{ fontWeight: 600 }}>R$ {quote.price.toFixed(2).replace('.', ',')}</div>
         </label>
       ))}
     </div>

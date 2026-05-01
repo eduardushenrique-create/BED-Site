@@ -5,25 +5,28 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<Required<BadgeProps>['variant'], string> = {
-  default: 'background-color: #E8E2DA; color: #1C1917;',
-  success: 'background-color: #1D7A72; color: white;',
-  warning: 'background-color: #C8552A; color: white;',
-  new: 'background-color: #1D7A72; color: white;',
-  sale: 'background-color: #C8552A; color: white;',
+  default: 'background-color: #EEF1F8; color: #3D4460;',
+  success: 'background-color: #DFF2EC; color: #2E7D6E;',
+  warning: 'background-color: #F7E6EB; color: #A3526A;',
+  new: 'background-color: #1D2235; color: white;',
+  sale: 'background-color: #D4849A; color: white;',
 }
 
 export default function Badge({ children, variant = 'default', style }: BadgeProps) {
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '4px 12px',
-      borderRadius: '999px',
-      fontSize: '12px',
-      fontWeight: 600,
-      textTransform: 'lowercase',
-      ...parseStyles(variantStyles[variant]),
-      ...style,
-    }}>
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '4px 12px',
+        borderRadius: '999px',
+        fontSize: '11px',
+        fontWeight: 700,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        ...parseStyles(variantStyles[variant]),
+        ...style,
+      }}
+    >
       {children}
     </span>
   )

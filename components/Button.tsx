@@ -12,10 +12,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'background-color: #C8552A; color: white; border: none;',
-  secondary: 'background-color: #1D7A72; color: white; border: none;',
-  outline: 'background-color: transparent; color: #1C1917; border: 1px solid #E8E2DA;',
-  ghost: 'background-color: transparent; color: #1C1917; border: none;',
+  primary: 'background-color: var(--color-primary); color: white; border: none;',
+  secondary: 'background-color: var(--color-accent-blue); color: var(--color-dark); border: none;',
+  outline: 'background-color: transparent; color: var(--color-dark); border: 1px solid var(--color-neutral-light);',
+  ghost: 'background-color: transparent; color: var(--color-dark); border: none;',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -29,7 +29,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyle = `
       font-family: var(--font-body);
       font-weight: 600;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
       transition: all var(--transition-fast);
       display: inline-flex;
@@ -38,15 +38,6 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       gap: 8px;
     `
 
-    const hoverStyle = variant === 'primary' 
-      ? '&:hover { background-color: #B44A23; }' 
-      : variant === 'secondary'
-      ? '&:hover { background-color: #16685F; }'
-      : variant === 'outline'
-      ? '&:hover { border-color: #78716C; }'
-      : '&:hover { background-color: #E8E2DA; }'
-
-    const activeStyle = '&:active { transform: scale(0.97); }'
     const widthStyle = fullWidth ? 'width: 100%;' : ''
 
     return (

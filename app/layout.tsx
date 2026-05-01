@@ -3,8 +3,8 @@ import './globals.css'
 import SiteShell from '@/components/SiteShell'
 
 export const metadata: Metadata = {
-  title: 'Forma 3D - Presentes Personalizados em 3D',
-  description: 'Presentes únicos e personalizados impressos em 3D. Decorações, objetos para cozinha, escritório e muito mais.',
+  title: 'B&D Artes & Impressões - Presentes personalizados em 3D',
+  description: 'Presentes únicos e personalizados em impressão 3D, com estética artesanal, personalização e produção sob demanda.',
 }
 
 export default function RootLayout({
