@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -26,11 +26,51 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      if (cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
+      return
+    }
+    if (cooldownTimerRef.current) return
+    cooldownTimerRef.current = setInterval(() => {
+      setCooldownSeconds(prev => (prev <= 1 ? 0 : prev - 1))
+    }, 1000)
+    return () => {
+      if (cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
+    }
+  }, [cooldownSeconds])
 
   function resetMessages() {
     setError('')
     setMessage('')
   }
+
+  function handleRateLimit(response: Response, fallbackError: string) {
+    const retryAfter = Number(response.headers.get('Retry-After')) || 0
+    if (retryAfter > 0) {
+      setCooldownSeconds(retryAfter)
+    }
+    setError(fallbackError)
+  }
+
+  function formatCooldown(seconds: number) {
+    if (seconds <= 0) return ''
+    if (seconds < 60) return `Aguarde ${seconds}s`
+    const minutes = Math.ceil(seconds / 60)
+    return `Aguarde ${minutes} min`
+  }
+
+  const isCoolingDown = cooldownSeconds > 0
+  const submitDisabled = loading || isCoolingDown
 
   async function requestCode(event: React.FormEvent) {
     event.preventDefault()
@@ -50,7 +90,12 @@ export default function LoginClient() {
     setLoading(false)
 
     if (!response.ok) {
-      setError(data.error || 'Não foi possível enviar o código.')
+      const fallback = data.error || 'Não foi possível enviar o código.'
+      if (response.status === 429) {
+        handleRateLimit(response, fallback)
+      } else {
+        setError(fallback)
+      }
       return
     }
 
@@ -72,7 +117,12 @@ export default function LoginClient() {
 
     if (!response.ok) {
       setLoading(false)
-      setError(data.error || 'Código inválido.')
+      const fallback = data.error || 'Código inválido.'
+      if (response.status === 429) {
+        handleRateLimit(response, fallback)
+      } else {
+        setError(fallback)
+      }
       return
     }
 
@@ -107,7 +157,12 @@ export default function LoginClient() {
     setLoading(false)
 
     if (!response.ok) {
-      setError(data.error || 'Não foi possível entrar com senha.')
+      const fallback = data.error || 'Não foi possível entrar com senha.'
+      if (response.status === 429) {
+        handleRateLimit(response, fallback)
+      } else {
+        setError(fallback)
+      }
       return
     }
 
@@ -162,7 +217,13 @@ export default function LoginClient() {
             <Input label="E-mail" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
             <Input label="Senha" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <Button type="submit" fullWidth disabled={loading}>{loading ? 'Entrando...' : 'Entrar com senha'}</Button>
+            <Button type="submit" fullWidth disabled={submitDisabled}>
+              {loading
+                ? 'Entrando...'
+                : isCoolingDown
+                  ? formatCooldown(cooldownSeconds)
+                  : 'Entrar com senha'}
+            </Button>
           </form>
         ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>
@@ -174,8 +235,14 @@ export default function LoginClient() {
             )}
             <Input label="E-mail *" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Enviando...' : tab === 'signup' ? 'Criar conta e receber código' : 'Receber código por e-mail'}
+            <Button type="submit" fullWidth disabled={submitDisabled}>
+              {loading
+                ? 'Enviando...'
+                : isCoolingDown
+                  ? formatCooldown(cooldownSeconds)
+                  : tab === 'signup'
+                    ? 'Criar conta e receber código'
+                    : 'Receber código por e-mail'}
             </Button>
           </form>
         ) : (
@@ -191,7 +258,13 @@ export default function LoginClient() {
               required
             />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <Button type="submit" fullWidth disabled={loading}>{loading ? 'Validando...' : 'Entrar'}</Button>
+            <Button type="submit" fullWidth disabled={submitDisabled}>
+              {loading
+                ? 'Validando...'
+                : isCoolingDown
+                  ? formatCooldown(cooldownSeconds)
+                  : 'Entrar'}
+            </Button>
             <button type="button" onClick={() => setStep('email')} style={{ border: 'none', background: 'transparent', color: '#1D2235', cursor: 'pointer', fontWeight: 600 }}>
               Usar outro e-mail
             </button>

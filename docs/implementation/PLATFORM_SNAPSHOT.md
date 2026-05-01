@@ -104,7 +104,7 @@ prisma/
   ├ schema.prisma       Modelos: Category, Product, ProductImage, ProductVariant,
   │                     PersonalizationField, Customer, CustomerAddress, AdminUser,
   │                     Banner, Order, OrderItem, Address, Payment, Shipment,
-  │                     Cart (não usado), CartItem (não usado), Coupon (não usado ainda),
+  │                     Cart (não usado), CartItem (não usado), Coupon,
   │                     AuthCode, WebhookEvent
   └ migrations/         4 migrations versionadas
 
@@ -211,7 +211,11 @@ model Shipment { id, orderId(uniq), provider?, serviceName?, price?, estimatedDa
 // Modelos definidos mas NÃO USADOS pela aplicação:
 model Cart     { id, sessionId?, userId?, couponCode?, items CartItem[], timestamps }
 model CartItem { id, cartId, productId, variantId?, quantity, unitPrice, personalizationJson? }
+
+// Em uso pelo checkout + admin:
 model Coupon   { id, code (uniq), type, value, minSubtotal?, startsAt?, endsAt?, usageLimit?, usedCount=0, isActive }
+// usado por POST /api/coupons/validate, POST /api/orders (couponCode opcional) e CRUD admin /api/cupons.
+// O código aplicado é snapshot em Payment.rawPayload.couponCode; desconto vai em Order.discountTotal.
 
 // Auth & infra:
 model AuthCode     { id, email, codeHash, ipHash, attempts=0, expiresAt, usedAt? }
@@ -460,13 +464,14 @@ export async function GET(request: NextRequest) {
 - ✅ `/admin/banners` CRUD com tempo de exibição
 - ✅ `/admin/clientes` lista + busca
 - ✅ `/admin/pedidos` lista
+- ✅ `/admin/cupons` CRUD com ativação, validade e limite de uso
 - ✅ Login bcrypt restrito por env var
 - ✅ Guard de role em todas as APIs admin
 
 ### Backend / infra
 - ✅ Sessão JWT em cookie httpOnly (TTL 7 dias)
 - ✅ Webhook MP com HMAC + idempotência via WebhookEvent
-- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP)
+- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP), `/api/auth/verify-code` (5/10min por email + 30/10min por IP) e `/api/auth/password-login` (5/10min por email + 20/10min por IP) — bucket compartilhado em `lib/rate-limit.ts` (Postgres `RateLimitBucket` em prod, `Map` em memória em dev)
 - ✅ Validação de CPF/CEP/telefone/email server-side
 - ✅ Fallback `localDb` para dev sem Postgres
 - ✅ Migrations versionadas
@@ -479,13 +484,13 @@ export async function GET(request: NextRequest) {
 ### Fase 3 — UX e descoberta
 - ❌ Busca de produtos no header (botão existe mas não faz nada)
 - ❌ Wishlist/favoritos (precisa modelo `Wishlist`)
-- ❌ Cupons no checkout (modelo `Coupon` existe, sem UI/validação)
+- ✅ Cupons no checkout (validação server-side, UI no `/checkout`, snapshot do código gravado em `Payment.rawPayload.couponCode`)
 - ❌ "Esqueci minha senha" (admin) — precisa modelo `PasswordResetToken`
 - ❌ Refazer Pix expirado
 
 ### Fase 4 — Admin operacional
 - ❌ Dashboard com KPIs
-- ❌ CRUD admin de cupons
+- ✅ CRUD admin de cupons (`/admin/cupons` + `/api/cupons`)
 - ❌ Drill-down de cliente → seus pedidos
 - ❌ Webhook do Melhor Envio para tracking automático
 - ❌ Filtros avançados em pedidos
@@ -505,7 +510,7 @@ export async function GET(request: NextRequest) {
 ### Bugs conhecidos / dívidas
 - `tests/e2e.spec.ts` tem erros de tipo, não roda no CI
 - `app/api/orders/[orderNumber]/route.ts:8` usa `RouteContext` não tipado (erro de tipo conhecido)
-- Modelos `Cart`/`CartItem`/`Coupon` no schema sem uso na aplicação
+- Modelos `Cart`/`CartItem` no schema sem uso na aplicação (apenas `Coupon` está em uso)
 - `lib/supabase.ts` é legado, não é usado em produção
 - Páginas estáticas (sobre, faq, políticas) ficam com linhas muito largas em monitor 1920px (sem `max-width` de leitura interno)
 - E-mail não pode ser trocado pelo cliente (precisa fazer via suporte)
@@ -588,7 +593,7 @@ Roteiro recomendado para o ChatGPT propor uma feature nova:
 | Banner do hero | `Banner` |
 | Variação de produto | `ProductVariant` |
 | Campo de personalização | `PersonalizationField` |
-| Cupom | `Coupon` (não usado ainda) |
+| Cupom | `Coupon` |
 | OTP por e-mail | `AuthCode` |
 | Evento de webhook | `WebhookEvent` |
 

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateAccessCode, storeAccessCode } from '@/lib/auth-codes'
 import { sendAccessCodeEmail } from '@/lib/email'
 import { validateEmail } from '@/lib/validation'
-
-function getIp(request: NextRequest) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'local'
-}
+import {
+  buildRateLimitKey,
+  consumeRateLimit,
+  getClientIp,
+  rateLimitResponseBody,
+} from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,9 +16,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Informe um e-mail válido.' }, { status: 400 })
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase()
+    const ip = getClientIp(request)
+
+    const limit = await consumeRateLimit(
+      buildRateLimitKey('request-code', normalizedEmail, ip),
+      5,
+      900,
+    )
+    if (!limit.ok) {
+      const { body, status, headers } = rateLimitResponseBody(limit)
+      return NextResponse.json(body, { status, headers })
+    }
+
     const code = generateAccessCode()
-    await storeAccessCode(email, code, getIp(request))
-    await sendAccessCodeEmail(email, code)
+    await storeAccessCode(normalizedEmail, code, ip)
+    await sendAccessCodeEmail(normalizedEmail, code)
 
     return NextResponse.json({
       success: true,
@@ -26,6 +39,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao enviar código.'
-    return NextResponse.json({ error: message }, { status: 429 })
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -14,6 +14,7 @@ import {
   ProductionTaskRecord,
   ProductionLogRecord,
   ProductionSettingsRecord,
+  CouponRecord,
 } from '@/lib/localDb'
 import {
   serializeProductionTask,
@@ -1134,7 +1135,7 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 }
 
-export async function createOrder(data: Order) {
+export async function createOrder(data: Order & { discountTotal?: number; couponCode?: string | null }) {
   if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
@@ -1152,6 +1153,7 @@ export async function createOrder(data: Order) {
         customerPhone: data.customerPhone,
         customerCpf: data.customerCpf,
         subtotal: data.subtotal,
+        discountTotal: typeof data.discountTotal === 'number' ? data.discountTotal : 0,
         shippingTotal: data.shippingCost,
         total: data.total,
         status: data.status,
@@ -2606,4 +2608,350 @@ function computeFulfillmentFromTasks(statuses: string[]): string | null {
   if (active.some((s) => s === 'in_production' || s === 'paused')) return 'in_production'
   if (active.every((s) => s === 'pending')) return 'pending'
   return 'in_production'
+}
+
+// =====================================================
+// COUPONS
+// =====================================================
+
+function serializeCoupon(coupon: any): CouponRecord {
+  const toIso = (value: any): string | null => {
+    if (!value) return null
+    if (value instanceof Date) return value.toISOString()
+    return String(value)
+  }
+
+  return {
+    id: coupon.id,
+    code: coupon.code,
+    type: coupon.type === 'percentage' ? 'percentage' : 'fixed',
+    value: money(coupon.value),
+    minSubtotal: coupon.minSubtotal != null ? money(coupon.minSubtotal) : null,
+    startsAt: toIso(coupon.startsAt),
+    endsAt: toIso(coupon.endsAt),
+    usageLimit: typeof coupon.usageLimit === 'number' ? coupon.usageLimit : (coupon.usageLimit ?? null),
+    usedCount: typeof coupon.usedCount === 'number' ? coupon.usedCount : 0,
+    isActive: Boolean(coupon.isActive),
+    createdAt: toIso(coupon.createdAt) || new Date().toISOString(),
+  }
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function computeCouponDiscount(type: 'fixed' | 'percentage', value: number, subtotal: number) {
+  if (type === 'fixed') {
+    return round2(Math.min(value, subtotal))
+  }
+  // percentage
+  return round2(subtotal * (value / 100))
+}
+
+export type CouponInput = {
+  code: string
+  type: 'fixed' | 'percentage'
+  value: number
+  minSubtotal?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  usageLimit?: number | null
+  isActive?: boolean
+}
+
+export async function listCoupons(): Promise<CouponRecord[]> {
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    return [...db.coupons].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }
+  try {
+    const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } })
+    return coupons.map(serializeCoupon)
+  } catch (error) {
+    console.error('[database] listCoupons Prisma failed, using fallback:', error)
+    const db = readDB()
+    return [...db.coupons].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }
+}
+
+export async function getCouponByCode(code: string): Promise<CouponRecord | null> {
+  const upper = String(code || '').trim().toUpperCase()
+  if (!upper) return null
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    return db.coupons.find(c => c.code.toUpperCase() === upper) || null
+  }
+  try {
+    const coupon = await prisma.coupon.findUnique({ where: { code: upper } })
+    return coupon ? serializeCoupon(coupon) : null
+  } catch (error) {
+    console.error('[database] getCouponByCode Prisma failed, using fallback:', error)
+    const db = readDB()
+    return db.coupons.find(c => c.code.toUpperCase() === upper) || null
+  }
+}
+
+export async function createCoupon(data: CouponInput): Promise<{ coupon: CouponRecord | null; error?: string }> {
+  const code = String(data.code || '').trim().toUpperCase()
+  if (!code) return { coupon: null, error: 'Código do cupom é obrigatório.' }
+  if (data.type !== 'fixed' && data.type !== 'percentage') {
+    return { coupon: null, error: 'Tipo do cupom deve ser "fixed" ou "percentage".' }
+  }
+  const value = Number(data.value)
+  if (!Number.isFinite(value) || value <= 0) {
+    return { coupon: null, error: 'Valor do cupom deve ser maior que zero.' }
+  }
+  if (data.type === 'percentage' && value > 100) {
+    return { coupon: null, error: 'Cupom percentual não pode exceder 100%.' }
+  }
+  const minSubtotal = data.minSubtotal != null && data.minSubtotal !== undefined ? Number(data.minSubtotal) : null
+  if (minSubtotal != null && (!Number.isFinite(minSubtotal) || minSubtotal < 0)) {
+    return { coupon: null, error: 'Subtotal mínimo inválido.' }
+  }
+  const startsAt = data.startsAt ? new Date(data.startsAt) : null
+  const endsAt = data.endsAt ? new Date(data.endsAt) : null
+  if (startsAt && endsAt && startsAt.getTime() >= endsAt.getTime()) {
+    return { coupon: null, error: 'Data de início deve ser anterior à data de término.' }
+  }
+  const usageLimit = data.usageLimit != null && data.usageLimit !== undefined ? Number(data.usageLimit) : null
+  if (usageLimit != null && (!Number.isInteger(usageLimit) || usageLimit < 1)) {
+    return { coupon: null, error: 'Limite de uso deve ser inteiro >= 1.' }
+  }
+  const isActive = data.isActive !== false
+
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    if (db.coupons.some(c => c.code.toUpperCase() === code)) {
+      return { coupon: null, error: 'Já existe um cupom com este código.' }
+    }
+    const newCoupon: CouponRecord = {
+      id: `coupon_${Date.now()}`,
+      code,
+      type: data.type,
+      value,
+      minSubtotal,
+      startsAt: startsAt ? startsAt.toISOString() : null,
+      endsAt: endsAt ? endsAt.toISOString() : null,
+      usageLimit,
+      usedCount: 0,
+      isActive,
+      createdAt: new Date().toISOString(),
+    }
+    db.coupons.push(newCoupon)
+    writeDB(db)
+    return { coupon: newCoupon }
+  }
+
+  try {
+    const existing = await prisma.coupon.findUnique({ where: { code } })
+    if (existing) {
+      return { coupon: null, error: 'Já existe um cupom com este código.' }
+    }
+    const created = await prisma.coupon.create({
+      data: {
+        code,
+        type: data.type,
+        value,
+        minSubtotal: minSubtotal != null ? minSubtotal : null,
+        startsAt,
+        endsAt,
+        usageLimit,
+        isActive,
+      },
+    })
+    return { coupon: serializeCoupon(created) }
+  } catch (error) {
+    console.error('[database] createCoupon Prisma failed:', error)
+    return { coupon: null, error: 'Erro ao criar cupom.' }
+  }
+}
+
+export async function updateCoupon(id: string, data: Partial<CouponInput>): Promise<{ coupon: CouponRecord | null; error?: string }> {
+  if (!id) return { coupon: null, error: 'ID do cupom é obrigatório.' }
+
+  const updateData: Record<string, any> = {}
+  if (data.code !== undefined) {
+    const code = String(data.code).trim().toUpperCase()
+    if (!code) return { coupon: null, error: 'Código do cupom é obrigatório.' }
+    updateData.code = code
+  }
+  if (data.type !== undefined) {
+    if (data.type !== 'fixed' && data.type !== 'percentage') {
+      return { coupon: null, error: 'Tipo do cupom inválido.' }
+    }
+    updateData.type = data.type
+  }
+  if (data.value !== undefined) {
+    const value = Number(data.value)
+    if (!Number.isFinite(value) || value <= 0) {
+      return { coupon: null, error: 'Valor do cupom deve ser maior que zero.' }
+    }
+    updateData.value = value
+  }
+  if (data.minSubtotal !== undefined) {
+    if (data.minSubtotal === null) {
+      updateData.minSubtotal = null
+    } else {
+      const minSubtotal = Number(data.minSubtotal)
+      if (!Number.isFinite(minSubtotal) || minSubtotal < 0) {
+        return { coupon: null, error: 'Subtotal mínimo inválido.' }
+      }
+      updateData.minSubtotal = minSubtotal
+    }
+  }
+  if (data.startsAt !== undefined) {
+    updateData.startsAt = data.startsAt ? new Date(data.startsAt) : null
+  }
+  if (data.endsAt !== undefined) {
+    updateData.endsAt = data.endsAt ? new Date(data.endsAt) : null
+  }
+  if (updateData.startsAt && updateData.endsAt && updateData.startsAt.getTime() >= updateData.endsAt.getTime()) {
+    return { coupon: null, error: 'Data de início deve ser anterior à data de término.' }
+  }
+  if (data.usageLimit !== undefined) {
+    if (data.usageLimit === null) {
+      updateData.usageLimit = null
+    } else {
+      const usageLimit = Number(data.usageLimit)
+      if (!Number.isInteger(usageLimit) || usageLimit < 1) {
+        return { coupon: null, error: 'Limite de uso deve ser inteiro >= 1.' }
+      }
+      updateData.usageLimit = usageLimit
+    }
+  }
+  if (data.isActive !== undefined) {
+    updateData.isActive = Boolean(data.isActive)
+  }
+
+  // Validate type/value combination if either was updated
+  const finalType = updateData.type
+  const finalValue = updateData.value
+  if (finalType === 'percentage' && typeof finalValue === 'number' && finalValue > 100) {
+    return { coupon: null, error: 'Cupom percentual não pode exceder 100%.' }
+  }
+
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    const index = db.coupons.findIndex(c => c.id === id)
+    if (index === -1) return { coupon: null, error: 'Cupom não encontrado.' }
+
+    if (updateData.code && db.coupons.some((c, i) => i !== index && c.code.toUpperCase() === updateData.code)) {
+      return { coupon: null, error: 'Já existe um cupom com este código.' }
+    }
+
+    // Cross-field validation against existing record for percentage limits
+    const merged = { ...db.coupons[index] }
+    if (updateData.code !== undefined) merged.code = updateData.code
+    if (updateData.type !== undefined) merged.type = updateData.type
+    if (updateData.value !== undefined) merged.value = updateData.value
+    if (updateData.minSubtotal !== undefined) merged.minSubtotal = updateData.minSubtotal
+    if (updateData.startsAt !== undefined) merged.startsAt = updateData.startsAt ? updateData.startsAt.toISOString() : null
+    if (updateData.endsAt !== undefined) merged.endsAt = updateData.endsAt ? updateData.endsAt.toISOString() : null
+    if (updateData.usageLimit !== undefined) merged.usageLimit = updateData.usageLimit
+    if (updateData.isActive !== undefined) merged.isActive = updateData.isActive
+
+    if (merged.type === 'percentage' && merged.value > 100) {
+      return { coupon: null, error: 'Cupom percentual não pode exceder 100%.' }
+    }
+
+    db.coupons[index] = merged
+    writeDB(db)
+    return { coupon: db.coupons[index] }
+  }
+
+  try {
+    if (updateData.code) {
+      const existing = await prisma.coupon.findUnique({ where: { code: updateData.code } })
+      if (existing && existing.id !== id) {
+        return { coupon: null, error: 'Já existe um cupom com este código.' }
+      }
+    }
+    const updated = await prisma.coupon.update({ where: { id }, data: updateData })
+    return { coupon: serializeCoupon(updated) }
+  } catch (error) {
+    console.error('[database] updateCoupon Prisma failed:', error)
+    return { coupon: null, error: 'Erro ao atualizar cupom.' }
+  }
+}
+
+export async function deleteCoupon(id: string): Promise<boolean> {
+  if (!id) return false
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    const index = db.coupons.findIndex(c => c.id === id)
+    if (index === -1) return false
+    db.coupons.splice(index, 1)
+    writeDB(db)
+    return true
+  }
+  try {
+    await prisma.coupon.delete({ where: { id } })
+    return true
+  } catch (error) {
+    console.error('[database] deleteCoupon Prisma failed:', error)
+    return false
+  }
+}
+
+export async function validateAndCalculateCoupon(
+  code: string,
+  subtotal: number
+): Promise<
+  | { ok: true; coupon: CouponRecord; discount: number }
+  | { ok: false; error: string }
+> {
+  const trimmed = String(code || '').trim()
+  if (!trimmed) return { ok: false, error: 'Informe um código de cupom.' }
+  const safeSubtotal = Number(subtotal)
+  if (!Number.isFinite(safeSubtotal) || safeSubtotal < 0) {
+    return { ok: false, error: 'Subtotal inválido para validar o cupom.' }
+  }
+
+  const coupon = await getCouponByCode(trimmed)
+  if (!coupon) return { ok: false, error: 'Cupom não encontrado.' }
+  if (!coupon.isActive) return { ok: false, error: 'Este cupom está inativo.' }
+
+  const now = Date.now()
+  if (coupon.startsAt && new Date(coupon.startsAt).getTime() > now) {
+    return { ok: false, error: 'Este cupom ainda não está disponível.' }
+  }
+  if (coupon.endsAt && new Date(coupon.endsAt).getTime() < now) {
+    return { ok: false, error: 'Este cupom expirou.' }
+  }
+  if (coupon.usageLimit != null && coupon.usedCount >= coupon.usageLimit) {
+    return { ok: false, error: 'Este cupom atingiu o limite de uso.' }
+  }
+  if (coupon.minSubtotal != null && safeSubtotal < coupon.minSubtotal) {
+    return {
+      ok: false,
+      error: `Este cupom requer subtotal mínimo de R$ ${coupon.minSubtotal.toFixed(2).replace('.', ',')}.`,
+    }
+  }
+
+  const discount = computeCouponDiscount(coupon.type, coupon.value, safeSubtotal)
+  if (discount <= 0) {
+    return { ok: false, error: 'Cupom não gera desconto neste pedido.' }
+  }
+  return { ok: true, coupon, discount }
+}
+
+export async function incrementCouponUsage(code: string): Promise<void> {
+  const upper = String(code || '').trim().toUpperCase()
+  if (!upper) return
+  if (!hasDatabase || !prisma?.coupon) {
+    const db = readDB()
+    const index = db.coupons.findIndex(c => c.code.toUpperCase() === upper)
+    if (index === -1) return
+    db.coupons[index].usedCount = (db.coupons[index].usedCount || 0) + 1
+    writeDB(db)
+    return
+  }
+  try {
+    await prisma.coupon.update({
+      where: { code: upper },
+      data: { usedCount: { increment: 1 } },
+    })
+  } catch (error) {
+    console.error('[database] incrementCouponUsage Prisma failed:', error)
+  }
 }

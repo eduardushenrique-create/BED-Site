@@ -51,6 +51,13 @@ const cards: DashboardCard[] = [
     cta: 'Ver banners →',
     accent: '#A3526A',
   },
+  {
+    href: '/admin/cupons',
+    title: 'Cupons',
+    description: 'Crie e gerencie cupons de desconto do checkout.',
+    cta: 'Ver cupons →',
+    accent: '#1D7A72',
+  },
 ]
 
 export default function AdminIndexPage() {

@@ -62,11 +62,11 @@ Lista de todos os endpoints (atuais + planejados). `🟢` existe. `🟡` planeja
 
 | Método | Rota | Auth | Descrição | Status |
 |---|---|---|---|---|
-| POST | `/api/coupons/validate` | público | Valida cupom para subtotal | 🟡 Fase 3 |
-| GET | `/api/cupons` | admin | Lista cupons | 🟡 Fase 4 |
-| POST | `/api/cupons` | admin | Cria cupom | 🟡 Fase 4 |
-| PUT | `/api/cupons` | admin | Atualiza cupom | 🟡 Fase 4 |
-| DELETE | `/api/cupons?id=X` | admin | Apaga cupom | 🟡 Fase 4 |
+| POST | `/api/coupons/validate` | público | Valida cupom para subtotal (body: `{ code, subtotal }`) | ✅ implementado |
+| GET | `/api/cupons` | admin | Lista cupons | ✅ implementado |
+| POST | `/api/cupons` | admin | Cria cupom | ✅ implementado |
+| PUT | `/api/cupons` | admin | Atualiza cupom (body: `{ id, ...campos }`) | ✅ implementado |
+| DELETE | `/api/cupons?id=X` | admin | Apaga cupom | ✅ implementado |
 
 ## Admin — CRUD
 

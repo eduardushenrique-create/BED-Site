@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createOrder, updateOrderPaymentByNumber } from '@/lib/database'
+import {
+  createOrder,
+  updateOrderPaymentByNumber,
+  validateAndCalculateCoupon,
+  incrementCouponUsage,
+} from '@/lib/database'
 import { requireApiUser } from '@/lib/api-auth'
 import { getLocalCatalogProducts } from '@/lib/catalog'
 import { calculateShipping, SHIPPING_CONFIG } from '@/lib/shipping'
@@ -31,6 +36,7 @@ interface OrderRequest {
   items: OrderItem[]
   shippingMethod: string
   paymentMethod?: string
+  couponCode?: string
 }
 
 function generateOrderNumber(): string {
@@ -46,10 +52,10 @@ export async function POST(request: Request) {
 
     const body: OrderRequest = await request.json()
 
-    const { 
-      customerName, 
-      customerEmail, 
-      customerPhone, 
+    const {
+      customerName,
+      customerEmail,
+      customerPhone,
       customerCpf,
       zipCode,
       street,
@@ -61,6 +67,7 @@ export async function POST(request: Request) {
       items,
       shippingMethod,
       paymentMethod,
+      couponCode,
     } = body
 
     if (!customerName || !customerEmail || !customerPhone || !customerCpf) {
@@ -144,7 +151,20 @@ export async function POST(request: Request) {
     }
 
     const safeShippingTotal = Number(selectedQuote.price || 0)
-    const safeTotal = safeSubtotal + safeShippingTotal
+
+    // Server-side coupon revalidation. Never trust client-provided discount.
+    let discountTotal = 0
+    let appliedCouponCode: string | null = null
+    if (typeof couponCode === 'string' && couponCode.trim()) {
+      const couponResult = await validateAndCalculateCoupon(couponCode.trim(), safeSubtotal)
+      if (!couponResult.ok) {
+        return NextResponse.json({ error: couponResult.error }, { status: 400 })
+      }
+      discountTotal = couponResult.discount
+      appliedCouponCode = couponResult.coupon.code
+    }
+
+    const safeTotal = Math.max(0, safeSubtotal + safeShippingTotal - discountTotal)
     const orderNumber = generateOrderNumber()
 
     const order = await createOrder({
@@ -173,6 +193,8 @@ export async function POST(request: Request) {
       subtotal: safeSubtotal,
       shippingCost: safeShippingTotal,
       total: safeTotal,
+      discountTotal,
+      couponCode: appliedCouponCode,
       paymentMethod: paymentMethod || 'pix',
       status: 'pending',
       paymentStatus: 'pending',
@@ -198,6 +220,17 @@ export async function POST(request: Request) {
       })),
     })
 
+    // Persist coupon snapshot inside Payment.rawPayload (no migration needed)
+    const rawPayloadWithCoupon: Record<string, unknown> | null =
+      appliedCouponCode || payment.rawPayload
+        ? {
+            ...(payment.rawPayload || {}),
+            ...(appliedCouponCode
+              ? { couponCode: appliedCouponCode, couponDiscount: discountTotal }
+              : {}),
+          }
+        : null
+
     const mappedStatus = mapMercadoPagoStatus(payment.status)
     const updatedOrder = await updateOrderPaymentByNumber(orderNumber, {
       status: mappedStatus.orderStatus,
@@ -209,8 +242,12 @@ export async function POST(request: Request) {
       pixQrCodeBase64: payment.pixQrCodeBase64 || null,
       pixCopyPaste: payment.pixCopyPaste || null,
       checkoutUrl: payment.checkoutUrl || null,
-      rawPayload: payment.rawPayload || null,
+      rawPayload: rawPayloadWithCoupon,
     })
+
+    if (appliedCouponCode) {
+      await incrementCouponUsage(appliedCouponCode)
+    }
 
     console.log('Order created:', orderNumber)
 
@@ -222,6 +259,8 @@ export async function POST(request: Request) {
       totals: {
         subtotal: safeSubtotal,
         shippingTotal: safeShippingTotal,
+        discountTotal,
+        couponCode: appliedCouponCode,
         total: safeTotal,
       },
       shipping: {
