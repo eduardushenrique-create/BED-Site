@@ -34,6 +34,8 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
   if (!activeBanner) return null
 
+  const hasImage = Boolean(activeBanner.imageUrl)
+
   return (
     <section
       style={{
@@ -106,21 +108,21 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
               letterSpacing: 0,
             }}
           >
-            Presentes feitos
-            <br />
-            <em style={{ fontStyle: 'italic', fontWeight: 400, color: '#BBCFEB' }}>para durar.</em>
+            {activeBanner.title}
           </h1>
-          <p
-            style={{
-              fontSize: '17px',
-              color: 'rgba(240,245,251,0.7)',
-              marginBottom: '28px',
-              maxWidth: '460px',
-              lineHeight: 1.7,
-            }}
-          >
-            {activeBanner.subtitle}
-          </p>
+          {activeBanner.subtitle && (
+            <p
+              style={{
+                fontSize: '17px',
+                color: 'rgba(240,245,251,0.7)',
+                marginBottom: '28px',
+                maxWidth: '460px',
+                lineHeight: 1.7,
+              }}
+            >
+              {activeBanner.subtitle}
+            </p>
+          )}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {activeBanner.ctaText && activeBanner.ctaLink && (
               <Link href={activeBanner.ctaLink}>
@@ -163,8 +165,8 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
         <div
           style={{
-            flex: '0 0 min(34vw, 300px)',
-            width: 'min(34vw, 300px)',
+            flex: '0 0 min(34vw, 320px)',
+            width: 'min(34vw, 320px)',
             minWidth: '220px',
             aspectRatio: '1 / 1',
             display: 'flex',
@@ -173,31 +175,46 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
             position: 'relative',
           }}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 280 280"
-            fill="none"
-            width="100%"
-            height="100%"
-            style={{ filter: 'drop-shadow(0 32px 64px rgba(29,34,53,0.35))' }}
-            aria-hidden="true"
-          >
-            <polygon points="140,28 236,80 140,132 44,80" fill="#BBCFEB" />
-            <polygon points="44,80 140,132 140,244 44,192" fill="#1D2235" />
-            <polygon points="236,80 140,132 140,244 236,192" fill="#2E3650" />
-            <polyline points="44,80 140,28 236,80" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-            <line x1="140" y1="132" x2="140" y2="244" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-            <g transform="translate(198,30) scale(0.28)">
-              <polygon points="80,0 160,40 80,80 0,40" fill="#BBCFEB" opacity="0.5" />
-              <polygon points="0,40 80,80 80,160 0,120" fill="#1D2235" opacity="0.5" />
-              <polygon points="160,40 80,80 80,160 160,120" fill="#2E3650" opacity="0.5" />
-            </g>
-            <g transform="translate(24,190) scale(0.18)">
-              <polygon points="80,0 160,40 80,80 0,40" fill="#BBCFEB" opacity="0.35" />
-              <polygon points="0,40 80,80 80,160 0,120" fill="#1D2235" opacity="0.35" />
-              <polygon points="160,40 80,80 80,160 160,120" fill="#2E3650" opacity="0.35" />
-            </g>
-          </svg>
+          {hasImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={activeBanner.imageUrl}
+              alt={activeBanner.title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '14px',
+                boxShadow: '0 32px 64px rgba(29,34,53,0.35)',
+              }}
+            />
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 280 280"
+              fill="none"
+              width="100%"
+              height="100%"
+              style={{ filter: 'drop-shadow(0 32px 64px rgba(29,34,53,0.35))' }}
+              aria-hidden="true"
+            >
+              <polygon points="140,28 236,80 140,132 44,80" fill="#BBCFEB" />
+              <polygon points="44,80 140,132 140,244 44,192" fill="#1D2235" />
+              <polygon points="236,80 140,132 140,244 236,192" fill="#2E3650" />
+              <polyline points="44,80 140,28 236,80" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+              <line x1="140" y1="132" x2="140" y2="244" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+              <g transform="translate(198,30) scale(0.28)">
+                <polygon points="80,0 160,40 80,80 0,40" fill="#BBCFEB" opacity="0.5" />
+                <polygon points="0,40 80,80 80,160 0,120" fill="#1D2235" opacity="0.5" />
+                <polygon points="160,40 80,80 80,160 160,120" fill="#2E3650" opacity="0.5" />
+              </g>
+              <g transform="translate(24,190) scale(0.18)">
+                <polygon points="80,0 160,40 80,80 0,40" fill="#BBCFEB" opacity="0.35" />
+                <polygon points="0,40 80,80 80,160 0,120" fill="#1D2235" opacity="0.35" />
+                <polygon points="160,40 80,80 80,160 160,120" fill="#2E3650" opacity="0.35" />
+              </g>
+            </svg>
+          )}
         </div>
       </div>
     </section>
