@@ -10,9 +10,11 @@ export default function LoginClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = useMemo(() => searchParams.get('redirect') || '/checkout', [searchParams])
+  const [mode, setMode] = useState<'code' | 'password'>('code')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -63,6 +65,29 @@ export default function LoginClient() {
     router.refresh()
   }
 
+  async function loginWithPassword(event: React.FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    const response = await fetch('/api/auth/password-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await response.json()
+    setLoading(false)
+
+    if (!response.ok) {
+      setError(data.error || 'Nao foi possivel entrar com senha.')
+      return
+    }
+
+    router.push(redirectTo)
+    router.refresh()
+  }
+
   return (
     <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '520px' }}>
       <Link href="/" style={{ color: '#1D2235', fontWeight: 600 }}>Voltar para a loja</Link>
@@ -71,10 +96,52 @@ export default function LoginClient() {
           Entrar ou criar conta
         </h1>
         <p style={{ color: '#5F6678', marginBottom: '24px' }}>
-          Enviaremos um codigo unico para confirmar seu e-mail antes de finalizar a compra.
+          Use codigo por e-mail para clientes ou senha para acessar a area administrativa.
         </p>
 
-        {step === 'email' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+          <button
+            type="button"
+            onClick={() => { setMode('code'); setError(''); setMessage('') }}
+            style={{
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: mode === 'code' ? '2px solid #1D2235' : '1px solid #BBCFEB',
+              backgroundColor: mode === 'code' ? '#F0F5FB' : 'white',
+              color: '#1D2235',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Codigo por e-mail
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('password'); setError(''); setMessage('') }}
+            style={{
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: mode === 'password' ? '2px solid #1D2235' : '1px solid #BBCFEB',
+              backgroundColor: mode === 'password' ? '#F0F5FB' : 'white',
+              color: '#1D2235',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            E-mail e senha
+          </button>
+        </div>
+
+        {mode === 'password' ? (
+          <form onSubmit={loginWithPassword} style={{ display: 'grid', gap: '16px' }}>
+            <Input label="E-mail" name="email" type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required aria-required="true" />
+            <Input label="Senha" name="password" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required aria-required="true" />
+            {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
+            <Button type="submit" fullWidth disabled={loading}>
+              {loading ? 'Entrando...' : 'Entrar com senha'}
+            </Button>
+          </form>
+        ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>
             <Input label="Nome completo" name="name" value={name} onChange={event => setName(event.target.value)} autoComplete="name" />
             <Input label="E-mail" name="email" type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required aria-required="true" />
