@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { captureException, captureMessage } from '@/lib/observability'
 
 const MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN!
 const MERCADOPAGO_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -93,14 +94,18 @@ export async function createPaymentPreference(data: PaymentPreference): Promise<
 
     if (!response.ok) {
       const error = await response.json()
-      console.error('Mercado Pago error:', error)
+      captureMessage('Mercado Pago preference API returned non-OK', 'error', {
+        context: 'mercadopago.createPaymentPreference',
+        status: response.status,
+        error,
+      })
       return null
     }
 
     const result = await response.json()
     return result as PaymentResult
   } catch (error) {
-    console.error('Error creating payment preference:', error)
+    captureException(error, { context: 'mercadopago.createPaymentPreference' })
     return null
   }
 }
@@ -146,7 +151,11 @@ export async function createPixPayment(data: MercadoPagoPixRequest) {
   })
 
   if (!response.ok) {
-    console.error('Mercado Pago PIX error:', await response.text())
+    captureMessage('Mercado Pago PIX API returned non-OK', 'error', {
+      context: 'mercadopago.createPixPayment',
+      status: response.status,
+      body: await response.text(),
+    })
     return null
   }
 
@@ -163,7 +172,12 @@ export async function getPaymentDetails(paymentId: string) {
   })
 
   if (!response.ok) {
-    console.error('Mercado Pago payment lookup failed:', await response.text())
+    captureMessage('Mercado Pago payment lookup failed', 'error', {
+      context: 'mercadopago.getPaymentDetails',
+      paymentId,
+      status: response.status,
+      body: await response.text(),
+    })
     return null
   }
 
@@ -192,7 +206,7 @@ export async function getPaymentStatus(paymentId: string): Promise<string | null
     const data = await response.json()
     return data.status
   } catch (error) {
-    console.error('Error getting payment status:', error)
+    captureException(error, { context: 'mercadopago.getPaymentStatus', paymentId })
     return null
   }
 }

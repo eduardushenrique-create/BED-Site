@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiAdmin } from '@/lib/api-auth'
 import { getProductionTask, updateProductionTask } from '@/lib/database'
+import { captureException } from '@/lib/observability'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function GET(
     }
     return NextResponse.json(task)
   } catch (error) {
-    console.error('[api/producao/[id]] GET failed:', error)
+    captureException(error, { context: 'api.producao.[id]', detail: 'GET getProductionTask failed' })
     return NextResponse.json({ error: 'Erro ao buscar tarefa de produção.' }, { status: 500 })
   }
 }
@@ -148,7 +149,7 @@ export async function PATCH(
 
     return NextResponse.json(result.task)
   } catch (error) {
-    console.error('[api/producao/[id]] PATCH failed:', error)
+    captureException(error, { context: 'api.producao.[id]', detail: 'PATCH updateProductionTask failed' })
     return NextResponse.json({ error: 'Erro ao atualizar tarefa de produção.' }, { status: 500 })
   }
 }
