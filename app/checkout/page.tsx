@@ -77,7 +77,7 @@ export default function CheckoutPage() {
         const data = await response.json()
 
         if (!response.ok || data.erro) {
-          setErrors(prev => ({ ...prev, zipCode: 'CEP nao encontrado.' }))
+          setErrors(prev => ({ ...prev, zipCode: 'CEP não encontrado.' }))
           return
         }
 
@@ -156,17 +156,17 @@ export default function CheckoutPage() {
 
   function validateForm() {
     const nextErrors: FormErrors = {}
-    if (!formData.customerName.trim()) nextErrors.customerName = 'Nome completo e obrigatorio.'
-    if (!validateEmail(formData.customerEmail)) nextErrors.customerEmail = 'Informe um e-mail valido.'
-    if (!formData.customerPhone.replace(/\D/g, '').match(/^\d{10,11}$/)) nextErrors.customerPhone = 'Informe um telefone valido.'
-    if (!validateCPF(formData.customerCpf)) nextErrors.customerCpf = 'Informe um CPF valido.'
-    if (!validateCEP(formData.zipCode)) nextErrors.zipCode = 'Informe um CEP valido.'
-    if (!formData.street.trim()) nextErrors.street = 'Rua e obrigatoria.'
-    if (!formData.number.trim()) nextErrors.number = 'Numero e obrigatorio.'
-    if (!formData.neighborhood.trim()) nextErrors.neighborhood = 'Bairro e obrigatorio.'
-    if (!formData.city.trim()) nextErrors.city = 'Cidade e obrigatoria.'
-    if (!formData.state.trim()) nextErrors.state = 'Estado e obrigatorio.'
-    if (!selectedShipping) nextErrors.shipping = 'Selecione uma opcao de frete.'
+    if (!formData.customerName.trim()) nextErrors.customerName = 'Nome completo é obrigatório.'
+    if (!validateEmail(formData.customerEmail)) nextErrors.customerEmail = 'Informe um e-mail válido.'
+    if (!formData.customerPhone.replace(/\D/g, '').match(/^\d{10,11}$/)) nextErrors.customerPhone = 'Informe um telefone válido.'
+    if (!validateCPF(formData.customerCpf)) nextErrors.customerCpf = 'Informe um CPF válido.'
+    if (!validateCEP(formData.zipCode)) nextErrors.zipCode = 'Informe um CEP válido.'
+    if (!formData.street.trim()) nextErrors.street = 'Rua é obrigatória.'
+    if (!formData.number.trim()) nextErrors.number = 'Número é obrigatório.'
+    if (!formData.neighborhood.trim()) nextErrors.neighborhood = 'Bairro é obrigatório.'
+    if (!formData.city.trim()) nextErrors.city = 'Cidade é obrigatória.'
+    if (!formData.state.trim()) nextErrors.state = 'Estado é obrigatório.'
+    if (!selectedShipping) nextErrors.shipping = 'Selecione uma opção de frete.'
     if (!paymentMethod) nextErrors.paymentMethod = 'Selecione uma forma de pagamento.'
 
     setErrors(nextErrors)
@@ -225,114 +225,141 @@ export default function CheckoutPage() {
 
   return (
     <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px' }}>
-      <h1 style={{ fontSize: '32px', fontWeight: 700, marginBottom: '32px', color: '#1D2235' }}>Checkout</h1>
+      <div style={{ marginBottom: '28px' }}>
+        <p style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#4A7AB5', marginBottom: '10px' }}>
+          Checkout seguro
+        </p>
+        <h1 style={{ fontSize: 'clamp(32px, 4vw, 46px)', fontWeight: 700, color: '#1D2235', marginBottom: '12px' }}>
+          Finalize sua compra
+        </h1>
+        <p style={{ maxWidth: '620px', color: '#6B7494', lineHeight: 1.7 }}>
+          Revise seus dados, escolha o frete e conclua o pagamento com o fluxo seguro da loja.
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gap: '32px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '32px' }}>
-            <section>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Seus dados</h2>
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <Input label="Nome completo" name="customerName" value={formData.customerName} onChange={handleInputChange} error={errors.customerName} required aria-required="true" />
-                <Input label="E-mail" name="customerEmail" type="email" value={formData.customerEmail} onChange={handleInputChange} error={errors.customerEmail} required aria-required="true" />
-                <Input label="Telefone" name="customerPhone" type="tel" value={formData.customerPhone} onChange={handleInputChange} error={errors.customerPhone} placeholder="(11) 99999-9999" required aria-required="true" />
-                <Input label="CPF" name="customerCpf" value={formData.customerCpf} onChange={handleInputChange} error={errors.customerCpf} placeholder="000.000.000-00" required aria-required="true" />
-              </div>
-            </section>
-
-            <section>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Endereco de entrega</h2>
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <Input label={cepLoading ? 'CEP (consultando...)' : 'CEP'} name="zipCode" value={formData.zipCode} onChange={handleInputChange} error={errors.zipCode} placeholder="00000-000" required aria-required="true" />
-                <Input label="Rua/Avenida" name="street" value={formData.street} onChange={handleInputChange} error={errors.street} required aria-required="true" />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
-                  <Input label="Numero" name="number" value={formData.number} onChange={handleInputChange} error={errors.number} required aria-required="true" />
-                  <Input label="Complemento" name="complement" value={formData.complement} onChange={handleInputChange} />
+        <div style={{ display: 'grid', gap: '28px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.9fr)', gap: '28px' }}>
+            <div style={{ display: 'grid', gap: '24px' }}>
+              <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '20px', color: '#1D2235' }}>Seus dados</h2>
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <Input label="Nome completo *" name="customerName" value={formData.customerName} onChange={handleInputChange} error={errors.customerName} required aria-required="true" />
+                  <Input label="E-mail *" name="customerEmail" type="email" value={formData.customerEmail} onChange={handleInputChange} error={errors.customerEmail} required aria-required="true" />
+                  <Input label="Telefone *" name="customerPhone" type="tel" value={formData.customerPhone} onChange={handleInputChange} error={errors.customerPhone} placeholder="(11) 99999-9999" required aria-required="true" />
+                  <Input label="CPF *" name="customerCpf" value={formData.customerCpf} onChange={handleInputChange} error={errors.customerCpf} placeholder="000.000.000-00" required aria-required="true" />
                 </div>
-                <Input label="Bairro" name="neighborhood" value={formData.neighborhood} onChange={handleInputChange} error={errors.neighborhood} required aria-required="true" />
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(90px, 1fr)', gap: '16px' }}>
-                  <Input label="Cidade" name="city" value={formData.city} onChange={handleInputChange} error={errors.city} required aria-required="true" />
-                  <Input label="Estado" name="state" value={formData.state} onChange={handleInputChange} error={errors.state} placeholder="SP" required aria-required="true" />
-                </div>
-              </div>
-            </section>
-          </div>
+              </section>
 
-          <section>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px' }}>Frete</h2>
-            {!validateCEP(formData.zipCode) && <p style={{ color: '#5F6678' }}>Informe seu CEP para calcular o frete.</p>}
-            {shippingLoading && <p style={{ color: '#5F6678' }}>Calculando frete...</p>}
-            {errors.shipping && <p role="alert" style={{ color: '#B42318' }}>{errors.shipping}</p>}
-            <div style={{ display: 'grid', gap: '12px' }}>
-              {shippingOptions.map(option => (
-                <label key={option.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: selectedShipping === option.id ? '2px solid #D4849A' : '1px solid #BBCFEB',
-                  backgroundColor: selectedShipping === option.id ? '#F0F5FB' : 'white',
-                  cursor: 'pointer',
-                }}>
-                  <input type="radio" name="shipping" value={option.id} checked={selectedShipping === option.id} onChange={() => setSelectedShipping(option.id)} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>{option.name}</div>
-                    <div style={{ fontSize: '14px', color: '#5F6678' }}>{option.company.name} - prazo estimado: {option.deliveryTime.days} dias</div>
+              <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '20px', color: '#1D2235' }}>Endereço de entrega</h2>
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <Input label={cepLoading ? 'CEP * (consultando...)' : 'CEP *'} name="zipCode" value={formData.zipCode} onChange={handleInputChange} error={errors.zipCode} placeholder="00000-000" required aria-required="true" />
+                  <Input label="Rua/Avenida *" name="street" value={formData.street} onChange={handleInputChange} error={errors.street} required aria-required="true" />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                    <Input label="Número *" name="number" value={formData.number} onChange={handleInputChange} error={errors.number} required aria-required="true" />
+                    <Input label="Complemento" name="complement" value={formData.complement} onChange={handleInputChange} />
                   </div>
-                  <strong>R$ {option.price.toFixed(2).replace('.', ',')}</strong>
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px' }}>Pagamento</h2>
-            {errors.paymentMethod && <p role="alert" style={{ color: '#B42318' }}>{errors.paymentMethod}</p>}
-            <div style={{ display: 'grid', gap: '12px' }}>
-              {[
-                { id: 'pix', label: 'Pix' },
-                { id: 'card', label: 'Cartao pelo checkout seguro' },
-              ].map(method => (
-                <label key={method.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '14px', border: '1px solid #BBCFEB', borderRadius: '8px', background: 'white' }}>
-                  <input type="radio" name="paymentMethod" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} />
-                  {method.label}
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Resumo do pedido</h2>
-            <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)' }}>
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0' }}>
-                {items.map((item, idx) => (
-                  <li key={`${item.productId}-${item.variantId}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '12px 0', borderBottom: '1px solid #E3E9F4' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{item.productName}</div>
-                      {item.variantName && <div style={{ fontSize: '14px', color: '#5F6678' }}>{item.variantName}</div>}
-                      <div style={{ fontSize: '14px', color: '#5F6678' }}>{item.quantity}x</div>
-                    </div>
-                    <strong>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</strong>
-                  </li>
-                ))}
-              </ul>
-              <div style={{ display: 'grid', gap: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subtotal</span><span>R$ {subtotal.toFixed(2).replace('.', ',')}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Frete</span><span>{selectedShipping ? `R$ ${shippingTotal.toFixed(2).replace('.', ',')}` : '-'}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 700, paddingTop: '12px', borderTop: '1px solid #E3E9F4' }}>
-                  <span>Total estimado</span><span>R$ {total.toFixed(2).replace('.', ',')}</span>
+                  <Input label="Bairro *" name="neighborhood" value={formData.neighborhood} onChange={handleInputChange} error={errors.neighborhood} required aria-required="true" />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(90px, 1fr)', gap: '16px' }}>
+                    <Input label="Cidade *" name="city" value={formData.city} onChange={handleInputChange} error={errors.city} required aria-required="true" />
+                    <Input label="Estado *" name="state" value={formData.state} onChange={handleInputChange} error={errors.state} placeholder="SP" required aria-required="true" />
+                  </div>
                 </div>
-                <p style={{ color: '#5F6678', fontSize: '13px', margin: 0 }}>Os totais sao recalculados no servidor antes da criacao do pedido.</p>
-              </div>
-              {errors.submit && <p role="alert" style={{ color: '#B42318' }}>{errors.submit}</p>}
-              <div style={{ marginTop: '24px' }}>
-                <Button type="submit" fullWidth disabled={loading || shippingLoading}>
-                  {loading ? 'Processando...' : `Concluir compra - R$ ${total.toFixed(2).replace('.', ',')}`}
-                </Button>
-              </div>
+              </section>
+
+              <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>Frete</h2>
+                {!validateCEP(formData.zipCode) && <p style={{ color: '#6B7494' }}>Informe seu CEP para calcular o frete.</p>}
+                {shippingLoading && <p style={{ color: '#6B7494' }}>Calculando frete...</p>}
+                {errors.shipping && <p role="alert" style={{ color: '#A3526A' }}>{errors.shipping}</p>}
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {shippingOptions.map(option => (
+                    <label
+                      key={option.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: selectedShipping === option.id ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+                        backgroundColor: selectedShipping === option.id ? '#FAFCFE' : 'white',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input type="radio" name="shipping" value={option.id} checked={selectedShipping === option.id} onChange={() => setSelectedShipping(option.id)} style={{ accentColor: '#1D2235' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, color: '#1D2235' }}>{option.name}</div>
+                        <div style={{ fontSize: '14px', color: '#6B7494' }}>{option.company.name} • prazo estimado: {option.deliveryTime.days} dias</div>
+                      </div>
+                      <strong style={{ color: '#1D2235' }}>R$ {option.price.toFixed(2).replace('.', ',')}</strong>
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>Pagamento</h2>
+                {errors.paymentMethod && <p role="alert" style={{ color: '#A3526A' }}>{errors.paymentMethod}</p>}
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {[
+                    { id: 'pix', label: 'Pix' },
+                    { id: 'card', label: 'Cartão pelo checkout seguro' },
+                  ].map(method => (
+                    <label
+                      key={method.id}
+                      style={{
+                        display: 'flex',
+                        gap: '12px',
+                        alignItems: 'center',
+                        padding: '16px',
+                        border: paymentMethod === method.id ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+                        borderRadius: '12px',
+                        background: paymentMethod === method.id ? '#FAFCFE' : 'white',
+                        color: '#1D2235',
+                      }}
+                    >
+                      <input type="radio" name="paymentMethod" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} style={{ accentColor: '#1D2235' }} />
+                      {method.label}
+                    </label>
+                  ))}
+                </div>
+              </section>
             </div>
-          </section>
+
+            <aside style={{ alignSelf: 'start', position: 'sticky', top: '92px' }}>
+              <section style={{ backgroundColor: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '24px', color: '#1D2235' }}>Resumo do pedido</h2>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0' }}>
+                  {items.map((item, idx) => (
+                    <li key={`${item.productId}-${item.variantId}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '12px 0', borderBottom: '1px solid #E3E9F4' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#1D2235' }}>{item.productName}</div>
+                        {item.variantName && <div style={{ fontSize: '14px', color: '#6B7494' }}>{item.variantName}</div>}
+                        <div style={{ fontSize: '14px', color: '#6B7494' }}>{item.quantity}x</div>
+                      </div>
+                      <strong style={{ color: '#1D2235' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</strong>
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Subtotal</span><span style={{ color: '#1D2235' }}>R$ {subtotal.toFixed(2).replace('.', ',')}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Frete</span><span style={{ color: '#1D2235' }}>{selectedShipping ? `R$ ${shippingTotal.toFixed(2).replace('.', ',')}` : '-'}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 700, paddingTop: '12px', borderTop: '1px solid #E3E9F4', color: '#1D2235' }}>
+                    <span>Total estimado</span><span>R$ {total.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                  <p style={{ color: '#6B7494', fontSize: '13px', margin: 0 }}>Os totais são recalculados no servidor antes da criação do pedido.</p>
+                </div>
+                {errors.submit && <p role="alert" style={{ color: '#A3526A', marginTop: '16px' }}>{errors.submit}</p>}
+                <div style={{ marginTop: '24px' }}>
+                  <Button type="submit" fullWidth disabled={loading || shippingLoading}>
+                    {loading ? 'Processando...' : `Concluir compra • R$ ${total.toFixed(2).replace('.', ',')}`}
+                  </Button>
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
       </form>
     </main>

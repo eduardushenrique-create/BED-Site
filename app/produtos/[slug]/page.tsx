@@ -80,7 +80,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   return {
-    title: `${product.name} - Forma 3D`,
+    title: `${product.name} - B&D Artes & Impressões`,
     description: product.shortDescription || `Compre ${product.name} personalizado`,
   }
 }
