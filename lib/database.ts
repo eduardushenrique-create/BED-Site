@@ -298,6 +298,80 @@ export async function deleteProduct(id: string) {
   }
 }
 
+export type BulkProductUpdate = {
+  isActive?: boolean
+  isFeatured?: boolean
+  isPersonalizable?: boolean
+  underOrder?: boolean
+  status?: string
+  category?: string  // slug da categoria; '' significa remover categoria
+}
+
+export async function updateProductsBulk(ids: string[], updates: BulkProductUpdate): Promise<{ updated: number; error?: string }> {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { updated: 0, error: 'Selecione ao menos um produto.' }
+  }
+
+  const data: Record<string, unknown> = {}
+  if (typeof updates.isActive === 'boolean') data.isActive = updates.isActive
+  if (typeof updates.isFeatured === 'boolean') data.isFeatured = updates.isFeatured
+  if (typeof updates.isPersonalizable === 'boolean') data.isPersonalizable = updates.isPersonalizable
+  if (typeof updates.underOrder === 'boolean') data.underOrder = updates.underOrder
+  if (typeof updates.status === 'string' && updates.status) data.status = updates.status
+
+  // Quando admin alterna isActive, sincronizamos status para que o filtro público (status != draft) reaja
+  if (typeof updates.isActive === 'boolean' && typeof updates.status !== 'string') {
+    data.status = updates.isActive ? 'published' : 'draft'
+  }
+
+  if (typeof updates.category === 'string') {
+    if (updates.category === '') {
+      data.categoryId = null
+    } else if (hasDatabase && prisma?.category) {
+      try {
+        const cat = await prisma.category.findUnique({ where: { slug: updates.category } })
+        if (!cat) return { updated: 0, error: `Categoria "${updates.category}" não encontrada.` }
+        data.categoryId = cat.id
+      } catch (error) {
+        console.error('[database] updateProductsBulk category lookup failed:', error)
+        return { updated: 0, error: 'Erro ao validar categoria.' }
+      }
+    }
+  }
+
+  if (Object.keys(data).length === 0) {
+    return { updated: 0, error: 'Nenhuma alteração válida informada.' }
+  }
+
+  if (!hasDatabase || !prisma?.product) {
+    const db = readDB()
+    let count = 0
+    db.products.forEach(p => {
+      if (!ids.includes(p.id)) return
+      if (typeof data.isActive === 'boolean') p.isActive = data.isActive as boolean
+      if (typeof data.isFeatured === 'boolean') p.isFeatured = data.isFeatured as boolean
+      if (typeof data.isPersonalizable === 'boolean') p.isPersonalizable = data.isPersonalizable as boolean
+      if (typeof data.underOrder === 'boolean') p.underOrder = data.underOrder as boolean
+      if (typeof data.status === 'string') p.status = data.status as string
+      if (typeof updates.category === 'string') p.category = updates.category
+      count++
+    })
+    writeDB(db)
+    return { updated: count }
+  }
+
+  try {
+    const result = await prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data,
+    })
+    return { updated: result.count }
+  } catch (error) {
+    console.error('[database] updateProductsBulk Prisma failed:', error)
+    return { updated: 0, error: 'Erro ao atualizar produtos no banco.' }
+  }
+}
+
 export async function listCategories() {
   if (!hasDatabase || !prisma?.category) return readDB().categories
   try {

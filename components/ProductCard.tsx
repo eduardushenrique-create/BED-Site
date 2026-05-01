@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Badge from './Badge'
+import SafeImage from './SafeImage'
 
 interface ProductImage {
   id: string
@@ -60,34 +61,15 @@ export default function ProductCard({ product }: ProductCardProps) {
             overflow: 'hidden',
           }}
         >
-          {mainImage ? (
-            <img
-              src={mainImage.url}
-              alt={mainImage.alt || product.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#8AAFD8',
-              }}
-            >
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
-            </div>
-          )}
+          <SafeImage
+            src={mainImage?.url}
+            alt={mainImage?.alt || product.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
 
           {product.isPersonalizable && (
             <Badge

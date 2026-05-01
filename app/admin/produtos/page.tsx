@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+import { compressImageToDataUrl, ImageUploadError } from '@/lib/image-upload'
 
 interface Product {
   id: string
@@ -91,17 +92,28 @@ export default function AdminProductsPage() {
     setFormData(emptyForm)
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const [imageProcessing, setImageProcessing] = useState(false)
+  const [imageError, setImageError] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const result = reader.result as string
-      setImagePreview(result)
-      setFormData(current => ({ ...current, imageUrl: result }))
+    setImageError('')
+    setImageProcessing(true)
+    try {
+      const compressed = await compressImageToDataUrl(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 })
+      setImagePreview(compressed)
+      setFormData(current => ({ ...current, imageUrl: compressed }))
+    } catch (err) {
+      const msg = err instanceof ImageUploadError ? err.message : 'Erro ao processar a imagem.'
+      setImageError(msg)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } finally {
+      setImageProcessing(false)
     }
-    reader.readAsDataURL(file)
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -135,15 +147,23 @@ export default function AdminProductsPage() {
     }
 
     try {
-      await fetch('/api/produtos', {
+      const res = await fetch('/api/produtos', {
         method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingId ? { id: editingId, ...productData } : productData),
       })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data?.error || 'Erro ao salvar produto. Tente novamente.')
+        return
+      }
 
       resetForm()
       loadProducts()
     } catch (error) {
       console.error('Error saving product:', error)
+      alert('Erro ao salvar produto. Verifique sua conexão e tente novamente.')
     }
   }
 
@@ -206,9 +226,55 @@ export default function AdminProductsPage() {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => {
+      if (prev.size === filteredProducts.length) return new Set()
+      return new Set(filteredProducts.map(p => p.id))
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  async function applyBulk(updates: Record<string, unknown>, confirmMessage?: string) {
+    if (selectedIds.size === 0) return
+    if (confirmMessage && !confirm(confirmMessage)) return
+
+    setBulkBusy(true)
+    try {
+      const res = await fetch('/api/produtos/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), updates }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data?.error || 'Erro ao aplicar alterações em massa.')
+        return
+      }
+      clearSelection()
+      await loadProducts()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: '48px', textAlign: 'center', color: '#6B7494' }}>Carregando...</div>
   }
+
+  const allSelected = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length
+  const hasSelection = selectedIds.size > 0
 
   return (
     <div>
@@ -261,19 +327,26 @@ export default function AdminProductsPage() {
             <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#1D2235' }}>Imagem do produto</label>
-                <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                <input type="file" ref={fileInputRef} accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} style={{ display: 'none' }} />
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button type="button" onClick={() => fileInputRef.current?.click()} style={{ padding: '10px 16px', backgroundColor: '#F0F5FB', border: '1px solid #D8DCE8', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', color: '#1D2235' }}>
-                    {imagePreview ? 'Trocar imagem' : 'Selecionar imagem'}
+                  <button type="button" disabled={imageProcessing} onClick={() => fileInputRef.current?.click()} style={{ padding: '10px 16px', backgroundColor: '#F0F5FB', border: '1px solid #D8DCE8', borderRadius: '10px', cursor: imageProcessing ? 'not-allowed' : 'pointer', fontSize: '14px', color: '#1D2235', opacity: imageProcessing ? 0.6 : 1 }}>
+                    {imageProcessing ? 'Processando...' : imagePreview ? 'Trocar imagem' : 'Selecionar imagem'}
                   </button>
-                  {imagePreview && (
-                    <button type="button" onClick={() => { setImagePreview(''); setFormData({ ...formData, imageUrl: '' }) }} style={{ padding: '10px 16px', backgroundColor: '#FCEBF0', border: '1px solid #D4849A', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', color: '#A3526A' }}>
+                  {imagePreview && !imageProcessing && (
+                    <button type="button" onClick={() => { setImagePreview(''); setFormData({ ...formData, imageUrl: '' }); setImageError('') }} style={{ padding: '10px 16px', backgroundColor: '#FCEBF0', border: '1px solid #D4849A', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', color: '#A3526A' }}>
                       Remover
                     </button>
                   )}
                 </div>
+                <p style={{ marginTop: '6px', fontSize: '12px', color: '#6B7494' }}>
+                  JPG, PNG ou WebP até 10 MB. A imagem é redimensionada automaticamente para 1600px.
+                </p>
+                {imageError && (
+                  <p role="alert" style={{ marginTop: '6px', fontSize: '13px', color: '#A3526A', fontWeight: 600 }}>{imageError}</p>
+                )}
                 {imagePreview && (
                   <div style={{ marginTop: '12px' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imagePreview} alt="Preview" style={{ maxWidth: '150px', maxHeight: '150px', borderRadius: '12px', objectFit: 'cover' }} />
                   </div>
                 )}
@@ -315,9 +388,51 @@ export default function AdminProductsPage() {
         </div>
       ) : (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
+          {hasSelection && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '14px 16px', background: '#1D2235', color: 'white', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                {selectedIds.size} produto{selectedIds.size > 1 ? 's' : ''} selecionado{selectedIds.size > 1 ? 's' : ''}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isActive: true, status: 'published' })} style={bulkBtn}>Ativar</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isActive: false, status: 'draft' })} style={bulkBtn}>Desativar</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isFeatured: true })} style={bulkBtn}>Destacar</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isFeatured: false })} style={bulkBtn}>Tirar destaque</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isPersonalizable: true })} style={bulkBtn}>Marcar personalizável</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isPersonalizable: false })} style={bulkBtn}>Tirar personalizável</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ underOrder: true })} style={bulkBtn}>Sob encomenda</button>
+                <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ underOrder: false })} style={bulkBtn}>Tirar sob encomenda</button>
+                <select
+                  disabled={bulkBusy}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const val = e.target.value
+                    e.target.value = ''
+                    if (val) applyBulk({ category: val }, `Mover ${selectedIds.size} produto(s) para a categoria selecionada?`)
+                  }}
+                  style={{ ...bulkBtn, padding: '6px 10px' }}
+                >
+                  <option value="">Mudar categoria...</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={clearSelection} disabled={bulkBusy} style={{ ...bulkBtn, background: 'rgba(255,255,255,0.1)' }}>Limpar seleção</button>
+              </div>
+            </div>
+          )}
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
+                <th style={{ padding: '16px', textAlign: 'left', width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Selecionar todos"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                </th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Produto</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Categoria</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Preco</th>
@@ -329,7 +444,16 @@ export default function AdminProductsPage() {
             </thead>
             <tbody>
               {filteredProducts.map(product => (
-                <tr key={product.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
+                <tr key={product.id} style={{ borderBottom: '1px solid #D8DCE8', background: selectedIds.has(product.id) ? '#FAFCFE' : 'white' }}>
+                  <td style={{ padding: '16px' }}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${product.name}`}
+                      checked={selectedIds.has(product.id)}
+                      onChange={() => toggleSelected(product.id)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                  </td>
                   <td style={{ padding: '16px', fontWeight: 500 }}>{product.name}</td>
                   <td style={{ padding: '16px', color: '#6B7494', textTransform: 'capitalize' }}>{product.category}</td>
                   <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>R$ {product.price.toFixed(2).replace('.', ',')}</td>
@@ -368,4 +492,15 @@ export default function AdminProductsPage() {
       )}
     </div>
   )
+}
+
+const bulkBtn: React.CSSProperties = {
+  padding: '6px 12px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255,255,255,0.25)',
+  background: 'rgba(255,255,255,0.16)',
+  color: 'white',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 600,
 }
