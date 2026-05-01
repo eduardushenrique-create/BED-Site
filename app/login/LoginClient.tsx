@@ -137,9 +137,26 @@ export default function LoginClient() {
             <Input label="E-mail" name="email" type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required aria-required="true" />
             <Input label="Senha" name="password" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required aria-required="true" />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
-            <Button type="submit" fullWidth disabled={loading}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: '#1D2235',
+                color: 'white',
+                fontFamily: 'var(--font-body)',
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                minHeight: '48px',
+              }}
+            >
               {loading ? 'Entrando...' : 'Entrar com senha'}
-            </Button>
+            </button>
           </form>
         ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>

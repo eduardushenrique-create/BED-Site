@@ -1,6 +1,6 @@
 'use client'
 
-import { ButtonHTMLAttributes, forwardRef } from 'react'
+import { ButtonHTMLAttributes, CSSProperties, forwardRef } from 'react'
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost'
 type ButtonSize = 'sm' | 'md' | 'lg'
@@ -11,40 +11,59 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean
 }
 
-const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'background-color: var(--color-primary); color: white; border: none;',
-  secondary: 'background-color: var(--color-accent-blue); color: var(--color-dark); border: none;',
-  outline: 'background-color: transparent; color: var(--color-dark); border: 1px solid var(--color-neutral-light);',
-  ghost: 'background-color: transparent; color: var(--color-dark); border: none;',
+const variantStyles: Record<ButtonVariant, CSSProperties> = {
+  primary: {
+    backgroundColor: 'var(--color-primary)',
+    color: 'white',
+    border: 'none',
+  },
+  secondary: {
+    backgroundColor: 'var(--color-accent-blue)',
+    color: 'var(--color-dark)',
+    border: 'none',
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    color: 'var(--color-dark)',
+    border: '1px solid var(--color-neutral-light)',
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+    color: 'var(--color-dark)',
+    border: 'none',
+  },
 }
 
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'padding: 8px 16px; font-size: 14px;',
-  md: 'padding: 12px 24px; font-size: 16px;',
-  lg: 'padding: 16px 32px; font-size: 18px;',
+const sizeStyles: Record<ButtonSize, CSSProperties> = {
+  sm: { padding: '8px 16px', fontSize: '14px' },
+  md: { padding: '12px 24px', fontSize: '16px' },
+  lg: { padding: '16px 32px', fontSize: '18px' },
+}
+
+const baseStyle: CSSProperties = {
+  fontFamily: 'var(--font-body)',
+  fontWeight: 600,
+  borderRadius: '10px',
+  cursor: 'pointer',
+  transition: 'all var(--transition-fast)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', fullWidth = false, style, children, ...props }, ref) => {
-    const baseStyle = `
-      font-family: var(--font-body);
-      font-weight: 600;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all var(--transition-fast);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    `
-
-    const widthStyle = fullWidth ? 'width: 100%;' : ''
-
+  ({ variant = 'primary', size = 'md', fullWidth = false, style, children, disabled, ...props }, ref) => {
     return (
       <button
         ref={ref}
+        disabled={disabled}
         style={{
-          ...parseStyles(baseStyle + variantStyles[variant] + sizeStyles[size] + widthStyle),
+          ...baseStyle,
+          ...variantStyles[variant],
+          ...sizeStyles[size],
+          ...(fullWidth ? { width: '100%' } : {}),
+          ...(disabled ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
           ...style,
         }}
         {...props}
@@ -56,17 +75,5 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 )
 
 Button.displayName = 'Button'
-
-function parseStyles(styleString: string): React.CSSProperties {
-  const style: Record<string, string> = {}
-  styleString.split(';').forEach(part => {
-    const [key, value] = part.split(':').map(s => s.trim())
-    if (key && value) {
-      const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-      style[cssKey] = value
-    }
-  })
-  return style as React.CSSProperties
-}
 
 export default Button
