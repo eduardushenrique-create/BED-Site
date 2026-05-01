@@ -1,8 +1,6 @@
-import { Pool } from 'pg'
-
 const globalForPrisma = globalThis as unknown as {
   prisma: any
-  prismaPool: Pool | undefined
+  prismaPool?: any
 }
 
 const databaseUrl = process.env.DATABASE_URL || ''
@@ -14,6 +12,7 @@ if (hasValidDb) {
   try {
     const { PrismaClient } = require('@prisma/client')
     const { PrismaPg } = require('@prisma/adapter-pg')
+    const { Pool } = require('pg')
 
     const pool = globalForPrisma.prismaPool ?? new Pool({ connectionString: databaseUrl })
     const adapter = new PrismaPg(pool)
