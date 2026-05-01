@@ -1,9 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from '@/lib/prisma'
-import { readDB, writeDB, Product, Category, Order, Banner, User } from '@/lib/localDb'
+import { readDB, writeDB, Product, Category, Order, Banner, User, WebhookEvent } from '@/lib/localDb'
 
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
+
+type WebhookEventUpsert = {
+  provider: string
+  deliveryKey: string
+  topic: string
+  resourceId?: string
+  eventId?: string
+  action?: string
+  orderNumber?: string
+  paymentId?: string
+  payloadHash: string
+  signature?: string | null
+}
+
+type WebhookEventUpdate = {
+  status: string
+  processedAt?: string | Date | null
+  lastError?: string | null
+  orderNumber?: string | null
+  paymentId?: string | null
+}
 
 function money(value: number) {
   return Number(value || 0)
@@ -739,6 +760,96 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
     console.error('[database] updateOrderPaymentByNumber Prisma failed:', error)
     return null
   }
+}
+
+export async function registerWebhookEvent(data: WebhookEventUpsert) {
+  if (!hasDatabase || !prisma?.webhookEvent) {
+    const db = readDB()
+    const existing = db.webhookEvents.find(event => event.deliveryKey === data.deliveryKey)
+    if (existing) {
+      return { event: existing, created: false }
+    }
+
+    const now = new Date().toISOString()
+    const createdEvent: WebhookEvent = {
+      id: `webhook_${Date.now()}`,
+      provider: data.provider,
+      deliveryKey: data.deliveryKey,
+      topic: data.topic,
+      resourceId: data.resourceId,
+      eventId: data.eventId,
+      action: data.action,
+      orderNumber: data.orderNumber,
+      paymentId: data.paymentId,
+      payloadHash: data.payloadHash,
+      signature: data.signature || undefined,
+      status: 'received',
+      receivedAt: now,
+      updatedAt: now,
+    }
+
+    db.webhookEvents.unshift(createdEvent)
+    writeDB(db)
+    return { event: createdEvent, created: true }
+  }
+
+  try {
+    const created = await prisma.webhookEvent.create({
+      data: {
+        provider: data.provider,
+        deliveryKey: data.deliveryKey,
+        topic: data.topic,
+        resourceId: data.resourceId || null,
+        eventId: data.eventId || null,
+        action: data.action || null,
+        orderNumber: data.orderNumber || null,
+        paymentId: data.paymentId || null,
+        payloadHash: data.payloadHash,
+        signature: data.signature || null,
+      },
+    })
+
+    return { event: created, created: true }
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      const existing = await prisma.webhookEvent.findUnique({ where: { deliveryKey: data.deliveryKey } })
+      return { event: existing, created: false }
+    }
+
+    throw error
+  }
+}
+
+export async function updateWebhookEvent(deliveryKey: string, data: WebhookEventUpdate) {
+  if (!hasDatabase || !prisma?.webhookEvent) {
+    const db = readDB()
+    const index = db.webhookEvents.findIndex(event => event.deliveryKey === deliveryKey)
+    if (index === -1) return null
+
+    db.webhookEvents[index] = {
+      ...db.webhookEvents[index],
+      status: data.status,
+      processedAt: data.processedAt ? new Date(data.processedAt).toISOString() : db.webhookEvents[index].processedAt,
+      lastError: data.lastError || undefined,
+      orderNumber: data.orderNumber ?? db.webhookEvents[index].orderNumber,
+      paymentId: data.paymentId ?? db.webhookEvents[index].paymentId,
+      updatedAt: new Date().toISOString(),
+    }
+
+    writeDB(db)
+    return db.webhookEvents[index]
+  }
+
+  return prisma.webhookEvent.update({
+    where: { deliveryKey },
+    data: {
+      status: data.status,
+      processedAt: data.processedAt ? new Date(data.processedAt) : undefined,
+      lastError: data.lastError ?? undefined,
+      orderNumber: data.orderNumber ?? undefined,
+      paymentId: data.paymentId ?? undefined,
+    },
+  })
 }
 
 export async function deleteOrder(id: string) {

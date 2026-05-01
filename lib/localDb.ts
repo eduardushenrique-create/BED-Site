@@ -89,12 +89,32 @@ export type User = {
   updatedAt: string
 }
 
+export type WebhookEvent = {
+  id: string
+  provider: string
+  deliveryKey: string
+  topic: string
+  resourceId?: string
+  eventId?: string
+  action?: string
+  orderNumber?: string
+  paymentId?: string
+  payloadHash: string
+  signature?: string
+  status: string
+  receivedAt: string
+  processedAt?: string
+  lastError?: string
+  updatedAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
   orders: Order[]
   banners: Banner[]
   users: User[]
+  webhookEvents: WebhookEvent[]
 }
 
 const defaultData: Database = {
@@ -103,6 +123,7 @@ const defaultData: Database = {
   orders: [],
   banners: [],
   users: [],
+  webhookEvents: [],
 }
 
 function ensureDir() {
@@ -129,6 +150,7 @@ export function readDB(): Database {
       orders: parsed.orders || [],
       banners: parsed.banners || [],
       users: parsed.users || [],
+      webhookEvents: parsed.webhookEvents || [],
     }
   } catch {
     return defaultData

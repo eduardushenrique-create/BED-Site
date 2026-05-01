@@ -174,21 +174,63 @@ export async function getPaymentStatus(paymentId: string): Promise<string | null
   }
 }
 
+function parseSignatureParts(signature: string | null) {
+  if (!signature) return { ts: null as string | null, v1: null as string | null }
+
+  const parts = signature.split(',')
+  let ts: string | null = null
+  let v1: string | null = null
+
+  for (const part of parts) {
+    const [rawKey, ...rawValue] = part.split('=')
+    const key = rawKey?.trim()
+    const value = rawValue.join('=').trim()
+
+    if (key === 'ts') ts = value
+    if (key === 'v1') v1 = value
+  }
+
+  return { ts, v1 }
+}
+
+function safeCompare(a: string, b: string) {
+  const left = Buffer.from(a)
+  const right = Buffer.from(b)
+  return left.length === right.length && crypto.timingSafeEqual(left, right)
+}
+
 export function verifyWebhookSignature(
   signature: string | null,
-  payload: string,
-  secret: string
+  requestId: string | null,
+  dataId: string | null | undefined,
+  secret: string,
+  maxAgeMs = 5 * 60 * 1000
 ): boolean {
-  if (!signature || !secret) {
+  if (!signature || !secret || !requestId) {
     return false
   }
 
-  const hash = crypto
+  const { ts, v1 } = parseSignatureParts(signature)
+  if (!ts || !v1) return false
+
+  const numericTs = Number(ts)
+  if (!Number.isFinite(numericTs)) return false
+
+  const normalizedTs = ts.length <= 10 ? numericTs * 1000 : numericTs
+  const age = Math.abs(Date.now() - normalizedTs)
+  if (age > maxAgeMs) return false
+
+  const manifestParts = []
+  if (dataId) manifestParts.push(`id:${String(dataId).toLowerCase()};`)
+  manifestParts.push(`request-id:${requestId};`)
+  manifestParts.push(`ts:${ts};`)
+
+  const digest = crypto
     .createHmac('sha256', secret)
-    .update(payload)
+    .update(manifestParts.join(''))
     .digest('hex')
 
-  return signature === `sha256=${hash}`
+  return safeCompare(digest, v1)
 }
 
 export function isPaymentApproved(status: string): boolean {

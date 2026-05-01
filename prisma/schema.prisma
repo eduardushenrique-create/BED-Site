@@ -264,3 +264,24 @@ model AuthCode {
 
   @@index([email, usedAt, expiresAt])
 }
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  deliveryKey String    @unique
+  topic       String
+  resourceId  String?
+  eventId     String?
+  action      String?
+  orderNumber String?
+  paymentId   String?
+  payloadHash String
+  signature   String?
+  status      String    @default("received")
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  lastError   String?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([provider, topic, resourceId])
+}

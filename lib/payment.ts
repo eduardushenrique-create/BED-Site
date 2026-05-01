@@ -147,3 +147,64 @@ export function mapMercadoPagoStatus(status: string | null | undefined) {
       return { orderStatus: 'pending_payment', paymentStatus: 'pending' }
   }
 }
+
+type MappedPaymentState = ReturnType<typeof mapMercadoPagoStatus>
+
+export function resolvePaymentTransition(
+  currentPaymentStatus: string | null | undefined,
+  currentOrderStatus: string | null | undefined,
+  nextState: MappedPaymentState
+) {
+  const currentPayment = currentPaymentStatus || 'pending'
+  const currentOrder = currentOrderStatus || 'pending_payment'
+
+  if (currentPayment === 'refunded') {
+    return {
+      orderStatus: currentOrder,
+      paymentStatus: currentPayment,
+      shouldPersistStatus: false,
+    }
+  }
+
+  if (currentPayment === 'paid') {
+    if (nextState.paymentStatus === 'refunded') {
+      return { ...nextState, shouldPersistStatus: true }
+    }
+
+    if (nextState.paymentStatus === 'paid') {
+      return { ...nextState, shouldPersistStatus: false }
+    }
+
+    return {
+      orderStatus: currentOrder,
+      paymentStatus: currentPayment,
+      shouldPersistStatus: false,
+    }
+  }
+
+  if (currentPayment === 'cancelled') {
+    if (nextState.paymentStatus === 'paid') {
+      return { ...nextState, shouldPersistStatus: true }
+    }
+
+    return {
+      orderStatus: currentOrder,
+      paymentStatus: currentPayment,
+      shouldPersistStatus: false,
+    }
+  }
+
+  if (currentPayment === 'rejected') {
+    if (nextState.paymentStatus === 'paid' || nextState.paymentStatus === 'refunded') {
+      return { ...nextState, shouldPersistStatus: true }
+    }
+
+    return {
+      orderStatus: currentOrder,
+      paymentStatus: currentPayment,
+      shouldPersistStatus: false,
+    }
+  }
+
+  return { ...nextState, shouldPersistStatus: true }
+}

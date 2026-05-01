@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import crypto from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentDetails, verifyWebhookSignature } from '@/lib/mercadopago'
-import { updateOrderPaymentByNumber } from '@/lib/database'
-import { mapMercadoPagoStatus } from '@/lib/payment'
+import { getOrderByNumber, registerWebhookEvent, updateOrderPaymentByNumber, updateWebhookEvent } from '@/lib/database'
+import { mapMercadoPagoStatus, resolvePaymentTransition } from '@/lib/payment'
 
 type MercadoPagoWebhookPayment = {
   payment_method_id?: string
@@ -19,43 +20,86 @@ type MercadoPagoWebhookPayment = {
   [key: string]: unknown
 }
 
-export async function POST(request: Request) {
+function buildPayloadHash(payload: string) {
+  return crypto.createHash('sha256').update(payload).digest('hex')
+}
+
+function buildDeliveryKey(topic: string, notificationId: string | null, resourceId: string | null, action: string | null, payloadHash: string) {
+  if (notificationId) {
+    return `mercadopago:${topic}:${notificationId}`
+  }
+
+  const resourcePart = resourceId || 'no-resource'
+  const actionPart = action || 'no-action'
+  return `mercadopago:${topic}:${resourcePart}:${actionPart}:${payloadHash}`
+}
+
+export async function POST(request: NextRequest) {
   try {
     const signature = request.headers.get('x-signature')
+    const requestId = request.headers.get('x-request-id')
     const payload = await request.text()
+    const payloadHash = buildPayloadHash(payload)
 
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
+    const raw = JSON.parse(payload)
+    const topic = raw.type || raw.topic || 'unknown'
+    const notificationId = raw.id ? String(raw.id) : null
+    const resourceId = raw.data?.id ? String(raw.data.id) : notificationId
+    const action = raw.action ? String(raw.action) : null
+    const dataId = request.nextUrl.searchParams.get('data.id') || resourceId
+    const deliveryKey = buildDeliveryKey(topic, notificationId, resourceId, action, payloadHash)
 
-    if (webhookSecret && !verifyWebhookSignature(signature, payload, webhookSecret)) {
+    if (webhookSecret && !verifyWebhookSignature(signature, requestId, dataId, webhookSecret)) {
       console.error('Invalid webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
-    const data = JSON.parse(payload)
+    const receipt = await registerWebhookEvent({
+      provider: 'mercadopago',
+      deliveryKey,
+      topic,
+      resourceId: resourceId || undefined,
+      eventId: notificationId || undefined,
+      action: action || undefined,
+      paymentId: topic === 'payment' ? (resourceId || undefined) : undefined,
+      payloadHash,
+      signature,
+    })
 
-    const topic = data.type || data.topic
-    const paymentId = data.data?.id || data.id
+    if (!receipt.created && receipt.event?.status === 'processed') {
+      return NextResponse.json({ received: true, duplicate: true })
+    }
 
-    console.log(`Mercado Pago webhook received: ${topic} - ${paymentId}`)
+    const paymentId = topic === 'payment' ? resourceId : null
 
     switch (topic) {
       case 'payment':
         const paymentDetails = paymentId ? await getPaymentDetails(String(paymentId)) : null
-        const paymentStatus = paymentDetails?.status || data.status
-        const externalReference = paymentDetails?.external_reference || data.external_reference
+        const paymentStatus = paymentDetails?.status || raw.status
+        const externalReference = paymentDetails?.external_reference || raw.external_reference
 
-        console.log(`Payment ${paymentId} status: ${paymentStatus}`)
-        console.log(`External reference: ${externalReference}`)
-
-        await handlePaymentUpdate(String(paymentId), paymentStatus, externalReference, paymentDetails)
+        await handlePaymentUpdate({
+          deliveryKey,
+          paymentId: String(paymentId),
+          status: String(paymentStatus || 'pending'),
+          externalReference: externalReference ? String(externalReference) : undefined,
+          paymentDetails,
+        })
         break
 
       case 'merchant_order':
-        console.log('Merchant order received:', data.id)
+        await updateWebhookEvent(deliveryKey, {
+          status: 'ignored',
+          processedAt: new Date(),
+        })
         break
 
       default:
-        console.log(`Unhandled webhook type: ${topic}`)
+        await updateWebhookEvent(deliveryKey, {
+          status: 'ignored',
+          processedAt: new Date(),
+        })
     }
 
     return NextResponse.json({ received: true })
@@ -65,66 +109,66 @@ export async function POST(request: Request) {
   }
 }
 
-async function handlePaymentUpdate(
-  paymentId: string,
-  status: string,
-  externalReference?: string,
+async function handlePaymentUpdate(input: {
+  deliveryKey: string
+  paymentId: string
+  status: string
+  externalReference?: string
   paymentDetails?: MercadoPagoWebhookPayment | null
-) {
-  console.log(`Updating payment ${paymentId} to status: ${status}`)
-
-  if (!externalReference) {
-    console.warn('No external reference found for payment:', paymentId)
+}) {
+  if (!input.externalReference) {
+    await updateWebhookEvent(input.deliveryKey, {
+      status: 'ignored',
+      processedAt: new Date(),
+      paymentId: input.paymentId,
+      lastError: 'missing_external_reference',
+    })
     return
   }
 
-  const orderNumber = externalReference
-  console.log(`Order to update: ${orderNumber}`)
+  const order = await getOrderByNumber(input.externalReference)
+  if (!order) {
+    await updateWebhookEvent(input.deliveryKey, {
+      status: 'failed',
+      processedAt: new Date(),
+      orderNumber: input.externalReference,
+      paymentId: input.paymentId,
+      lastError: 'order_not_found',
+    })
+    return
+  }
 
-  const mapped = mapMercadoPagoStatus(status)
-  await updateOrderPaymentByNumber(orderNumber, {
-    status: mapped.orderStatus,
-    paymentStatus: mapped.paymentStatus,
+  const mapped = mapMercadoPagoStatus(input.status)
+  const resolved = resolvePaymentTransition(order.paymentStatus, order.status, mapped)
+
+  const updated = await updateOrderPaymentByNumber(order.orderNumber, {
+    status: resolved.orderStatus,
+    paymentStatus: resolved.paymentStatus,
     provider: 'mercadopago',
-    method: paymentDetails?.payment_method_id === 'pix' ? 'pix' : 'card',
-    amount: typeof paymentDetails?.transaction_amount === 'number' ? paymentDetails.transaction_amount : undefined,
-    providerPaymentId: paymentId,
-    pixQrCodeBase64: paymentDetails?.point_of_interaction?.transaction_data?.qr_code_base64 || null,
-    pixCopyPaste: paymentDetails?.point_of_interaction?.transaction_data?.qr_code || null,
-    checkoutUrl: paymentDetails?.transaction_details?.external_resource_url || null,
-    rawPayload: paymentDetails
+    method: input.paymentDetails?.payment_method_id === 'pix' ? 'pix' : 'card',
+    amount: typeof input.paymentDetails?.transaction_amount === 'number' ? input.paymentDetails.transaction_amount : undefined,
+    providerPaymentId: input.paymentId,
+    pixQrCodeBase64: input.paymentDetails?.point_of_interaction?.transaction_data?.qr_code_base64 || null,
+    pixCopyPaste: input.paymentDetails?.point_of_interaction?.transaction_data?.qr_code || null,
+    checkoutUrl: input.paymentDetails?.transaction_details?.external_resource_url || null,
+    rawPayload: input.paymentDetails
       ? {
-          ...paymentDetails,
-          paidAt: paymentDetails.date_approved || null,
+          ...input.paymentDetails,
+          paidAt: input.paymentDetails.date_approved || null,
         }
       : null,
   })
 
-  switch (status) {
-    case 'approved':
-    case 'accredited':
-      console.log(`Payment approved for order ${orderNumber}`)
-      break
+  await updateWebhookEvent(input.deliveryKey, {
+    status: updated ? 'processed' : 'failed',
+    processedAt: new Date(),
+    orderNumber: order.orderNumber,
+    paymentId: input.paymentId,
+    lastError: updated ? null : 'payment_update_failed',
+  })
 
-    case 'pending':
-    case 'in_process':
-      console.log(`Payment pending for order ${orderNumber}`)
-      break
-
-    case 'rejected':
-      console.log(`Payment rejected for order ${orderNumber}`)
-      break
-
-    case 'cancelled':
-      console.log(`Payment cancelled for order ${orderNumber}`)
-      break
-
-    case 'refunded':
-      console.log(`Payment refunded for order ${orderNumber}`)
-      break
-
-    default:
-      console.log(`Unknown payment status: ${status}`)
+  if (!resolved.shouldPersistStatus) {
+    console.info(`Webhook ${input.deliveryKey} received duplicate or regressive status ${input.status} for order ${order.orderNumber}.`)
   }
 }
 
