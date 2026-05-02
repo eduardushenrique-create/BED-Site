@@ -184,6 +184,66 @@ export async function getPaymentDetails(paymentId: string) {
   return await response.json()
 }
 
+export type RefundResult =
+  | { ok: true; refundId: string; amount: number; status: string; raw: any }
+  | { ok: false; error: 'not_configured' | 'mp_error'; status?: number; detail?: string }
+
+/**
+ * Refunds a Mercado Pago payment. Pass amount=undefined for total refund;
+ * pass a number for partial refund.
+ */
+export async function refundMercadoPagoPayment(
+  paymentId: string,
+  amount?: number,
+): Promise<RefundResult> {
+  if (!MERCADOPAGO_ACCESS_TOKEN) {
+    return { ok: false, error: 'not_configured' }
+  }
+
+  const idempotencyKey = `refund-${paymentId}-${amount ?? 'full'}`
+  const body: Record<string, unknown> = {}
+  if (typeof amount === 'number' && amount > 0) {
+    body.amount = Number(amount.toFixed(2))
+  }
+
+  try {
+    const response = await fetch(`${MERCADOPAGO_BASE_URL}/v1/payments/${paymentId}/refunds`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+        'X-Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      captureMessage('Mercado Pago refund API returned non-OK', 'error', {
+        context: 'mercadopago.refundPayment',
+        status: response.status,
+        body: data,
+        paymentId,
+        amount,
+      })
+      const detail = typeof data?.message === 'string' ? data.message : data?.error || 'mp_error'
+      return { ok: false, error: 'mp_error', status: response.status, detail }
+    }
+
+    return {
+      ok: true,
+      refundId: String(data.id || ''),
+      amount: typeof data.amount === 'number' ? data.amount : amount || 0,
+      status: String(data.status || 'approved'),
+      raw: data,
+    }
+  } catch (error) {
+    captureException(error, { context: 'mercadopago.refundPayment', paymentId })
+    return { ok: false, error: 'mp_error', detail: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 export async function getPaymentStatus(paymentId: string): Promise<string | null> {
   if (!MERCADOPAGO_ACCESS_TOKEN) {
     return null
