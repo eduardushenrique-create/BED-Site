@@ -19,8 +19,39 @@ export default async function Home() {
   const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
   const featuredProducts = allProducts.slice(0, 4)
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const orgJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'B&D Artes & Impressões',
+    url: appUrl || undefined,
+    logo: appUrl ? `${appUrl.replace(/\/$/, '')}/icon.png` : undefined,
+    sameAs: ['https://www.instagram.com/beddesings/'],
+    contactPoint: [
+      {
+        '@type': 'ContactPoint',
+        contactType: 'customer service',
+        telephone: '+55-11-97887-1566',
+        availableLanguage: ['Portuguese'],
+      },
+    ],
+  }
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'B&D Artes & Impressões',
+    url: appUrl || undefined,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: appUrl ? `${appUrl.replace(/\/$/, '')}/produtos?busca={search_term_string}` : undefined,
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
   return (
     <main className="container" style={{ paddingTop: '20px', paddingBottom: '64px' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <Banner banners={activeBanners.length > 0 ? activeBanners : undefined} />
 
       <section style={{ marginBottom: '64px' }}>
