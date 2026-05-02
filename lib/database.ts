@@ -1350,6 +1350,59 @@ export async function getOrderByTrackingCode(trackingCode: string) {
   }
 }
 
+export async function cancelOrderByOwner(
+  orderNumber: string,
+  customerEmail: string,
+): Promise<{ ok: boolean; error?: 'not_found' | 'not_owner' | 'not_cancellable'; orderStatus?: string }> {
+  const normalized = customerEmail.trim().toLowerCase()
+
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    const idx = db.orders.findIndex(o => o.orderNumber === orderNumber)
+    if (idx === -1) return { ok: false, error: 'not_found' }
+    if (db.orders[idx].customerEmail.toLowerCase() !== normalized) return { ok: false, error: 'not_owner' }
+    if (db.orders[idx].paymentStatus !== 'pending' || db.orders[idx].status === 'cancelled') {
+      return { ok: false, error: 'not_cancellable' }
+    }
+    db.orders[idx].status = 'cancelled'
+    db.orders[idx].paymentStatus = 'cancelled'
+    db.orders[idx].fulfillmentStatus = 'cancelled'
+    writeDB(db)
+    return { ok: true, orderStatus: 'cancelled' }
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      select: { id: true, customerEmail: true, status: true, paymentStatus: true },
+    })
+    if (!order) return { ok: false, error: 'not_found' }
+    if (order.customerEmail.toLowerCase() !== normalized) return { ok: false, error: 'not_owner' }
+    if (order.paymentStatus !== 'pending' || order.status === 'cancelled') {
+      return { ok: false, error: 'not_cancellable' }
+    }
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'cancelled',
+          paymentStatus: 'cancelled',
+          fulfillmentStatus: 'cancelled',
+        },
+      }),
+      prisma.payment.updateMany({
+        where: { orderId: order.id },
+        data: { status: 'cancelled' },
+      }),
+    ])
+    return { ok: true, orderStatus: 'cancelled' }
+  } catch (error) {
+    console.error('[database] cancelOrderByOwner Prisma failed:', error)
+    return { ok: false, error: 'not_cancellable' }
+  }
+}
+
 export async function setOrderFulfillmentByTracking(
   trackingCode: string,
   fulfillmentStatus: string,
