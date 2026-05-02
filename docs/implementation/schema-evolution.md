@@ -1,8 +1,10 @@
 # Evolução do schema Prisma
 
 > Estado atual + todas as alterações planejadas por fase. Use como referência única para evitar conflitos entre fases.
+>
+> **Última atualização:** 2026-05-02 (sessão de fechamento de backlog)
 
-## Estado atual (após Fase 0 / banner carousel)
+## Estado atual (Fase 5 parcial — LGPD/Wishlist/Auth recovery aplicados)
 
 | Modelo | Campos-chave | Relações |
 |---|---|---|
@@ -24,7 +26,9 @@
 | `Coupon` | id, code (uniq), type, value, minSubtotal, startsAt, endsAt, usageLimit, usedCount, isActive | (USO PLANEJADO FASE 3) |
 | `AuthCode` | id, email, codeHash, ipHash, attempts, expiresAt, usedAt | — |
 | `RateLimitBucket` | key (PK), count, resetAt, updatedAt | — (bucket compartilhado para `request-code`, `verify-code`, `password-login`) |
-| `WebhookEvent` | id, provider, deliveryKey (uniq), topic, status, payloadHash | — |
+| `WebhookEvent` | id, provider, deliveryKey (uniq), topic, status, payloadHash | — (provider hoje: `mercadopago`, `melhor-envio`) |
+| `WishlistItem` | id, customerId, productId, createdAt; UNIQUE (customerId, productId) | ← Customer (cascade) |
+| `PasswordResetToken` | id, adminUserId, tokenHash (uniq, sha256), expiresAt, usedAt | ← AdminUser (cascade) |
 
 ## Fase 1 — Conta cliente MVP
 

@@ -13,25 +13,27 @@ Lista de todos os endpoints (atuais + planejados). `🟢` existe. `🟡` planeja
 | GET | `/api/auth/google/callback` | público | Callback OAuth Google | 🟢 |
 | POST | `/api/auth/logout` | público | Limpa cookie de sessão | 🟢 |
 | GET | `/api/auth/me` | público | Retorna user da sessão (ou null) | 🟢 |
-| POST | `/api/auth/forgot-password` | público | Envia link de reset (admin) | 🟡 Fase 3 |
-| POST | `/api/auth/reset-password` | público | Aplica nova senha via token | 🟡 Fase 3 |
+| POST | `/api/auth/request-password-reset` | público | Envia link de reset (admin), 1h TTL, rate-limited | 🟢 |
+| POST | `/api/auth/reset-password` | público | Aplica nova senha via token | 🟢 |
 
 ## Cliente logado — `/api/me/*`
 
 | Método | Rota | Auth | Descrição | Status |
 |---|---|---|---|---|
-| GET | `/api/me` | customer | Perfil completo do cliente | 🟡 Fase 2 |
-| PATCH | `/api/me` | customer | Atualiza nome/telefone/CPF | 🟡 Fase 2 |
-| DELETE | `/api/me` | customer | Anonimiza conta (LGPD) | 🟡 Fase 5 |
-| GET | `/api/me/orders` | customer | Lista pedidos do cliente | 🟡 Fase 1 |
-| GET | `/api/me/addresses` | customer | Lista endereços salvos | 🟡 Fase 2 |
-| POST | `/api/me/addresses` | customer | Cria endereço | 🟡 Fase 2 |
-| PUT | `/api/me/addresses/[id]` | customer | Atualiza endereço | 🟡 Fase 2 |
-| DELETE | `/api/me/addresses/[id]` | customer | Remove endereço | 🟡 Fase 2 |
-| GET | `/api/me/wishlist` | customer | Lista favoritos | 🟡 Fase 3 |
-| POST | `/api/me/wishlist` | customer | Adiciona favorito | 🟡 Fase 3 |
-| DELETE | `/api/me/wishlist/[productId]` | customer | Remove favorito | 🟡 Fase 3 |
-| GET | `/api/me/export` | customer | Exporta JSON dos dados (LGPD) | 🟡 Fase 5 |
+| GET | `/api/me` | customer | Perfil completo do cliente | 🟢 |
+| PATCH | `/api/me` | customer | Atualiza nome/telefone/CPF | 🟢 |
+| DELETE | `/api/me` | customer | Anonimiza conta (LGPD) — preserva histórico de pedidos | 🟢 |
+| GET | `/api/me/orders` | customer | Lista pedidos do cliente | 🟢 |
+| POST | `/api/me/orders/[orderNumber]/cancel` | customer (dono) | Cancela pedido pending payment | 🟢 |
+| POST | `/api/me/orders/[orderNumber]/regenerate-pix` | customer (dono) | Gera novo Pix para pedido pending | 🟢 |
+| GET | `/api/me/addresses` | customer | Lista endereços salvos | 🟢 |
+| POST | `/api/me/addresses` | customer | Cria endereço | 🟢 |
+| PUT | `/api/me/addresses/[id]` | customer | Atualiza endereço | 🟢 |
+| DELETE | `/api/me/addresses/[id]` | customer | Remove endereço | 🟢 |
+| GET | `/api/me/wishlist` | customer | Lista favoritos com Product join | 🟢 |
+| POST | `/api/me/wishlist` body=`{productId}` | customer | Adiciona favorito (idempotente) | 🟢 |
+| DELETE | `/api/me/wishlist/[productId]` | customer | Remove favorito | 🟢 |
+| GET | `/api/me/export` | customer | Exporta JSON com perfil + endereços + pedidos + wishlist (LGPD) | 🟢 |
 
 ## Catálogo público — `/api/products`, `/api/categories`, `/api/banners`
 
@@ -48,9 +50,11 @@ Lista de todos os endpoints (atuais + planejados). `🟢` existe. `🟡` planeja
 | Método | Rota | Auth | Descrição | Status |
 |---|---|---|---|---|
 | GET | `/api/orders/[orderNumber]` | customer (dono) ou admin | Detalhe de um pedido | 🟢 |
-| POST | `/api/orders` | customer | Cria pedido + payment | 🟢 |
-| POST | `/api/orders/[orderNumber]/regenerate-pix` | customer (dono) | Gera novo Pix | 🟡 Fase 3 |
-| POST | `/api/admin/orders/[orderNumber]/refund` | admin | Reembolso via MP | 🟡 Fase 4 |
+| POST | `/api/orders` | customer | Cria pedido + payment. **502 quando method=card e MP não devolveu checkoutUrl** | 🟢 |
+| GET | `/api/pedidos/[id]` | admin | Detalhe pedido por id ou orderNumber | 🟢 |
+| POST | `/api/pedidos/[id]/refund` body=`{amount?}` | admin | Reembolso MP (total ou parcial) | 🟢 |
+| POST | `/api/me/orders/[orderNumber]/cancel` | customer | Cancela pedido pending | 🟢 |
+| POST | `/api/me/orders/[orderNumber]/regenerate-pix` | customer | Gera novo Pix | 🟢 |
 
 ## Frete
 
@@ -77,13 +81,11 @@ Lista de todos os endpoints (atuais + planejados). `🟢` existe. `🟡` planeja
 | GET/POST/PUT/DELETE | `/api/banners` | admin | CRUD banners | 🟢 |
 | GET/POST/PUT/DELETE | `/api/clientes` | admin | CRUD clientes | 🟢 |
 | GET/POST/PUT/DELETE | `/api/pedidos` | admin | CRUD pedidos | 🟢 |
-| GET | `/api/clientes/[id]` | admin | Detalhe cliente + pedidos | 🟡 Fase 4 |
+| GET | `/api/clientes/[id]` | admin | Detalhe cliente + pedidos + endereços + totais | 🟢 |
 
 ## Admin — Dashboards
 
-| Método | Rota | Auth | Descrição | Status |
-|---|---|---|---|---|
-| GET | `/api/admin/stats` | admin | Métricas do dashboard | 🟡 Fase 4 |
+KPIs do `/admin` são gerados via `lib/database.ts:getAdminDashboardMetrics` (Server Component direto, sem endpoint REST dedicado).
 
 ## Webhooks
 
@@ -91,7 +93,7 @@ Lista de todos os endpoints (atuais + planejados). `🟢` existe. `🟡` planeja
 |---|---|---|---|---|
 | POST | `/api/webhooks/mercadopago` | HMAC | Atualiza pedido via webhook MP | 🟢 |
 | GET | `/api/webhooks/mercadopago` | público | Healthcheck | 🟢 |
-| POST | `/api/webhooks/melhorenvio` | HMAC | Atualiza Shipment via webhook ME | 🟡 Fase 4 |
+| POST | `/api/webhooks/melhor-envio` | HMAC SHA256 | Atualiza fulfillment via webhook ME, envia emails | 🟢 |
 
 ## Convenções de resposta
 
