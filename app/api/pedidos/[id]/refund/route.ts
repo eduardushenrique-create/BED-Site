@@ -3,6 +3,8 @@ import { requireApiAdmin } from '@/lib/api-auth'
 import { getOrderByIdOrNumber, updateOrderPaymentByNumber } from '@/lib/database'
 import { refundMercadoPagoPayment } from '@/lib/mercadopago'
 import { captureException } from '@/lib/observability'
+import { recordAuditEntry } from '@/lib/audit-log'
+import { getClientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,6 +105,23 @@ export async function POST(
         ],
       },
     })
+
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: 'order.refund',
+      targetType: 'Order',
+      targetId: order.id,
+      summary: `${isFullRefund ? 'Estorno total' : 'Estorno parcial'} de R$ ${result.amount.toFixed(2)} no pedido ${order.orderNumber}`,
+      metadata: {
+        refundId: result.refundId,
+        amount: result.amount,
+        orderNumber: order.orderNumber,
+        isFullRefund,
+        providerPaymentId,
+      },
+      ip: getClientIp(request),
+    }).catch(() => {})
 
     return NextResponse.json({
       ok: true,

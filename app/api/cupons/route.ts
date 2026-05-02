@@ -6,6 +6,8 @@ import {
   deleteCoupon,
 } from '@/lib/database'
 import { requireApiAdmin } from '@/lib/api-auth'
+import { recordAuditEntry } from '@/lib/audit-log'
+import { getClientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +26,16 @@ export async function POST(request: NextRequest) {
     if (!coupon) {
       return NextResponse.json({ error: error || 'Erro ao criar cupom.' }, { status: 400 })
     }
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: 'coupon.create',
+      targetType: 'Coupon',
+      targetId: coupon.id,
+      summary: `Cupom ${coupon.code} criado`,
+      metadata: { code: coupon.code, type: coupon.type, value: coupon.value },
+      ip: getClientIp(request),
+    }).catch(() => {})
     return NextResponse.json(coupon, { status: 201 })
   } catch (error) {
     console.error('[api/cupons] POST error:', error)
@@ -44,6 +56,16 @@ export async function PUT(request: NextRequest) {
     if (!coupon) {
       return NextResponse.json({ error: error || 'Cupom não encontrado.' }, { status: 404 })
     }
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: 'coupon.update',
+      targetType: 'Coupon',
+      targetId: coupon.id,
+      summary: `Cupom ${coupon.code} atualizado`,
+      metadata: { code: coupon.code, changes: rest },
+      ip: getClientIp(request),
+    }).catch(() => {})
     return NextResponse.json(coupon)
   } catch (error) {
     console.error('[api/cupons] PUT error:', error)
@@ -63,5 +85,14 @@ export async function DELETE(request: NextRequest) {
   if (!ok) {
     return NextResponse.json({ error: 'Cupom não encontrado.' }, { status: 404 })
   }
+  recordAuditEntry({
+    actorEmail: auth.user!.email,
+    actorRole: auth.user!.role || null,
+    action: 'coupon.delete',
+    targetType: 'Coupon',
+    targetId: id,
+    summary: `Cupom ${id} excluído`,
+    ip: getClientIp(request),
+  }).catch(() => {})
   return NextResponse.json({ success: true })
 }

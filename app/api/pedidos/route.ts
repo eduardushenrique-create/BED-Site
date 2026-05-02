@@ -8,6 +8,8 @@ import {
 } from '@/lib/database'
 import { requireApiAdmin } from '@/lib/api-auth'
 import { notifyOrderStatusChange } from '@/lib/order-notifications'
+import { recordAuditEntry } from '@/lib/audit-log'
+import { getClientIp } from '@/lib/rate-limit'
 
 export async function GET() {
   const auth = await requireApiAdmin()
@@ -34,6 +36,29 @@ export async function PUT(request: NextRequest) {
 
   if (!order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  }
+
+  if (before) {
+    const fields: string[] = []
+    if (before.paymentStatus !== order.paymentStatus) fields.push(`pagamento ${before.paymentStatus}→${order.paymentStatus}`)
+    if (before.fulfillmentStatus !== order.fulfillmentStatus) fields.push(`fulfillment ${before.fulfillmentStatus}→${order.fulfillmentStatus}`)
+    if (before.trackingCode !== order.trackingCode && order.trackingCode) fields.push(`tracking definido`)
+    if (fields.length > 0) {
+      recordAuditEntry({
+        actorEmail: auth.user!.email,
+        actorRole: auth.user!.role || null,
+        action: 'order.update',
+        targetType: 'Order',
+        targetId: order.id,
+        summary: `Pedido ${order.orderNumber}: ${fields.join('; ')}`,
+        metadata: {
+          orderNumber: order.orderNumber,
+          before: { paymentStatus: before.paymentStatus, fulfillmentStatus: before.fulfillmentStatus, trackingCode: before.trackingCode },
+          after: { paymentStatus: order.paymentStatus, fulfillmentStatus: order.fulfillmentStatus, trackingCode: order.trackingCode },
+        },
+        ip: getClientIp(request),
+      }).catch(() => {})
+    }
   }
 
   // Best-effort customer notifications when admin changes status. Wrapped in
@@ -75,8 +100,24 @@ export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  if (!id || !(await deleteOrder(id))) {
+  if (!id) return NextResponse.json({ error: 'Order id is required' }, { status: 400 })
+  const before = await getOrderByIdOrNumber(id)
+
+  if (!(await deleteOrder(id))) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  }
+
+  if (before) {
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: 'order.delete',
+      targetType: 'Order',
+      targetId: before.id,
+      summary: `Pedido ${before.orderNumber} excluído`,
+      metadata: { orderNumber: before.orderNumber, customerEmail: before.customerEmail, total: before.total },
+      ip: getClientIp(request),
+    }).catch(() => {})
   }
 
   return NextResponse.json({ success: true })
