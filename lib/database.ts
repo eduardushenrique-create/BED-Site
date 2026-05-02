@@ -3545,3 +3545,151 @@ export async function decrementOrderStock(
     }),
   )
 }
+
+// ---------------------------------------------------------------------------
+// Wishlist
+// ---------------------------------------------------------------------------
+
+export type WishlistItemDto = {
+  id: string
+  productId: string
+  product: Product | null
+  createdAt: string
+}
+
+const wishlistClient = (): any => (prisma as any)?.wishlistItem
+
+function readWishlistFromLocalDb(customerId: string): WishlistItemDto[] {
+  const db = readDB()
+  const items = (db.wishlistItems || []).filter(item => item.customerId === customerId)
+  const productsMap = new Map(db.products.map(p => [p.id, p]))
+  return items
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .map(item => ({
+      id: item.id,
+      productId: item.productId,
+      product: productsMap.get(item.productId) || null,
+      createdAt: item.createdAt,
+    }))
+}
+
+export async function listWishlistForCustomer(customerId: string): Promise<WishlistItemDto[]> {
+  if (!customerId) return []
+
+  if (!hasDatabase || !wishlistClient()) {
+    return readWishlistFromLocalDb(customerId)
+  }
+
+  try {
+    const records = await wishlistClient().findMany({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (records.length === 0) return []
+
+    const productIds: string[] = Array.from(new Set(records.map((r: any) => String(r.productId))))
+    const products = await prisma!.product.findMany({
+      where: { id: { in: productIds } },
+      include: { images: true, category: true },
+    })
+    const productMap = new Map(products.map(p => [p.id, serializeProduct(p)]))
+
+    return records.map((r: any) => ({
+      id: r.id,
+      productId: r.productId,
+      product: productMap.get(r.productId) || null,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    }))
+  } catch (error) {
+    console.error('[database] listWishlistForCustomer Prisma failed, using fallback:', error)
+    return readWishlistFromLocalDb(customerId)
+  }
+}
+
+export async function listWishlistProductIds(customerId: string): Promise<string[]> {
+  if (!customerId) return []
+
+  if (!hasDatabase || !wishlistClient()) {
+    const db = readDB()
+    return (db.wishlistItems || []).filter(item => item.customerId === customerId).map(item => item.productId)
+  }
+
+  try {
+    const records = await wishlistClient().findMany({
+      where: { customerId },
+      select: { productId: true },
+    })
+    return records.map((r: any) => r.productId)
+  } catch (error) {
+    console.error('[database] listWishlistProductIds Prisma failed:', error)
+    return []
+  }
+}
+
+export async function addToWishlist(
+  customerId: string,
+  productId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!customerId || !productId) return { ok: false, error: 'invalid_input' }
+
+  if (!hasDatabase || !wishlistClient()) {
+    const db = readDB()
+    const product = db.products.find(p => p.id === productId)
+    if (!product) return { ok: false, error: 'product_not_found' }
+    db.wishlistItems = db.wishlistItems || []
+    const exists = db.wishlistItems.find(
+      item => item.customerId === customerId && item.productId === productId,
+    )
+    if (!exists) {
+      db.wishlistItems.unshift({
+        id: `wishlist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        customerId,
+        productId,
+        createdAt: new Date().toISOString(),
+      })
+      writeDB(db)
+    }
+    return { ok: true }
+  }
+
+  try {
+    const product = await prisma!.product.findUnique({ where: { id: productId }, select: { id: true } })
+    if (!product) return { ok: false, error: 'product_not_found' }
+
+    await wishlistClient().upsert({
+      where: { customerId_productId: { customerId, productId } },
+      update: {},
+      create: { customerId, productId },
+    })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] addToWishlist Prisma failed:', error)
+    return { ok: false, error: 'persist_failed' }
+  }
+}
+
+export async function removeFromWishlist(
+  customerId: string,
+  productId: string,
+): Promise<{ ok: boolean }> {
+  if (!customerId || !productId) return { ok: false }
+
+  if (!hasDatabase || !wishlistClient()) {
+    const db = readDB()
+    const before = (db.wishlistItems || []).length
+    db.wishlistItems = (db.wishlistItems || []).filter(
+      item => !(item.customerId === customerId && item.productId === productId),
+    )
+    if (db.wishlistItems.length !== before) writeDB(db)
+    return { ok: true }
+  }
+
+  try {
+    await wishlistClient().deleteMany({ where: { customerId, productId } })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] removeFromWishlist Prisma failed:', error)
+    return { ok: false }
+  }
+}
