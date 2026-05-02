@@ -5,7 +5,7 @@ import { isAdminRole } from '@/lib/auth-shared'
 
 export async function GET(
   _request: NextRequest,
-  context: RouteContext<'/api/orders/[orderNumber]'>
+  context: { params: Promise<{ orderNumber: string }> }
 ) {
   const auth = await requireApiUser()
   if (auth.response) return auth.response
