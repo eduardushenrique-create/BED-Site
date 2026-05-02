@@ -203,6 +203,64 @@ export async function sendPasswordResetEmail(
   }
 }
 
+export async function sendOrderInProduction(
+  email: string,
+  customerName: string,
+  orderNumber: string,
+): Promise<boolean> {
+  if (!resend) return true
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Pedido ${orderNumber} entrou em produção - Forma 3D`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+          <h2 style="color: #1D2235;">Olá${customerName ? `, ${customerName.split(' ')[0]}` : ''}!</h2>
+          <p>Boa notícia: seu pedido <strong>${orderNumber}</strong> entrou em produção.</p>
+          <p>Cada peça é impressa sob demanda. Assim que estiver pronta para envio, enviaremos um novo aviso com o código de rastreio.</p>
+          <p style="color: #6B7494; font-size: 13px;">Qualquer dúvida, é só responder este e-mail.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending in-production email:', error)
+    return false
+  }
+}
+
+export async function sendOrderRefunded(
+  email: string,
+  customerName: string,
+  orderNumber: string,
+  amount: number,
+): Promise<boolean> {
+  if (!resend) return true
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Estorno do pedido ${orderNumber} - Forma 3D`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+          <h2 style="color: #8B5CF6;">Estorno em processamento</h2>
+          <p>Olá${customerName ? `, ${customerName.split(' ')[0]}` : ''},</p>
+          <p>O reembolso do pedido <strong>${orderNumber}</strong> no valor de <strong>R$ ${amount.toFixed(2).replace('.', ',')}</strong> foi solicitado ao Mercado Pago.</p>
+          <p>O valor deve voltar para a sua forma de pagamento original em até 7 dias úteis (cartão) ou imediatamente (Pix), conforme as regras do banco emissor.</p>
+          <p style="color: #6B7494; font-size: 13px;">Qualquer dúvida, é só responder este e-mail.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending refunded email:', error)
+    return false
+  }
+}
+
 export async function sendOrderDelivered(
   email: string,
   orderNumber: string,
