@@ -9,6 +9,7 @@ export interface ProductionTaskRow {
   id: string
   status: string
   priority: string
+  printerId: string | null
   requiredQuantity: number
   producedQuantity: number
   remainingQuantity: number
@@ -32,10 +33,19 @@ export interface ProductionTaskRow {
   }
 }
 
+export type PrinterOption = {
+  id: string
+  name: string
+  status: 'active' | 'maintenance' | 'offline'
+  color: string | null
+}
+
 interface ProductionTaskTableProps {
   items: ProductionTaskRow[]
   busyId: string | null
   onIncrement: (task: ProductionTaskRow, delta: number) => void
+  printers?: PrinterOption[]
+  onAssign?: (task: ProductionTaskRow, printerId: string | null) => void
 }
 
 function formatDateTime(iso: string | null): string {
@@ -95,7 +105,7 @@ const actionBtn: React.CSSProperties = {
   color: '#1D2235',
 }
 
-export default function ProductionTaskTable({ items, busyId, onIncrement }: ProductionTaskTableProps) {
+export default function ProductionTaskTable({ items, busyId, onIncrement, printers = [], onAssign }: ProductionTaskTableProps) {
   return (
     <div
       style={{
@@ -116,6 +126,7 @@ export default function ProductionTaskTable({ items, busyId, onIncrement }: Prod
               <th style={thStyle}>Prazo</th>
               <th style={thStyle}>Risco</th>
               <th style={thStyle}>Prioridade</th>
+              {printers.length > 0 && <th style={thStyle}>Impressora</th>}
               <th style={thStyle}>Atualizada em</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Ações</th>
             </tr>
@@ -162,6 +173,27 @@ export default function ProductionTaskTable({ items, busyId, onIncrement }: Prod
                   <td style={tdStyle}>
                     <ProductionPriorityBadge priority={task.priority} size="sm" />
                   </td>
+                  {printers.length > 0 && (
+                    <td style={tdStyle}>
+                      {onAssign ? (
+                        <select
+                          value={task.printerId || ''}
+                          onChange={e => onAssign(task, e.target.value || null)}
+                          disabled={isBusy}
+                          style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '12px', maxWidth: '160px' }}
+                        >
+                          <option value="">— sem máquina —</option>
+                          {printers.map(p => (
+                            <option key={p.id} value={p.id} disabled={p.status !== 'active'}>
+                              {p.name}{p.status !== 'active' ? ` (${p.status === 'maintenance' ? 'manut.' : 'off'})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ color: '#6B7494' }}>{printers.find(p => p.id === task.printerId)?.name || '—'}</span>
+                      )}
+                    </td>
+                  )}
                   <td style={{ ...tdStyle, color: '#6B7494', fontSize: '12px' }}>
                     {formatDateTime(task.updatedAt)}
                   </td>
