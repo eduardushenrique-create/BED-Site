@@ -29,6 +29,8 @@
 | `WebhookEvent` | id, provider, deliveryKey (uniq), topic, status, payloadHash | — (provider hoje: `mercadopago`, `melhor-envio`) |
 | `WishlistItem` | id, customerId, productId, createdAt; UNIQUE (customerId, productId) | ← Customer (cascade) |
 | `PasswordResetToken` | id, adminUserId, tokenHash (uniq, sha256), expiresAt, usedAt | ← AdminUser (cascade) |
+| `RestockAlert` | id, email, productId, variantId?, notifiedAt?, createdAt; UNIQUE (email, productId, variantId) | (sem FK formal — preserva alerta mesmo se produto for alterado) |
+| `AuditLog` | id, actorEmail, actorRole?, action, targetType, targetId?, summary?, metadata Json?, ip?, createdAt | (sem FK — log append-only) |
 
 ## Fase 1 — Conta cliente MVP
 
