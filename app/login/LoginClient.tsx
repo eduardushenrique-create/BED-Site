@@ -182,7 +182,7 @@ export default function LoginClient() {
   }
 
   return (
-    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '520px' }}>
+    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '640px' }}>
       <Link href="/" style={{ color: '#1D2235', fontWeight: 600 }}>← Voltar para a loja</Link>
       <section style={{ marginTop: '24px', backgroundColor: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #E3E9F4', marginBottom: '24px' }}>
