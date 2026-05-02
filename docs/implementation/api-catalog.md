@@ -109,7 +109,28 @@ Disparo automático: `dispatchRestockNotificationsIfNeeded` é chamado após `up
 |---|---|---|---|---|
 | GET | `/api/admin/audit-log?actor=&action=&targetType=&limit=&offset=` | admin | Log paginado | 🟢 |
 
-Hooks: `recordAuditEntry` (best-effort) em refund, update/delete de pedidos, CRUD de cupons, exclusão LGPD de cliente.
+Hooks: `recordAuditEntry` (best-effort) em refund, update/delete de pedidos, CRUD de cupons, exclusão LGPD de cliente, moderação/exclusão de reviews, CRUD de impressoras, atribuição de tarefas.
+
+## Reviews / avaliações
+
+| Método | Rota | Auth | Descrição | Status |
+|---|---|---|---|---|
+| GET | `/api/me/reviews?productId=` | customer | Verifica elegibilidade (pedido pago + não-avaliado) | 🟢 |
+| POST | `/api/me/reviews` body=`{productId, rating, title?, body?}` | customer | Cria review (status=pending) | 🟢 |
+| GET | `/api/products/[id]/reviews` | público | Lista reviews aprovadas + agregado (count, média, distribuição) | 🟢 |
+| GET | `/api/avaliacoes?status=&productId=` | admin | Lista para moderação | 🟢 |
+| PATCH | `/api/avaliacoes/[id]` body=`{status}` | admin | Aprovar/ocultar | 🟢 |
+| DELETE | `/api/avaliacoes/[id]` | admin | Hard delete | 🟢 |
+
+ProductCard e o catálogo público (`getLocalCatalogProducts`/`bySlug`) anexam `averageRating` + `reviewCount` via `getRatingsForProductIds`.
+
+## Impressoras / produção
+
+| Método | Rota | Auth | Descrição | Status |
+|---|---|---|---|---|
+| GET / POST | `/api/impressoras` | admin | Lista / cadastra impressora | 🟢 |
+| GET / PATCH / DELETE | `/api/impressoras/[id]` | admin | Detalhe / edita / exclui (SET NULL nas tarefas) | 🟢 |
+| POST | `/api/producao/[id]/assign` body=`{printerId\|null}` | admin | Atribui (ou desatribui) tarefa a uma impressora | 🟢 |
 
 ## Convenções de resposta
 

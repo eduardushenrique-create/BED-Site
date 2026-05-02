@@ -66,6 +66,10 @@ Antes de qualquer trabalho, leia:
 | [#34](https://github.com/eduardushenrique-create/BED-Site/pull/34) | "Avise quando voltar" para produtos sem estoque (RestockAlert + email) | ✅ |
 | [#35](https://github.com/eduardushenrique-create/BED-Site/pull/35) | AuditLog admin (refund/update/delete pedidos, cupons CRUD, exclusão LGPD) + tela `/admin/auditoria` | ✅ |
 | [#36](https://github.com/eduardushenrique-create/BED-Site/pull/36) | CI/CD GitHub Actions (lint + typecheck + build + migration BOM check) | ✅ |
+| [#37](https://github.com/eduardushenrique-create/BED-Site/pull/37) | docs: refresh pós-PRs #34-#36 | ✅ |
+| [#38](https://github.com/eduardushenrique-create/BED-Site/pull/38) | fix: RouteContext (CI typecheck) | ✅ |
+| [#39](https://github.com/eduardushenrique-create/BED-Site/pull/39) | feat: avaliações de produto com moderação admin (Review + estrelas) | ✅ |
+| [#40](https://github.com/eduardushenrique-create/BED-Site/pull/40) | feat: CRUD de impressoras + atribuição de tarefas (Printer + ProductionTask.printerId) | ✅ |
 
 ## 3. ⚠️ Pendências do stakeholder (configuração externa)
 
@@ -112,6 +116,8 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 - Item #16 — Refazer Pix expirado
 - Item #17 — Avise quando voltar (RestockAlert)
 - Item #19 — CI/CD GitHub Actions
+- Item #14 — Reviews de produto com moderação
+- Item #18 — CRUD de impressoras + atribuição de tarefas
 - 12/15 fixes da auditoria de UX/responsividade
 - Configuração de WhatsApp e Instagram reais
 
@@ -121,11 +127,8 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 | 7 | Migrar `<SafeImage>` → `next/image` | Depende do R2 ativo (5 envs no Railway) |
 | — | Acentuação correta nos produtos (Descrição/produção/úteis) | Edição manual via `/admin/produtos` |
 
-### 🎯 Backlog futuro (alto esforço, não atacados nesta sessão)
-| # | Item | Esforço |
-|---|---|---|
-| 14 | Reviews/avaliações de produtos | Alto |
-| 18 | CRUD de impressoras + fila por máquina (evolução de produção) | Alto |
+### 🎯 Backlog futuro
+Nada de prioridade alta-esforço pendente. Itens entregues nesta sessão incluem reviews (PR #39) e CRUD de impressoras (PR #40).
 
 ### 🧹 Dívidas técnicas conhecidas
 - 2 erros pré-existentes em `tests/e2e.spec.ts` (Playwright, linhas 26 e 34)

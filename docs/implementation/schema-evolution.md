@@ -31,6 +31,9 @@
 | `PasswordResetToken` | id, adminUserId, tokenHash (uniq, sha256), expiresAt, usedAt | ← AdminUser (cascade) |
 | `RestockAlert` | id, email, productId, variantId?, notifiedAt?, createdAt; UNIQUE (email, productId, variantId) | (sem FK formal — preserva alerta mesmo se produto for alterado) |
 | `AuditLog` | id, actorEmail, actorRole?, action, targetType, targetId?, summary?, metadata Json?, ip?, createdAt | (sem FK — log append-only) |
+| `Review` | id, productId, customerId?, customerName, customerEmail, orderNumber?, rating 1-5, title?, body?, status (pending/approved/hidden), moderatedAt?, moderatedBy? | ← Product (cascade), ← Customer (SetNull para sobreviver à anonimização LGPD) |
+| `Printer` | id, name, model?, buildVolume?, materials?, dailyCapacityMinutes (default 480), status (active/maintenance/offline), color?, notes? | → ProductionTask[] |
+| `ProductionTask.printerId` | (campo adicionado em 20260511000000_printers) | ← Printer? (FK SetNull) — tarefas existentes recebem null na migração |
 
 ## Fase 1 — Conta cliente MVP
 
