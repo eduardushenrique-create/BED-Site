@@ -300,12 +300,26 @@ model Coupon {
 }
 
 model AdminUser {
-  id           String   @id @default(cuid())
+  id           String               @id @default(cuid())
   name         String
-  email        String   @unique
-  role         String   @default("admin")
+  email        String               @unique
+  role         String               @default("admin")
   passwordHash String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime             @default(now())
+  resetTokens  PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId])
+  @@index([expiresAt])
 }
 
 model AuthCode {

@@ -224,6 +224,9 @@ export default function LoginClient() {
                   ? formatCooldown(cooldownSeconds)
                   : 'Entrar com senha'}
             </Button>
+            <a href="/login/esqueci-senha" style={{ color: '#4A7AB5', fontSize: '14px', textAlign: 'center', textDecoration: 'none' }}>
+              Esqueceu a senha?
+            </a>
           </form>
         ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>
