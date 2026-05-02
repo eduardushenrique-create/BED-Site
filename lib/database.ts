@@ -410,7 +410,11 @@ export async function updateProduct(id: string, data: Partial<Product>) {
       }
     }
 
-    return serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true } }))
+    const final = serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true } }))
+    // Best-effort restock notifications when the product is now in stock /
+    // under order. Won't email anyone if there are no pending subscribers.
+    dispatchRestockNotificationsIfNeeded(id).catch(() => {})
+    return final
   } catch (error) {
     console.error('[database] updateProduct Prisma failed, using fallback:', error)
     const db = readDB()
@@ -3632,6 +3636,7 @@ export async function updateProductVariant(
         ...(input.isAvailable !== undefined ? { isAvailable: !!input.isAvailable } : {}),
       },
     })
+    dispatchRestockNotificationsIfNeeded(productId, variantId).catch(() => {})
     return { ok: true, variant: serializeVariant(updated) }
   } catch (error) {
     console.error('[database] updateProductVariant Prisma failed:', error)
@@ -3837,6 +3842,172 @@ export async function addToWishlist(
   } catch (error) {
     console.error('[database] addToWishlist Prisma failed:', error)
     return { ok: false, error: 'persist_failed' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Restock alerts ("avise quando voltar")
+// ---------------------------------------------------------------------------
+
+const restockClient = (): any => (prisma as any)?.restockAlert
+
+export type RestockAlertSubscription = {
+  email: string
+  productId: string
+  variantId?: string | null
+}
+
+export async function subscribeToRestock(input: RestockAlertSubscription): Promise<{ ok: boolean; error?: string }> {
+  const email = input.email.trim().toLowerCase()
+  if (!email || !input.productId) return { ok: false, error: 'invalid_input' }
+
+  if (!hasDatabase || !restockClient()) {
+    const db = readDB()
+    db.restockAlerts = db.restockAlerts || []
+    const exists = db.restockAlerts.find(
+      a => a.email === email && a.productId === input.productId && (a.variantId || null) === (input.variantId || null) && !a.notifiedAt,
+    )
+    if (!exists) {
+      db.restockAlerts.unshift({
+        id: `restock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        email,
+        productId: input.productId,
+        variantId: input.variantId || null,
+        notifiedAt: null,
+        createdAt: new Date().toISOString(),
+      })
+      writeDB(db)
+    }
+    return { ok: true }
+  }
+
+  try {
+    await restockClient().upsert({
+      where: {
+        email_productId_variantId: {
+          email,
+          productId: input.productId,
+          variantId: input.variantId || null,
+        },
+      },
+      update: { notifiedAt: null }, // re-arm if previously notified
+      create: { email, productId: input.productId, variantId: input.variantId || null },
+    })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] subscribeToRestock Prisma failed:', error)
+    return { ok: false, error: 'persist_failed' }
+  }
+}
+
+export type PendingRestockAlert = {
+  id: string
+  email: string
+  productId: string
+  variantId: string | null
+}
+
+export async function listPendingRestockAlertsForProduct(
+  productId: string,
+  variantId?: string | null,
+): Promise<PendingRestockAlert[]> {
+  if (!productId) return []
+
+  if (!hasDatabase || !restockClient()) {
+    const db = readDB()
+    return (db.restockAlerts || [])
+      .filter(a => a.productId === productId && (a.variantId || null) === (variantId || null) && !a.notifiedAt)
+      .map(a => ({ id: a.id, email: a.email, productId: a.productId, variantId: a.variantId || null }))
+  }
+
+  try {
+    const records = await restockClient().findMany({
+      where: { productId, variantId: variantId || null, notifiedAt: null },
+      select: { id: true, email: true, productId: true, variantId: true },
+    })
+    return records as PendingRestockAlert[]
+  } catch (error) {
+    console.error('[database] listPendingRestockAlertsForProduct Prisma failed:', error)
+    return []
+  }
+}
+
+async function dispatchRestockEmails(
+  alerts: PendingRestockAlert[],
+  productName: string,
+  productSlug: string,
+): Promise<void> {
+  if (alerts.length === 0) return
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  // Lazy import to keep email config out of the database module's import graph in tests.
+  const { sendRestockAlertEmail } = await import('@/lib/email')
+
+  const sent: string[] = []
+  for (const alert of alerts) {
+    const ok = await sendRestockAlertEmail(alert.email, productName, productSlug, appUrl).catch(() => false)
+    if (ok) sent.push(alert.id)
+  }
+
+  if (sent.length > 0) await markRestockAlertsNotified(sent)
+}
+
+export async function dispatchRestockNotificationsIfNeeded(
+  productId: string,
+  variantId?: string | null,
+): Promise<void> {
+  if (!productId) return
+
+  if (!hasDatabase || !prisma?.product || !restockClient()) return
+
+  try {
+    if (variantId) {
+      const variant = await prisma.productVariant.findUnique({
+        where: { id: variantId },
+        select: { stockQuantity: true, isAvailable: true, productId: true, product: { select: { name: true, slug: true } } },
+      })
+      if (!variant) return
+      if (!variant.isAvailable || variant.stockQuantity <= 0) return
+
+      const alerts = await listPendingRestockAlertsForProduct(productId, variantId)
+      await dispatchRestockEmails(alerts, variant.product.name, variant.product.slug)
+      return
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { name: true, slug: true, stock: true, underOrder: true, isActive: true, status: true },
+    })
+    if (!product || !product.isActive || product.status === 'draft') return
+    const available = product.stock > 0 || product.underOrder
+    if (!available) return
+
+    const alerts = await listPendingRestockAlertsForProduct(productId, null)
+    await dispatchRestockEmails(alerts, product.name, product.slug)
+  } catch (error) {
+    console.error('[database] dispatchRestockNotificationsIfNeeded failed:', error)
+  }
+}
+
+export async function markRestockAlertsNotified(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+
+  if (!hasDatabase || !restockClient()) {
+    const db = readDB()
+    const now = new Date().toISOString()
+    db.restockAlerts = (db.restockAlerts || []).map(a =>
+      ids.includes(a.id) ? { ...a, notifiedAt: now } : a,
+    )
+    writeDB(db)
+    return
+  }
+
+  try {
+    await restockClient().updateMany({
+      where: { id: { in: ids } },
+      data: { notifiedAt: new Date() },
+    })
+  } catch (error) {
+    console.error('[database] markRestockAlertsNotified Prisma failed:', error)
   }
 }
 

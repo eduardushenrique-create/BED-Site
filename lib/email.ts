@@ -287,6 +287,45 @@ export async function sendOrderDelivered(
   }
 }
 
+export async function sendRestockAlertEmail(
+  email: string,
+  productName: string,
+  productSlug: string,
+  appUrl: string,
+): Promise<boolean> {
+  if (!resend) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[restock] ${productName} disponível para ${email}`)
+    }
+    return true
+  }
+
+  try {
+    const productUrl = `${appUrl.replace(/\/$/, '')}/produtos/${productSlug}`
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `${productName} voltou! - B&D Artes & Impressões`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+          <h2 style="color: #1D7A72;">Boa notícia!</h2>
+          <p>O produto <strong>${productName}</strong> está disponível novamente.</p>
+          <p style="margin: 24px 0;">
+            <a href="${productUrl}" style="display: inline-block; padding: 12px 22px; background: #1D2235; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+              Ver produto
+            </a>
+          </p>
+          <p style="color: #6B7494; font-size: 13px;">Você recebeu este e-mail porque pediu para ser avisado quando este produto voltasse ao estoque.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending restock alert email:', error)
+    return false
+  }
+}
+
 export async function sendOrderShipped(
   email: string,
   orderNumber: string,

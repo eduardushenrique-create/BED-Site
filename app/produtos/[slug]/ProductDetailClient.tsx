@@ -378,6 +378,10 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </Button>
           </div>
 
+          {outOfStockForVariant && (
+            <RestockAlertForm productId={product.id} variantId={selectedVariant?.id || null} />
+          )}
+
           {product.description && (
             <div style={{ borderTop: '1px solid #E3E9F4', paddingTop: '24px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>
@@ -389,5 +393,92 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
         </div>
       </div>
     </main>
+  )
+}
+
+function RestockAlertForm({ productId, variantId }: { productId: string; variantId: string | null }) {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setError('')
+    if (!email.trim()) {
+      setError('Informe seu e-mail.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/products/restock-alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), productId, variantId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Não foi possível registrar agora.')
+        return
+      }
+      setSubmitted(true)
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginBottom: '32px',
+        padding: '16px',
+        borderRadius: '12px',
+        border: '1px solid #E3E9F4',
+        background: '#F9FBFD',
+      }}
+    >
+      <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600, color: '#1D2235' }}>
+        Receba um aviso quando voltar
+      </p>
+      <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#6B7494' }}>
+        Deixe seu e-mail e te avisamos assim que este produto estiver disponível novamente.
+      </p>
+
+      {submitted ? (
+        <p style={{ margin: 0, color: '#1D7A72', fontSize: '14px', fontWeight: 600 }}>
+          Pronto! Vamos te avisar.
+        </p>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="seu@email.com"
+            required
+            style={{ flex: 1, minWidth: '200px', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#1D2235',
+              color: 'white',
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            {loading ? 'Salvando...' : 'Avise-me'}
+          </button>
+          {error && <p role="alert" style={{ width: '100%', margin: 0, color: '#B42318', fontSize: '13px' }}>{error}</p>}
+        </form>
+      )}
+    </div>
   )
 }
