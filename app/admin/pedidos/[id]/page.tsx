@@ -87,6 +87,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showTrackingInput, setShowTrackingInput] = useState(false)
   const [showEditItemsModal, setShowEditItemsModal] = useState(false)
   const [showCloneModal, setShowCloneModal] = useState(false)
+  const [showRefundModal, setShowRefundModal] = useState(false)
+  const [refunding, setRefunding] = useState(false)
+  const [refundError, setRefundError] = useState('')
   const [saving, setSaving] = useState(false)
   
   const [editingItems, setEditingItems] = useState<{productId: string; productName: string; quantity: number; unitPrice: number}[]>([])
@@ -324,6 +327,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  const handleRefundOrder = async () => {
+    if (!order) return
+    setRefunding(true)
+    setRefundError('')
+    try {
+      const res = await fetch(`/api/pedidos/${encodeURIComponent(order.id)}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setRefundError(data?.error || 'Não foi possível estornar o pedido.')
+        return
+      }
+      setShowRefundModal(false)
+      alert(`Estorno solicitado ao Mercado Pago. Status: ${data.paymentStatus || 'refunded'}.`)
+      loadOrder()
+    } catch (e) {
+      console.error('Error refunding order:', e)
+      setRefundError('Erro de conexão ao processar estorno.')
+    } finally {
+      setRefunding(false)
+    }
+  }
+
   const calculateNewTotal = () => {
     if (!order) return 0
     return editingItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0) + order.shippingCost
@@ -484,6 +513,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
               <button onClick={() => { setEditingItems([...order.items]); setShowEditItemsModal(true) }} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#3B82F6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>✏️ Editar Itens</button>
               <button onClick={() => setShowCloneModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#8B5CF6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>📋 Clonar Pedido</button>
+              {order.paymentStatus === 'paid' && (
+                <button
+                  onClick={() => { setRefundError(''); setShowRefundModal(true) }}
+                  style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  💸 Estornar pagamento
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -568,6 +605,39 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button onClick={() => setShowCancelModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer' }}>Manter pedido</button>
               <button onClick={handleCancelOrder} style={{ padding: '10px 20px', backgroundColor: '#EF4444', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', fontWeight: 500 }}>Sim, cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRefundModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '12px', maxWidth: '420px', width: '90%' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px' }}>Estornar pagamento?</h2>
+            <p style={{ color: '#6B7494', marginBottom: '8px' }}>
+              O Mercado Pago vai devolver <strong>R$ {order.total.toFixed(2).replace('.', ',')}</strong> para o cliente.
+            </p>
+            <p style={{ color: '#6B7494', marginBottom: '20px', fontSize: '13px' }}>
+              Esta ação não pode ser desfeita pelo painel. O pedido será marcado como estornado.
+            </p>
+            {refundError && (
+              <p role="alert" style={{ color: '#B42318', background: '#FEE2E2', padding: '10px 12px', borderRadius: '8px', marginBottom: '16px' }}>{refundError}</p>
+            )}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                disabled={refunding}
+                onClick={() => setShowRefundModal(false)}
+                style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: refunding ? 'not-allowed' : 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={refunding}
+                onClick={handleRefundOrder}
+                style={{ padding: '10px 20px', backgroundColor: '#F59E0B', border: 'none', borderRadius: '8px', cursor: refunding ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 500, opacity: refunding ? 0.7 : 1 }}
+              >
+                {refunding ? 'Estornando...' : 'Sim, estornar'}
+              </button>
             </div>
           </div>
         </div>
