@@ -200,6 +200,13 @@ export type CouponRecord = {
   createdAt: string
 }
 
+export type WishlistItemRecord = {
+  id: string
+  customerId: string
+  productId: string
+  createdAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
@@ -213,6 +220,7 @@ export type Database = {
   productionSettings: ProductionSettingsRecord[]
   coupons: CouponRecord[]
   productVariants: ProductVariantRecord[]
+  wishlistItems: WishlistItemRecord[]
 }
 
 const defaultData: Database = {
@@ -248,6 +256,7 @@ const defaultData: Database = {
   ],
   coupons: [],
   productVariants: [],
+  wishlistItems: [],
 }
 
 function ensureDir() {
@@ -284,6 +293,7 @@ export function readDB(): Database {
           : defaultData.productionSettings,
       coupons: parsed.coupons || [],
       productVariants: parsed.productVariants || [],
+      wishlistItems: parsed.wishlistItems || [],
     }
   } catch {
     return defaultData

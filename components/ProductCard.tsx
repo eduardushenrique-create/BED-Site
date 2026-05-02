@@ -1,8 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter, usePathname } from 'next/navigation'
 import Badge from './Badge'
 import SafeImage from './SafeImage'
+import { useAuth } from '@/context/AuthContext'
+import { useWishlist } from '@/context/WishlistContext'
 
 interface ProductImage {
   id: string
@@ -31,6 +34,11 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
+  const { isFavorite, toggle } = useWishlist()
+
   if (!product) {
     return null
   }
@@ -40,6 +48,19 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountPercent = hasDiscount && product.compareAtPrice
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : 0
+  const favorited = isFavorite(product.id)
+  const isCustomer = user && user.role === 'customer'
+
+  async function handleFavoriteClick(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isCustomer) {
+      const next = pathname && pathname !== '/login' ? pathname : '/produtos'
+      router.push(`/login?redirect=${encodeURIComponent(next)}`)
+      return
+    }
+    await toggle(product.id)
+  }
 
   return (
     <Link href={`/produtos/${product.slug}`}>
@@ -98,9 +119,8 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
 
           <button
-            onClick={(e) => {
-              e.preventDefault()
-            }}
+            type="button"
+            onClick={handleFavoriteClick}
             style={{
               position: 'absolute',
               bottom: '12px',
@@ -116,9 +136,17 @@ export default function ProductCard({ product }: ProductCardProps) {
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(29,34,53,0.1)',
             }}
-            aria-label="Adicionar aos favoritos"
+            aria-label={favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            aria-pressed={favorited}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4849A" strokeWidth="1.5">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill={favorited ? '#D4849A' : 'none'}
+              stroke="#D4849A"
+              strokeWidth="1.5"
+            >
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
           </button>

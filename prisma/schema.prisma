@@ -64,8 +64,21 @@ model Customer {
   isVerified Boolean           @default(false)
   addresses  CustomerAddress[]
   orders     Order[]
+  wishlist   WishlistItem[]
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+  @@index([productId])
 }
 
 model CustomerAddress {
