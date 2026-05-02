@@ -78,6 +78,9 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
   const [production, setProduction] = useState<ProductionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -280,6 +283,63 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
               >
                 Concluir pagamento
               </a>
+            </Section>
+          )}
+
+          {order.paymentStatus === 'pending' && order.status !== 'cancelled' && (
+            <Section title="Mudou de ideia?">
+              <p style={{ fontSize: '13px', color: '#6B7494', margin: '0 0 12px' }}>
+                Enquanto o pagamento estiver pendente, você pode cancelar este pedido.
+                Após o pagamento, fale com o suporte.
+              </p>
+              {!showCancelConfirm ? (
+                <button
+                  onClick={() => { setCancelError(''); setShowCancelConfirm(true) }}
+                  style={{ display: 'block', width: '100%', padding: '10px', background: 'white', border: '1px solid #EF4444', borderRadius: '10px', cursor: 'pointer', color: '#EF4444', fontWeight: 600 }}
+                >
+                  Cancelar pedido
+                </button>
+              ) : (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#1D2235' }}>Confirma o cancelamento? Esta ação não pode ser desfeita.</p>
+                  {cancelError && (
+                    <p role="alert" style={{ margin: 0, color: '#B42318', fontSize: '13px' }}>{cancelError}</p>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      disabled={cancelling}
+                      onClick={() => setShowCancelConfirm(false)}
+                      style={{ flex: 1, padding: '10px', background: 'white', border: '1px solid #D8DCE8', borderRadius: '10px', cursor: cancelling ? 'not-allowed' : 'pointer' }}
+                    >
+                      Não, manter
+                    </button>
+                    <button
+                      disabled={cancelling}
+                      onClick={async () => {
+                        setCancelling(true)
+                        setCancelError('')
+                        try {
+                          const res = await fetch(`/api/me/orders/${encodeURIComponent(order.orderNumber)}/cancel`, { method: 'POST' })
+                          const data = await res.json().catch(() => null)
+                          if (!res.ok) {
+                            setCancelError(data?.error || 'Não foi possível cancelar.')
+                            return
+                          }
+                          // Reload to reflect new state
+                          window.location.reload()
+                        } catch {
+                          setCancelError('Erro de conexão. Tente novamente.')
+                        } finally {
+                          setCancelling(false)
+                        }
+                      }}
+                      style={{ flex: 1, padding: '10px', background: '#EF4444', border: 'none', borderRadius: '10px', cursor: cancelling ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 600, opacity: cancelling ? 0.7 : 1 }}
+                    >
+                      {cancelling ? 'Cancelando...' : 'Sim, cancelar'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </Section>
           )}
         </aside>
