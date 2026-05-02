@@ -2,7 +2,7 @@
 
 > **Como usar este documento:** copie e cole o conteúdo abaixo no início de uma conversa com o ChatGPT. Em seguida, descreva o feature/funcionalidade que você quer adicionar. O assistente terá o contexto completo da arquitetura, schema, rotas, padrões e estado atual — e poderá propor implementação alinhada ao que já existe.
 >
-> **Última atualização:** 2026-05-02 (sessão pós-backlog: 13 PRs entregues — Wishlist, Refund, Webhook ME, Esqueci-senha, KPIs, LGPD, etc.)
+> **Última atualização:** 2026-05-02 (sessão pós-backlog: 19 PRs entregues incluindo Wishlist, Refund, Webhook ME, Esqueci-senha, KPIs, LGPD, UX audit, RestockAlert, AuditLog, CI)
 
 ---
 
@@ -238,6 +238,8 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 9. `20260505000000_variant_images` — `ProductImage.variantId` (FK SetNull) + `ProductVariant.priceOverride` (Decimal opcional). ProductVariant sai do estado "legado" e passa a USO FUNCIONAL.
 10. `20260506000000_wishlist` — `WishlistItem` (BUG-1 resolvido — favoritos persistidos)
 11. `20260507000000_password_reset_token` — `PasswordResetToken` (esqueci minha senha do admin)
+12. `20260508000000_restock_alerts` — `RestockAlert` (avise quando voltar)
+13. `20260509000000_audit_log` — `AuditLog` (auditoria de ações admin sensíveis)
 
 ---
 
@@ -311,6 +313,8 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 | POST | `/api/webhooks/mercadopago` | Atualiza pedido (HMAC + idempotência via WebhookEvent) |
 | POST | `/api/webhooks/melhor-envio` | Atualiza fulfillment (HMAC SHA256 + idempotência). Envia email shipped/delivered |
 | GET | `/api/clientes/[id]` | Drill-down admin: customer + orders (50) + addresses + totais |
+| POST | `/api/products/restock-alerts` | Cliente assina notificação para produto/variação (rate-limited 10/10min/IP, 5/10min/email) |
+| GET | `/api/admin/audit-log` | Lista ações sensíveis (admin only). Filtros: actor, action, targetType. Paginação. |
 
 ---
 
@@ -491,6 +495,8 @@ export async function GET(request: NextRequest) {
 - ✅ **Wishlist** (coração no ProductCard funcional, página de favoritos)
 - ✅ **Banner de cookies** (LGPD)
 - ✅ **Exportar dados** + **Excluir conta** (anonimização)
+- ✅ **Avise quando voltar** em produtos esgotados
+- ✅ **Header mobile responsivo** (auditoria UX 02/05/2026)
 - ✅ Logout funcional
 
 ### Admin
@@ -502,6 +508,7 @@ export async function GET(request: NextRequest) {
 - ✅ `/admin/pedidos` lista com **filtros avançados** (status, pagamento, intervalo de datas, total mínimo) + **export CSV**
 - ✅ `/admin/pedidos/[id]` detalhe com **botão Estorno** (refund MP) e cupom/desconto
 - ✅ `/admin/cupons` CRUD com ativação, validade e limite de uso
+- ✅ `/admin/auditoria` — log de ações sensíveis (estornos, alterações, exclusões) com filtros e paginação
 - ✅ Login scrypt restrito por env var (com fluxo de redefinição via email)
 - ✅ Guard de role em todas as APIs admin
 
@@ -545,11 +552,11 @@ export async function GET(request: NextRequest) {
 - ❌ Rate limit nos demais endpoints sensíveis (Upstash Redis)
 - ❌ Captcha (Turnstile)
 - ❌ Logs estruturados (pino)
-- ❌ CI/CD com lint/typecheck/teste antes do merge
+- ✅ **CI/CD com lint/typecheck/build** (PR #36, `.github/workflows/ci.yml` + `tsconfig.ci.json`)
 - ❌ Carrinho persistente em DB (modelo `Cart` existe, sem uso)
 - ❌ Reviews/avaliações de produtos
-- ❌ Auditoria admin (`AuditLog`)
-- ❌ "Avise quando voltar" para produtos sem estoque
+- ✅ **Auditoria admin** (`AuditLog`, PR #35)
+- ✅ **"Avise quando voltar"** para produtos sem estoque (PR #34)
 - ❌ CRUD de impressoras + fila por máquina
 - ❌ Migração `<SafeImage>` → `next/image` (depende de R2 ativo)
 

@@ -95,6 +95,22 @@ KPIs do `/admin` são gerados via `lib/database.ts:getAdminDashboardMetrics` (Se
 | GET | `/api/webhooks/mercadopago` | público | Healthcheck | 🟢 |
 | POST | `/api/webhooks/melhor-envio` | HMAC SHA256 | Atualiza fulfillment via webhook ME, envia emails | 🟢 |
 
+## Restock alerts ("avise quando voltar")
+
+| Método | Rota | Auth | Descrição | Status |
+|---|---|---|---|---|
+| POST | `/api/products/restock-alerts` body=`{email, productId, variantId?}` | público (rate-limited) | Registra inscrição idempotente | 🟢 |
+
+Disparo automático: `dispatchRestockNotificationsIfNeeded` é chamado após `updateProduct` e `updateProductVariant` quando a disponibilidade volta (filtra `notifiedAt: null`).
+
+## Auditoria admin
+
+| Método | Rota | Auth | Descrição | Status |
+|---|---|---|---|---|
+| GET | `/api/admin/audit-log?actor=&action=&targetType=&limit=&offset=` | admin | Log paginado | 🟢 |
+
+Hooks: `recordAuditEntry` (best-effort) em refund, update/delete de pedidos, CRUD de cupons, exclusão LGPD de cliente.
+
 ## Convenções de resposta
 
 ### Sucesso

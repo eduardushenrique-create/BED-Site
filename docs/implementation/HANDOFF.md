@@ -60,6 +60,12 @@ Antes de qualquer trabalho, leia:
 | [#28](https://github.com/eduardushenrique-create/BED-Site/pull/28) | Refazer Pix expirado (POST /api/me/orders/[orderNumber]/regenerate-pix) | ✅ |
 | [#29](https://github.com/eduardushenrique-create/BED-Site/pull/29) | Filtros avançados de pedidos + export CSV | ✅ |
 | [#30](https://github.com/eduardushenrique-create/BED-Site/pull/30) | LGPD: banner cookies + export dados + excluir conta (anonimização) | ✅ |
+| [#31](https://github.com/eduardushenrique-create/BED-Site/pull/31) | Atualização de docs (HANDOFF + SNAPSHOT + api-catalog + schema-evolution) | ✅ |
+| [#32](https://github.com/eduardushenrique-create/BED-Site/pull/32) | UX/responsividade: 12 fixes da auditoria 02/05/2026 (header mobile, produto, touch targets, etc.) | ✅ |
+| [#33](https://github.com/eduardushenrique-create/BED-Site/pull/33) | WhatsApp real (11) 97887-1566 + Instagram @beddesings | ✅ |
+| [#34](https://github.com/eduardushenrique-create/BED-Site/pull/34) | "Avise quando voltar" para produtos sem estoque (RestockAlert + email) | ✅ |
+| [#35](https://github.com/eduardushenrique-create/BED-Site/pull/35) | AuditLog admin (refund/update/delete pedidos, cupons CRUD, exclusão LGPD) + tela `/admin/auditoria` | ✅ |
+| [#36](https://github.com/eduardushenrique-create/BED-Site/pull/36) | CI/CD GitHub Actions (lint + typecheck + build + migration BOM check) | ✅ |
 
 ## 3. ⚠️ Pendências do stakeholder (configuração externa)
 
@@ -102,21 +108,24 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 - Item #11 — Filtros avançados + CSV
 - Item #12 — E-mails de mudança de status
 - Item #13 — Cancelamento de pedido pelo cliente
+- Item #15 — Auditoria admin (AuditLog)
 - Item #16 — Refazer Pix expirado
+- Item #17 — Avise quando voltar (RestockAlert)
+- Item #19 — CI/CD GitHub Actions
+- 12/15 fixes da auditoria de UX/responsividade
+- Configuração de WhatsApp e Instagram reais
 
 ### ⏳ Pendentes (precisam de configuração externa do stakeholder antes)
 | # | Item | Bloqueio |
 |---|---|---|
 | 7 | Migrar `<SafeImage>` → `next/image` | Depende do R2 ativo (5 envs no Railway) |
+| — | Acentuação correta nos produtos (Descrição/produção/úteis) | Edição manual via `/admin/produtos` |
 
-### 🎯 Backlog futuro
+### 🎯 Backlog futuro (alto esforço, não atacados nesta sessão)
 | # | Item | Esforço |
 |---|---|---|
 | 14 | Reviews/avaliações de produtos | Alto |
-| 15 | Auditoria admin (`AuditLog` para mudanças sensíveis) | Médio |
-| 17 | Notificações "avise quando voltar" para produtos sem estoque | Baixo |
 | 18 | CRUD de impressoras + fila por máquina (evolução de produção) | Alto |
-| 19 | CI/CD com lint+typecheck+Playwright antes do merge | Médio |
 
 ### 🧹 Dívidas técnicas conhecidas
 - 2 erros pré-existentes em `tests/e2e.spec.ts` (Playwright, linhas 26 e 34)
@@ -172,6 +181,9 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 15. **Notificações ao cliente** centralizadas em `lib/order-notifications.ts:notifyOrderStatusChange` — `PUT /api/pedidos` chama; webhook ME envia próprios emails para shipped/delivered
 16. **Anonimização (LGPD)**: `anonymizeCustomer` preserva pedidos antigos para fins fiscais; substitui dados pessoais e detacha `customerId` (`SET NULL`)
 17. **Wishlist** vive em `WishlistContext` mountado entre `AuthProvider` e `CartProvider` no `SiteShell`
+18. **AuditLog** é write-best-effort (`recordAuditEntry` nunca propaga erro). Hooks em refund, update/delete pedidos, CRUD de cupons, exclusão LGPD
+19. **Restock alerts** disparam automaticamente em `updateProduct` e `updateProductVariant` quando o produto/variação volta a ter estoque (com `notifiedAt: null` filter para idempotência)
+20. **CI** roda em `tsconfig.ci.json` (exclui `tests/e2e.spec.ts`); migrations são checadas para BOM no workflow
 
 ## 8. Variáveis de ambiente — estado atual
 
