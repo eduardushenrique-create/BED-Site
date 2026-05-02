@@ -1,10 +1,25 @@
-const MELHOR_ENVIO_TOKEN = process.env.MELHOR_ENVIO_TOKEN
-const MELHOR_ENVIO_URL = 'https://www.melhorenvio.com.br/api/v2'
+const MELHOR_ENVIO_BASE = 'https://www.melhorenvio.com.br/api/v2/me'
 
 const CEP_ORIGEM = process.env.SHIPPING_ORIGIN_CEP || '01001000'
 
 export const SHIPPING_CONFIG = {
   originCep: CEP_ORIGEM,
+}
+
+// Read at request time so Railway env updates take effect without rebuild.
+function getToken(): string | undefined {
+  return process.env.MELHOR_ENVIO_TOKEN
+}
+
+// ME requires a User-Agent string identifying the app + a contact email.
+// Reference: https://docs.melhorenvio.com.br/reference/como-fazer-uma-requisicao
+function getUserAgent(): string {
+  const email = process.env.MELHOR_ENVIO_CONTACT_EMAIL || 'eduardus.henrique@gmail.com'
+  return `BED Design (${email})`
+}
+
+function sanitizeCep(cep: string): string {
+  return String(cep || '').replace(/\D/g, '')
 }
 
 export interface ShippingQuote {
@@ -47,50 +62,92 @@ export async function calculateShipping(
   toPostalCode: string,
   packageInfo: ShippingPackage
 ): Promise<ShippingQuote[]> {
-  if (!MELHOR_ENVIO_TOKEN) {
-    console.warn('Melhor Envio token not configured')
+  const token = getToken()
+  if (!token) {
+    console.warn('[shipping] Melhor Envio token not configured — returning mock quotes')
     return getMockShippingQuotes()
   }
 
   try {
-    const response = await fetch(`${MELHOR_ENVIO_URL}/shipping.calculate`, {
+    const fromCep = sanitizeCep(fromPostalCode)
+    const toCep = sanitizeCep(toPostalCode)
+
+    const response = await fetch(`${MELHOR_ENVIO_BASE}/shipment/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MELHOR_ENVIO_TOKEN}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'User-Agent': getUserAgent(),
       },
       body: JSON.stringify({
-        from: { postal_code: fromPostalCode },
-        to: { postal_code: toPostalCode },
-        package: packageInfo,
+        from: { postal_code: fromCep },
+        to: { postal_code: toCep },
+        // ME aceita 'package' (peso + dimensões) ou 'products' (lista). Manter
+        // o formato legado por compatibilidade — peso em kg, dimensões em cm.
+        package: {
+          weight: Number(packageInfo.weight) || 0.3,
+          width: Number(packageInfo.dimensions?.width) || 11,
+          height: Number(packageInfo.dimensions?.height) || 2,
+          length: Number(packageInfo.dimensions?.length) || 16,
+        },
       }),
     })
 
     if (!response.ok) {
-      console.error('Melhor Envio API error:', await response.text())
+      const errorBody = await response.text().catch(() => '')
+      console.error('[shipping] Melhor Envio API error', response.status, errorBody)
       return getMockShippingQuotes()
     }
 
     const data = await response.json()
 
-    return data.map((option: Record<string, unknown>) => ({
-      id: option.id as string,
-      name: option.name as string,
-      price: option.price as number,
-      currency: 'BRL',
-      deliveryTime: {
-        days: (option.delivery_time as { days?: number })?.days || 5,
-        min: (option.delivery_time as { min?: number })?.min,
-        max: (option.delivery_time as { max?: number })?.max,
-      },
-      company: {
-        name: (option.company as { name?: string })?.name || option.name as string,
-        picture: (option.company as { picture?: string })?.picture || '',
-      },
-    }))
+    if (!Array.isArray(data)) {
+      console.error('[shipping] Melhor Envio unexpected payload shape:', JSON.stringify(data).slice(0, 200))
+      return getMockShippingQuotes()
+    }
+
+    // ME pode devolver opções com `error` (quando a transportadora não atende
+    // aquele trecho ou o pacote excede limites). Filtramos essas e mapeamos
+    // o restante para o formato interno.
+    const quotes: ShippingQuote[] = []
+    for (const option of data as Array<Record<string, unknown>>) {
+      if (option?.error) continue
+      const priceRaw = option.price ?? option.custom_price
+      const priceNum = typeof priceRaw === 'string' ? Number(priceRaw) : Number(priceRaw)
+      if (!Number.isFinite(priceNum) || priceNum <= 0) continue
+
+      const company = option.company as { name?: string; picture?: string } | undefined
+      const deliveryTimeRaw = option.delivery_time
+      const deliveryTime = typeof deliveryTimeRaw === 'object' && deliveryTimeRaw !== null
+        ? deliveryTimeRaw as { days?: number; min?: number; max?: number }
+        : { days: typeof deliveryTimeRaw === 'number' ? deliveryTimeRaw : 5 }
+
+      quotes.push({
+        id: String(option.id ?? ''),
+        name: String(option.name ?? 'Frete'),
+        price: priceNum,
+        currency: 'BRL',
+        deliveryTime: {
+          days: deliveryTime.days ?? deliveryTime.max ?? 5,
+          min: deliveryTime.min,
+          max: deliveryTime.max,
+        },
+        company: {
+          name: company?.name || String(option.name ?? 'Transportadora'),
+          picture: company?.picture || '',
+        },
+      })
+    }
+
+    if (quotes.length === 0) {
+      console.warn('[shipping] Melhor Envio returned no usable quotes for', { fromCep, toCep })
+      return getMockShippingQuotes()
+    }
+
+    return quotes
   } catch (error) {
-    console.error('Error calculating shipping:', error)
+    console.error('[shipping] calculateShipping threw:', error)
     return getMockShippingQuotes()
   }
 }
@@ -156,18 +213,20 @@ export interface ShipmentData {
 }
 
 export async function createShipment(data: ShipmentData): Promise<{ trackingCode?: string; labelUrl?: string } | null> {
-  if (!MELHOR_ENVIO_TOKEN) {
-    console.warn('Melhor Envio token not configured')
+  const token = getToken()
+  if (!token) {
+    console.warn('[shipping] Melhor Envio token not configured — returning mock shipment')
     return { trackingCode: 'MOCK123456BR', labelUrl: '#' }
   }
 
   try {
-    const response = await fetch(`${MELHOR_ENVIO_URL}/shipments`, {
+    const response = await fetch(`${MELHOR_ENVIO_BASE}/cart`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MELHOR_ENVIO_TOKEN}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'User-Agent': getUserAgent(),
       },
       body: JSON.stringify({
         service: data.service,
@@ -197,7 +256,8 @@ export async function getTrackingInfo(trackingCode: string): Promise<{
   status: string
   events: Array<{ date: string; description: string; location: string }>
 } | null> {
-  if (!MELHOR_ENVIO_TOKEN) {
+  const token = getToken()
+  if (!token) {
     return {
       status: 'Em trânsito',
       events: [
@@ -212,11 +272,12 @@ export async function getTrackingInfo(trackingCode: string): Promise<{
 
   try {
     const response = await fetch(
-      `${MELHOR_ENVIO_URL}/shipments/tracking/${trackingCode}`,
+      `${MELHOR_ENVIO_BASE}/shipment/tracking?orders[]=${encodeURIComponent(trackingCode)}`,
       {
         headers: {
-          'Authorization': `Bearer ${MELHOR_ENVIO_TOKEN}`,
-          'Accept': 'application/json',
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'User-Agent': getUserAgent(),
         },
       }
     )
