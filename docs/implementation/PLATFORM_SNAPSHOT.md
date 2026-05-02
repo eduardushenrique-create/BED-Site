@@ -240,6 +240,8 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 11. `20260507000000_password_reset_token` — `PasswordResetToken` (esqueci minha senha do admin)
 12. `20260508000000_restock_alerts` — `RestockAlert` (avise quando voltar)
 13. `20260509000000_audit_log` — `AuditLog` (auditoria de ações admin sensíveis)
+14. `20260510000000_reviews` — `Review` (avaliações de produto com moderação)
+15. `20260511000000_printers` — `Printer` + `ProductionTask.printerId` (CRUD impressoras + atribuição de tarefas)
 
 ---
 
@@ -315,6 +317,12 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 | GET | `/api/clientes/[id]` | Drill-down admin: customer + orders (50) + addresses + totais |
 | POST | `/api/products/restock-alerts` | Cliente assina notificação para produto/variação (rate-limited 10/10min/IP, 5/10min/email) |
 | GET | `/api/admin/audit-log` | Lista ações sensíveis (admin only). Filtros: actor, action, targetType. Paginação. |
+| GET / POST | `/api/me/reviews` | Eligibilidade + envio de avaliação pelo cliente |
+| GET | `/api/products/[id]/reviews` | Lista pública de reviews aprovadas + agregado |
+| GET / PATCH / DELETE | `/api/avaliacoes` (e `[id]`) | Moderação admin |
+| GET / POST | `/api/impressoras` | CRUD de impressoras (admin) |
+| GET / PATCH / DELETE | `/api/impressoras/[id]` | Detalhe / atualizar / excluir (admin) |
+| POST | `/api/producao/[id]/assign` | Atribui tarefa de produção a uma impressora |
 
 ---
 
@@ -496,6 +504,7 @@ export async function GET(request: NextRequest) {
 - ✅ **Banner de cookies** (LGPD)
 - ✅ **Exportar dados** + **Excluir conta** (anonimização)
 - ✅ **Avise quando voltar** em produtos esgotados
+- ✅ **Avaliações de produto** (cliente pode avaliar produtos comprados; rating exibido no ProductCard)
 - ✅ **Header mobile responsivo** (auditoria UX 02/05/2026)
 - ✅ Logout funcional
 
@@ -509,6 +518,9 @@ export async function GET(request: NextRequest) {
 - ✅ `/admin/pedidos/[id]` detalhe com **botão Estorno** (refund MP) e cupom/desconto
 - ✅ `/admin/cupons` CRUD com ativação, validade e limite de uso
 - ✅ `/admin/auditoria` — log de ações sensíveis (estornos, alterações, exclusões) com filtros e paginação
+- ✅ `/admin/avaliacoes` — moderação das reviews de produto (aprovar/ocultar/excluir)
+- ✅ `/admin/impressoras` — CRUD de impressoras (capacidade, status, materiais)
+- ✅ `/admin/producao` — coluna de impressora com select inline para atribuir tarefas
 - ✅ Login scrypt restrito por env var (com fluxo de redefinição via email)
 - ✅ Guard de role em todas as APIs admin
 
@@ -554,10 +566,10 @@ export async function GET(request: NextRequest) {
 - ❌ Logs estruturados (pino)
 - ✅ **CI/CD com lint/typecheck/build** (PR #36, `.github/workflows/ci.yml` + `tsconfig.ci.json`)
 - ❌ Carrinho persistente em DB (modelo `Cart` existe, sem uso)
-- ❌ Reviews/avaliações de produtos
+- ✅ **Reviews/avaliações** de produtos (PR #39)
 - ✅ **Auditoria admin** (`AuditLog`, PR #35)
 - ✅ **"Avise quando voltar"** para produtos sem estoque (PR #34)
-- ❌ CRUD de impressoras + fila por máquina
+- ✅ **CRUD de impressoras** + atribuição de tarefas (PR #40)
 - ❌ Migração `<SafeImage>` → `next/image` (depende de R2 ativo)
 
 ### Bugs conhecidos / dívidas
