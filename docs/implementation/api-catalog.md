@@ -132,6 +132,15 @@ ProductCard e o catálogo público (`getLocalCatalogProducts`/`bySlug`) anexam `
 | GET / PATCH / DELETE | `/api/impressoras/[id]` | admin | Detalhe / edita / exclui (SET NULL nas tarefas) | 🟢 |
 | POST | `/api/producao/[id]/assign` body=`{printerId\|null}` | admin | Atribui (ou desatribui) tarefa a uma impressora | 🟢 |
 
+## Anti-bot (Captcha)
+
+Endpoints abaixo aceitam um campo opcional `turnstileToken` no body. Quando `TURNSTILE_SECRET_KEY` está setada, o token é verificado via `lib/turnstile.ts:verifyTurnstileToken`; sem a env, a verificação é pulada (skipped:true).
+
+- `POST /api/auth/request-code`
+- `POST /api/auth/password-login`
+- `POST /api/auth/request-password-reset`
+- `POST /api/products/restock-alerts`
+
 ## Convenções de resposta
 
 ### Sucesso
