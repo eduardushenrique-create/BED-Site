@@ -66,7 +66,7 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([])
   const [selectedShipping, setSelectedShipping] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('pix')
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [cepLoading, setCepLoading] = useState(false)
   const [shippingLoading, setShippingLoading] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -477,8 +477,11 @@ export default function CheckoutPage() {
               </section>
 
               <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>Pagamento</h2>
-                {errors.paymentMethod && <p role="alert" style={{ color: '#A3526A' }}>{errors.paymentMethod}</p>}
+                <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '8px', color: '#1D2235' }}>Pagamento</h2>
+                <p style={{ fontSize: '14px', color: '#6B7494', marginBottom: '16px' }}>
+                  Escolha como deseja pagar. Pix gera QR no próximo passo; cartão abre o checkout seguro do Mercado Pago.
+                </p>
+                {errors.paymentMethod && <p role="alert" style={{ color: '#A3526A', marginBottom: '12px' }}>{errors.paymentMethod}</p>}
                 <div style={{ display: 'grid', gap: '12px' }}>
                   {[
                     { id: 'pix', label: 'Pix' },

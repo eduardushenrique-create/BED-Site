@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createPaymentPreference, createPixPayment } from '@/lib/mercadopago'
+import { captureMessage } from '@/lib/observability'
 
 export type PaymentCreationInput = {
   orderNumber: string
@@ -51,6 +52,13 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
   const provider = process.env.PAYMENT_PROVIDER || 'mercadopago'
 
   if (provider !== 'mercadopago' || !process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    captureMessage('Payment provider not configured', 'warning', {
+      context: 'payment.createPaymentForOrder',
+      provider,
+      method: input.method,
+      orderNumber: input.orderNumber,
+      hasAccessToken: Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN),
+    })
     return {
       provider: provider || 'manual',
       status: 'pending',
@@ -121,6 +129,13 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
   })
 
   if (!preference) {
+    captureMessage('Mercado Pago checkout preference creation failed', 'error', {
+      context: 'payment.createPaymentForOrder',
+      method: input.method,
+      orderNumber: input.orderNumber,
+      hasBackUrls: Boolean(backUrls),
+      hasAppUrl: Boolean(process.env.NEXT_PUBLIC_APP_URL),
+    })
     return {
       provider: 'mercadopago',
       status: 'pending',
@@ -128,15 +143,27 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
     }
   }
 
+  const checkoutUrl = preference.sandbox_init_point || preference.init_point || undefined
+
+  if (!checkoutUrl) {
+    captureMessage('Mercado Pago preference returned without init_point', 'error', {
+      context: 'payment.createPaymentForOrder',
+      method: input.method,
+      orderNumber: input.orderNumber,
+      preferenceId: preference.id,
+      preferenceStatus: preference.status,
+    })
+  }
+
   return {
     provider: 'mercadopago',
     status: preference.status || 'pending',
     statusDetail: preference.status_detail || undefined,
     providerPaymentId: preference.id ? String(preference.id) : undefined,
-    checkoutUrl: preference.sandbox_init_point || preference.init_point || undefined,
+    checkoutUrl,
     rawPayload: {
       ...preference,
-      checkoutUrl: preference.sandbox_init_point || preference.init_point || undefined,
+      checkoutUrl,
     },
   }
 }
