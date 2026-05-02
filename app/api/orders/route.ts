@@ -12,6 +12,9 @@ import { calculateShipping, SHIPPING_CONFIG } from '@/lib/shipping'
 import { createPaymentForOrder, mapMercadoPagoStatus } from '@/lib/payment'
 import { validateCEP, validateCPF, validateEmail } from '@/lib/validation'
 import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api.orders' })
 
 interface OrderItem {
   productId: string
@@ -327,7 +330,7 @@ export async function POST(request: Request) {
       })
     }
 
-    console.log('Order created:', orderNumber)
+    log.info({ orderNumber, customerEmail, total: safeTotal, paymentMethod }, 'Order created')
 
     return NextResponse.json({
       success: true,
