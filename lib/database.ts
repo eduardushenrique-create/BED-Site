@@ -3726,6 +3726,148 @@ export async function addToWishlist(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Admin dashboard metrics
+// ---------------------------------------------------------------------------
+
+export type AdminDashboardMetrics = {
+  todayPaidCount: number
+  todayPaidRevenue: number
+  monthPaidCount: number
+  monthPaidRevenue: number
+  monthAverageTicket: number
+  pendingProduction: number
+  readyToShip: number
+  topProductThisMonth: { name: string; quantity: number; revenue: number } | null
+}
+
+function startOfDay(date: Date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function startOfMonth(date: Date) {
+  const d = new Date(date)
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+export async function getAdminDashboardMetrics(): Promise<AdminDashboardMetrics> {
+  const now = new Date()
+  const today = startOfDay(now)
+  const monthStart = startOfMonth(now)
+
+  if (!hasDatabase || !prisma?.order) {
+    const orders = readDB().orders
+    const paid = orders.filter(o => o.paymentStatus === 'paid')
+    const todayPaid = paid.filter(o => new Date(o.createdAt) >= today)
+    const monthPaid = paid.filter(o => new Date(o.createdAt) >= monthStart)
+    const monthRevenue = monthPaid.reduce((sum, o) => sum + (o.total || 0), 0)
+    const todayRevenue = todayPaid.reduce((sum, o) => sum + (o.total || 0), 0)
+
+    const productAgg = new Map<string, { quantity: number; revenue: number }>()
+    for (const order of monthPaid) {
+      for (const item of order.items || []) {
+        const key = item.productName || 'Produto'
+        const cur = productAgg.get(key) || { quantity: 0, revenue: 0 }
+        cur.quantity += item.quantity
+        cur.revenue += item.unitPrice * item.quantity
+        productAgg.set(key, cur)
+      }
+    }
+    const top = Array.from(productAgg.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.quantity - a.quantity)[0] || null
+
+    return {
+      todayPaidCount: todayPaid.length,
+      todayPaidRevenue: todayRevenue,
+      monthPaidCount: monthPaid.length,
+      monthPaidRevenue: monthRevenue,
+      monthAverageTicket: monthPaid.length ? monthRevenue / monthPaid.length : 0,
+      pendingProduction: orders.filter(o => o.fulfillmentStatus === 'pending' || o.fulfillmentStatus === 'in_production').length,
+      readyToShip: orders.filter(o => o.fulfillmentStatus === 'ready_to_ship').length,
+      topProductThisMonth: top,
+    }
+  }
+
+  try {
+    const [todayAgg, monthAgg, fulfillmentCounts, monthItems] = await Promise.all([
+      prisma.order.aggregate({
+        where: { paymentStatus: 'paid', createdAt: { gte: today } },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: { paymentStatus: 'paid', createdAt: { gte: monthStart } },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
+      prisma.order.groupBy({
+        by: ['fulfillmentStatus'],
+        where: { paymentStatus: 'paid' },
+        _count: { _all: true },
+      }),
+      prisma.orderItem.findMany({
+        where: {
+          order: { paymentStatus: 'paid', createdAt: { gte: monthStart } },
+        },
+        select: {
+          productNameSnapshot: true,
+          quantity: true,
+          unitPrice: true,
+          total: true,
+        },
+      }),
+    ])
+
+    const productAgg = new Map<string, { quantity: number; revenue: number }>()
+    for (const item of monthItems) {
+      const name = item.productNameSnapshot || 'Produto'
+      const cur = productAgg.get(name) || { quantity: 0, revenue: 0 }
+      cur.quantity += item.quantity
+      cur.revenue += Number(item.total ?? Number(item.unitPrice) * item.quantity)
+      productAgg.set(name, cur)
+    }
+    const top = Array.from(productAgg.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.quantity - a.quantity)[0] || null
+
+    const fulfillmentMap = new Map<string, number>()
+    for (const row of fulfillmentCounts) {
+      fulfillmentMap.set(row.fulfillmentStatus, row._count._all)
+    }
+
+    const monthCount = monthAgg._count._all
+    const monthRevenue = Number(monthAgg._sum.total ?? 0)
+
+    return {
+      todayPaidCount: todayAgg._count._all,
+      todayPaidRevenue: Number(todayAgg._sum.total ?? 0),
+      monthPaidCount: monthCount,
+      monthPaidRevenue: monthRevenue,
+      monthAverageTicket: monthCount ? monthRevenue / monthCount : 0,
+      pendingProduction: (fulfillmentMap.get('pending') || 0) + (fulfillmentMap.get('in_production') || 0),
+      readyToShip: fulfillmentMap.get('ready_to_ship') || 0,
+      topProductThisMonth: top,
+    }
+  } catch (error) {
+    console.error('[database] getAdminDashboardMetrics Prisma failed:', error)
+    return {
+      todayPaidCount: 0,
+      todayPaidRevenue: 0,
+      monthPaidCount: 0,
+      monthPaidRevenue: 0,
+      monthAverageTicket: 0,
+      pendingProduction: 0,
+      readyToShip: 0,
+      topProductThisMonth: null,
+    }
+  }
+}
+
 export async function removeFromWishlist(
   customerId: string,
   productId: string,
