@@ -1,7 +1,11 @@
 import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const FROM_EMAIL = 'Forma 3D <noreply@forma3d.com.br>'
+
+// Domain verified at Resend on 2026-05-02. Stakeholder can override via env
+// without a redeploy if they later set up a Google Workspace / Zoho mailbox.
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'BED Design <noreply@beddesigns.com.br>'
+const REPLY_TO_EMAIL = process.env.RESEND_REPLY_TO_EMAIL || 'eduardus.henrique@gmail.com'
 
 interface OrderEmailData {
   orderNumber: string
@@ -44,8 +48,9 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<boole
 
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: data.customerEmail,
-      subject: `Pedido ${data.orderNumber} confirmado - Forma 3D`,
+      subject: `Pedido ${data.orderNumber} confirmado - BED Design`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -56,7 +61,7 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<boole
         <body style="font-family: 'DM Sans', Arial, sans-serif; background-color: #F5F2EE; margin: 0; padding: 20px;">
           <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; padding: 32px;">
             <div style="text-align: center; margin-bottom: 24px;">
-              <h1 style="color: #C8552A; font-size: 28px; margin: 0;">Forma 3D</h1>
+              <h1 style="color: #C8552A; font-size: 28px; margin: 0;">BED Design</h1>
             </div>
 
             <div style="text-align: center; margin-bottom: 32px;">
@@ -91,7 +96,7 @@ export async function sendOrderConfirmation(data: OrderEmailData): Promise<boole
             </table>
 
             <p style="color: #78716C; font-size: 14px; line-height: 1.6;">
-              Seu pedido foi recebido e我们将尽快开始生产。 Você receberá atualizações por e-mail sobre ostatus do seu pedido.
+              Seu pedido foi recebido e em breve entraremos em produção. Você receberá atualizações por e-mail sobre o status do seu pedido.
             </p>
 
             <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #E8E2DA; text-align: center;">
@@ -123,6 +128,7 @@ export async function sendAccessCodeEmail(email: string, code: string): Promise<
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
       subject: 'Seu código de acesso - B&D Artes & Impressões',
       html: `
@@ -147,8 +153,9 @@ export async function sendPaymentApproved(data: OrderEmailData): Promise<boolean
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: data.customerEmail,
-      subject: `Pagamento aprovado - Pedido ${data.orderNumber} - Forma 3D`,
+      subject: `Pagamento aprovado - Pedido ${data.orderNumber} - BED Design`,
       html: `
         <h2>Pagamento aprovado!</h2>
         <p>Olá ${data.customerName}, o pagamento do seu pedido ${data.orderNumber} foi aprovado!</p>
@@ -177,6 +184,7 @@ export async function sendPasswordResetEmail(
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
       subject: 'Redefinição de senha - B&D Artes & Impressões',
       html: `
@@ -213,8 +221,9 @@ export async function sendOrderInProduction(
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
-      subject: `Pedido ${orderNumber} entrou em produção - Forma 3D`,
+      subject: `Pedido ${orderNumber} entrou em produção - BED Design`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
           <h2 style="color: #1D2235;">Olá${customerName ? `, ${customerName.split(' ')[0]}` : ''}!</h2>
@@ -242,8 +251,9 @@ export async function sendOrderRefunded(
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
-      subject: `Estorno do pedido ${orderNumber} - Forma 3D`,
+      subject: `Estorno do pedido ${orderNumber} - BED Design`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
           <h2 style="color: #8B5CF6;">Estorno em processamento</h2>
@@ -270,8 +280,9 @@ export async function sendOrderDelivered(
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
-      subject: `Pedido ${orderNumber} entregue! - Forma 3D`,
+      subject: `Pedido ${orderNumber} entregue! - BED Design`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
           <h2 style="color: #1D7A72;">Seu pedido foi entregue!</h2>
@@ -304,6 +315,7 @@ export async function sendRestockAlertEmail(
     const productUrl = `${appUrl.replace(/\/$/, '')}/produtos/${productSlug}`
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
       subject: `${productName} voltou! - B&D Artes & Impressões`,
       html: `
@@ -336,8 +348,9 @@ export async function sendOrderShipped(
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO_EMAIL,
       to: email,
-      subject: `Pedido ${orderNumber} enviado! - Forma 3D`,
+      subject: `Pedido ${orderNumber} enviado! - BED Design`,
       html: `
         <h2>Seu pedido foi enviado!</h2>
         <p>O pedido ${orderNumber} foi postado e está a caminho.</p>
