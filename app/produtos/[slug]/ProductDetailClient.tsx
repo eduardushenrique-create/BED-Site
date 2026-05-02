@@ -118,9 +118,9 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   return (
     <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px' }}>
       <div
+        className="product-detail-layout"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)',
           gap: '32px',
           alignItems: 'start',
         }}

@@ -119,42 +119,53 @@ export default function CartDrawer() {
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
+                        type="button"
                         onClick={() => updateQuantity(item.productId, item.variantId, item.quantity - 1)}
+                        aria-label={`Diminuir quantidade de ${item.productName}`}
+                        className="icon-btn"
                         style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '4px',
+                          borderRadius: '8px',
                           border: '1px solid #D8DCE8',
                           backgroundColor: 'white',
                           cursor: 'pointer',
+                          fontSize: '18px',
+                          lineHeight: 1,
                         }}
                       >
-                        -
+                        −
                       </button>
-                      <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '14px' }}>{item.quantity}</span>
+                      <span style={{ minWidth: '24px', textAlign: 'center', fontSize: '14px' }} aria-live="polite">{item.quantity}</span>
                       <button
+                        type="button"
                         onClick={() => updateQuantity(item.productId, item.variantId, item.quantity + 1)}
+                        aria-label={`Aumentar quantidade de ${item.productName}`}
+                        className="icon-btn"
                         style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '4px',
+                          borderRadius: '8px',
                           border: '1px solid #D8DCE8',
                           backgroundColor: 'white',
                           cursor: 'pointer',
+                          fontSize: '18px',
+                          lineHeight: 1,
                         }}
                       >
                         +
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => removeItem(item.productId, item.variantId)}
+                        aria-label={`Remover ${item.productName} do carrinho`}
                         style={{
                           marginLeft: 'auto',
                           background: 'none',
                           border: 'none',
                           color: '#A3526A',
                           cursor: 'pointer',
-                          fontSize: '12px',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          padding: '8px 4px',
+                          textDecoration: 'underline',
                         }}
                       >
                         Remover

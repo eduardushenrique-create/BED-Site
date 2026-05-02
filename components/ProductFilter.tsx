@@ -28,42 +28,59 @@ export default function ProductFilter({ categories, selectedCategory }: ProductF
   }, [router, searchParams])
 
   return (
-    <div style={{ marginBottom: '32px' }}>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+    <div className="product-filter" style={{ marginBottom: '32px' }}>
+      <div
+        className="product-filter-track"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          scrollSnapType: 'x proximity',
+          paddingBottom: '4px',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }}
+      >
         <button
+          type="button"
           onClick={() => handleCategoryClick(null)}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '999px',
-            border: '1px solid #E8E2DA',
-            backgroundColor: selectedCategory === null ? '#1C1917' : 'white',
-            color: selectedCategory === null ? 'white' : '#1C1917',
-            cursor: 'pointer',
-            fontSize: '14px',
-            transition: 'all 0.2s ease',
-          }}
+          style={chipStyle(selectedCategory === null)}
         >
           Todos
         </button>
         {categories.map(cat => (
           <button
             key={cat.slug}
+            type="button"
             onClick={() => handleCategoryClick(cat.slug)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '999px',
-              border: '1px solid #E8E2DA',
-              backgroundColor: selectedCategory === cat.slug ? '#1C1917' : 'white',
-              color: selectedCategory === cat.slug ? 'white' : '#1C1917',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.2s ease',
-            }}
+            style={chipStyle(selectedCategory === cat.slug)}
           >
             {cat.name}
           </button>
         ))}
       </div>
+      <style>{`
+        .product-filter-track::-webkit-scrollbar { display: none; }
+        @media (min-width: 1024px) {
+          .product-filter-track { flex-wrap: wrap; overflow-x: visible; }
+        }
+      `}</style>
     </div>
   )
+}
+
+function chipStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '8px 16px',
+    borderRadius: '999px',
+    border: '1px solid #E8E2DA',
+    backgroundColor: active ? '#1C1917' : 'white',
+    color: active ? 'white' : '#1C1917',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    flexShrink: 0,
+    scrollSnapAlign: 'start',
+    whiteSpace: 'nowrap',
+  }
 }
