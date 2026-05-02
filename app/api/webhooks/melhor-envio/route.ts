@@ -16,6 +16,9 @@ import {
 } from '@/lib/melhor-envio'
 import { sendOrderDelivered, sendOrderShipped } from '@/lib/email'
 import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'webhook.melhor-envio' })
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
   try {
     const secret = process.env.MELHOR_ENVIO_WEBHOOK_SECRET || process.env.MELHOR_ENVIO_SECRET
     if (!secret || !secret.trim()) {
-      console.error('[webhook] MELHOR_ENVIO_WEBHOOK_SECRET not configured — rejecting')
+      log.error('MELHOR_ENVIO_WEBHOOK_SECRET not configured — rejecting')
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 503 },
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
     const rawPayload = await request.text()
 
     if (!verifyMelhorEnvioSignature(secret, signature, rawPayload)) {
-      console.error('[webhook] Invalid Melhor Envio signature')
+      log.warn('Invalid Melhor Envio signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 

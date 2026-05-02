@@ -4,6 +4,9 @@ import { getPaymentDetails, verifyWebhookSignature } from '@/lib/mercadopago'
 import { ensureProductionTasksForOrder, getOrderByNumber, registerWebhookEvent, updateOrderPaymentByNumber, updateWebhookEvent } from '@/lib/database'
 import { mapMercadoPagoStatus, resolvePaymentTransition } from '@/lib/payment'
 import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'webhook.mercadopago' })
 
 type MercadoPagoWebhookPayment = {
   payment_method_id?: string
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
     if (!webhookSecret || !webhookSecret.trim()) {
-      console.error('[webhook] MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
+      log.error('MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 503 }
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
     const deliveryKey = buildDeliveryKey(topic, notificationId, resourceId, action, payloadHash)
 
     if (!verifyWebhookSignature(signature, requestId, dataId, webhookSecret)) {
-      console.error('Invalid webhook signature')
+      log.warn({ topic, notificationId }, 'Invalid webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
@@ -177,13 +180,13 @@ async function handlePaymentUpdate(input: {
   })
 
   if (!resolved.shouldPersistStatus) {
-    console.info(`Webhook ${input.deliveryKey} received duplicate or regressive status ${input.status} for order ${order.orderNumber}.`)
+    log.info({ deliveryKey: input.deliveryKey, status: input.status, orderNumber: order.orderNumber }, 'duplicate or regressive payment status')
   }
 
   if (updated && resolved.shouldPersistStatus && mapped.paymentStatus === 'paid') {
     try {
       const result = await ensureProductionTasksForOrder(order.id)
-      console.info(`[webhook] production tasks ensured for ${order.orderNumber}: created=${result.created}`)
+      log.info({ orderNumber: order.orderNumber, created: result.created }, 'production tasks ensured')
     } catch (err) {
       captureException(err, {
         context: 'webhook.mercadopago',
