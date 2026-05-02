@@ -74,6 +74,9 @@ export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [fulfillmentFilter, setFulfillmentFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [minTotal, setMinTotal] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [cepLoading, setCepLoading] = useState(false)
   const [searchProduct, setSearchProduct] = useState('')
@@ -167,16 +170,93 @@ export default function AdminOrdersPage() {
   }
 
   const filteredOrders = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : null
+    const toTs = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : null
+    const minTotalNum = minTotal ? Number(minTotal.replace(',', '.')) : null
+
     return orders.filter(order => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customerEmail.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesFulfillment = !fulfillmentFilter || order.fulfillmentStatus === fulfillmentFilter
       const matchesPayment = !paymentFilter || order.paymentStatus === paymentFilter
-      return matchesSearch && matchesFulfillment && matchesPayment
+      const created = new Date(order.createdAt).getTime()
+      const matchesFrom = !fromTs || created >= fromTs
+      const matchesTo = !toTs || created <= toTs
+      const matchesMinTotal = !minTotalNum || order.total >= minTotalNum
+      return matchesSearch && matchesFulfillment && matchesPayment && matchesFrom && matchesTo && matchesMinTotal
     })
-  }, [orders, searchQuery, fulfillmentFilter, paymentFilter])
+  }, [orders, searchQuery, fulfillmentFilter, paymentFilter, dateFrom, dateTo, minTotal])
+
+  function handleClearFilters() {
+    setSearchQuery('')
+    setFulfillmentFilter('')
+    setPaymentFilter('')
+    setDateFrom('')
+    setDateTo('')
+    setMinTotal('')
+  }
+
+  function escapeCsvField(value: string | number | null | undefined): string {
+    if (value === null || value === undefined) return ''
+    const s = String(value)
+    if (/[",\n;]/.test(s)) {
+      return '"' + s.replace(/"/g, '""') + '"'
+    }
+    return s
+  }
+
+  function handleExportCsv() {
+    const headers = [
+      'Pedido',
+      'Data',
+      'Cliente',
+      'E-mail',
+      'Telefone',
+      'CEP',
+      'Cidade',
+      'UF',
+      'Pagamento',
+      'Status',
+      'Subtotal',
+      'Frete',
+      'Total',
+      'Tracking',
+    ]
+    const rows = filteredOrders.map(order => [
+      order.orderNumber,
+      new Date(order.createdAt).toLocaleString('pt-BR'),
+      order.customerName,
+      order.customerEmail,
+      order.customerPhone,
+      order.shippingAddress?.zipCode || '',
+      order.shippingAddress?.city || '',
+      order.shippingAddress?.state || '',
+      order.paymentStatus,
+      order.fulfillmentStatus,
+      order.subtotal.toFixed(2).replace('.', ','),
+      order.shippingCost.toFixed(2).replace('.', ','),
+      order.total.toFixed(2).replace('.', ','),
+      order.trackingCode || '',
+    ])
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(escapeCsvField).join(';'))
+      .join('\n')
+
+    // Add UTF-8 BOM so Excel opens with correct encoding.
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const stamp = new Date().toISOString().slice(0, 10)
+    link.download = `pedidos-${stamp}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   const statusCounts = useMemo(() => ({
     total: orders.length,
@@ -356,7 +436,7 @@ export default function AdminOrdersPage() {
         <StatusCard label="Entregues" count={statusCounts.delivered} color="#059669" />
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ flex: 1, minWidth: '250px' }}>
           <Input placeholder="Buscar por cliente, e-mail ou pedido..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
@@ -368,6 +448,63 @@ export default function AdminOrdersPage() {
           <option value="">Todos Pagamentos</option>
           {paymentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '12px', color: '#6B7494', fontWeight: 600 }}>De</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '12px', color: '#6B7494', fontWeight: 600 }}>Até</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '12px', color: '#6B7494', fontWeight: 600 }}>Total mínimo (R$)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={minTotal}
+            onChange={e => setMinTotal(e.target.value)}
+            placeholder="ex: 100"
+            style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px', width: '140px' }}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleClearFilters}
+          style={{ padding: '10px 16px', borderRadius: '6px', border: '1px solid #D8DCE8', background: 'white', cursor: 'pointer', fontSize: '14px' }}
+        >
+          Limpar filtros
+        </button>
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={filteredOrders.length === 0}
+          style={{
+            padding: '10px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            background: filteredOrders.length === 0 ? '#9CA3AF' : '#1D7A72',
+            color: 'white',
+            cursor: filteredOrders.length === 0 ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: 600,
+          }}
+        >
+          ⬇ Exportar CSV ({filteredOrders.length})
+        </button>
       </div>
 
       {orders.length === 0 ? (
