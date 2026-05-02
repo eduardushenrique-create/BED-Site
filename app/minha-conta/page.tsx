@@ -54,6 +54,7 @@ export default function MinhaContaPage() {
         <Card href="/minha-conta/favoritos" title="Favoritos" subtitle={`${wishlistCount} ${wishlistCount === 1 ? 'produto salvo' : 'produtos salvos'}`} cta="Ver favoritos" icon={<IconHeart />} />
         <Card href="/minha-conta/dados" title="Dados pessoais" subtitle="Nome, telefone, CPF" cta="Editar dados" icon={<IconUser />} />
         <Card href="/minha-conta/enderecos" title="Endereços salvos" subtitle={addressCount === null ? 'carregando...' : `${addressCount} ${addressCount === 1 ? 'endereço' : 'endereços'}`} cta="Gerenciar" icon={<IconPin />} />
+        <Card href="/minha-conta/privacidade" title="Privacidade (LGPD)" subtitle="Baixe seus dados ou exclua a conta" cta="Acessar" icon={<IconShield />} />
       </div>
     </main>
   )
@@ -90,3 +91,4 @@ function IconBox() { return <svg width="22" height="22" viewBox="0 0 24 24" fill
 function IconUser() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="1.7"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
 function IconPin() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="1.7"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> }
 function IconHeart() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4849A" strokeWidth="1.7"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> }
+function IconShield() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2235" strokeWidth="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> }
