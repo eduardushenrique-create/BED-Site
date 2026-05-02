@@ -70,6 +70,14 @@ Antes de qualquer trabalho, leia:
 | [#38](https://github.com/eduardushenrique-create/BED-Site/pull/38) | fix: RouteContext (CI typecheck) | ✅ |
 | [#39](https://github.com/eduardushenrique-create/BED-Site/pull/39) | feat: avaliações de produto com moderação admin (Review + estrelas) | ✅ |
 | [#40](https://github.com/eduardushenrique-create/BED-Site/pull/40) | feat: CRUD de impressoras + atribuição de tarefas (Printer + ProductionTask.printerId) | ✅ |
+| [#41](https://github.com/eduardushenrique-create/BED-Site/pull/41) | docs: refresh pós-#39 + #40 | ✅ |
+| [#42](https://github.com/eduardushenrique-create/BED-Site/pull/42) | feat(seo): JSON-LD Product + OpenGraph/Twitter cards | ✅ |
+| [#43](https://github.com/eduardushenrique-create/BED-Site/pull/43) | feat(production): Kanban-style board agrupado por impressora | ✅ |
+| [#44](https://github.com/eduardushenrique-create/BED-Site/pull/44) | feat(home): seção de reviews aprovadas em destaque | ✅ |
+| [#45](https://github.com/eduardushenrique-create/BED-Site/pull/45) | feat(security): Captcha Turnstile (DSN-opcional) | ✅ |
+| [#46](https://github.com/eduardushenrique-create/BED-Site/pull/46) | feat(observability): logs estruturados (pino) com redact | ✅ |
+| [#47](https://github.com/eduardushenrique-create/BED-Site/pull/47) | feat(rate-limit): Upstash Redis (opcional, fallback Postgres+memory) | ✅ |
+| [#48](https://github.com/eduardushenrique-create/BED-Site/pull/48) | fix(admin+login): sidebar Painel + uniformiza largura do login (640px) | ✅ |
 
 ## 3. ⚠️ Pendências do stakeholder (configuração externa)
 
@@ -120,12 +128,21 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 - Item #18 — CRUD de impressoras + atribuição de tarefas
 - 12/15 fixes da auditoria de UX/responsividade
 - Configuração de WhatsApp e Instagram reais
+- SEO estruturado (JSON-LD Product + OG/Twitter)
+- Visão Kanban de produção por impressora
+- Reviews em destaque na home
+- Captcha Turnstile DSN-opcional
+- Logs estruturados (pino) com redact de secrets
+- Rate limit Upstash Redis DSN-opcional
+- Sidebar admin com Painel + uniformização do login
 
 ### ⏳ Pendentes (precisam de configuração externa do stakeholder antes)
 | # | Item | Bloqueio |
 |---|---|---|
 | 7 | Migrar `<SafeImage>` → `next/image` | Depende do R2 ativo (5 envs no Railway) |
 | — | Acentuação correta nos produtos (Descrição/produção/úteis) | Edição manual via `/admin/produtos` |
+| — | Captcha Turnstile (PR #45) | Setar `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` no Railway |
+| — | Rate limit em Redis (PR #47) | Setar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` no Railway |
 
 ### 🎯 Backlog futuro
 Nada de prioridade alta-esforço pendente. Itens entregues nesta sessão incluem reviews (PR #39) e CRUD de impressoras (PR #40).
@@ -187,6 +204,11 @@ Nada de prioridade alta-esforço pendente. Itens entregues nesta sessão incluem
 18. **AuditLog** é write-best-effort (`recordAuditEntry` nunca propaga erro). Hooks em refund, update/delete pedidos, CRUD de cupons, exclusão LGPD
 19. **Restock alerts** disparam automaticamente em `updateProduct` e `updateProductVariant` quando o produto/variação volta a ter estoque (com `notifiedAt: null` filter para idempotência)
 20. **CI** roda em `tsconfig.ci.json` (exclui `tests/e2e.spec.ts`); migrations são checadas para BOM no workflow
+21. **Captcha Turnstile** é DSN-opcional via `verifyTurnstileToken` em `lib/turnstile.ts`. Sem `TURNSTILE_SECRET_KEY` → skipped:true. Aplicado em login (OTP+senha), esqueci-senha e restock-alert
+22. **Rate limit** prioridade: Upstash Redis (REST) → Postgres `RateLimitBucket` → memória. Cada tier degrada para o próximo em caso de erro
+23. **Logger estruturado**: `createLogger({ component: 'x' })` em `lib/logger.ts`, redact automático de password/token/cookie/authorization
+24. **Sidebar admin**: navItems agora incluem `Painel` (exact match) + `Impressoras`/`Avaliações`/`Auditoria` que tinham sido criadas mas não linkadas
+25. **JSON-LD**: Product (com aggregateRating quando há reviews) emitido em `/produtos/[slug]`; Organization + WebSite na home
 
 ## 8. Variáveis de ambiente — estado atual
 
@@ -226,6 +248,17 @@ R2_ACCESS_KEY_ID=                          # ❌
 R2_SECRET_ACCESS_KEY=                      # ❌
 R2_BUCKET_NAME=                            # ❌
 R2_PUBLIC_URL=                             # ❌
+
+# Cloudflare Turnstile (opcional — sem essas, captcha fica off)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=            # ❌
+TURNSTILE_SECRET_KEY=                      # ❌
+
+# Upstash Redis (opcional — sem essas, rate-limit cai pro Postgres bucket)
+UPSTASH_REDIS_REST_URL=                    # ❌
+UPSTASH_REDIS_REST_TOKEN=                  # ❌
+
+# Logger
+LOG_LEVEL=                                 # default: info em prod, debug em dev
 ```
 
 ## 9. Comandos úteis

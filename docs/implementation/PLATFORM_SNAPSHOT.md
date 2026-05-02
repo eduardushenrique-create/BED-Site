@@ -2,7 +2,7 @@
 
 > **Como usar este documento:** copie e cole o conteúdo abaixo no início de uma conversa com o ChatGPT. Em seguida, descreva o feature/funcionalidade que você quer adicionar. O assistente terá o contexto completo da arquitetura, schema, rotas, padrões e estado atual — e poderá propor implementação alinhada ao que já existe.
 >
-> **Última atualização:** 2026-05-02 (sessão pós-backlog: 19 PRs entregues incluindo Wishlist, Refund, Webhook ME, Esqueci-senha, KPIs, LGPD, UX audit, RestockAlert, AuditLog, CI)
+> **Última atualização:** 2026-05-02 (sessão extendida: 31 PRs entregues — todo backlog priorizado + Reviews, Printers, SEO, Kanban, Captcha, Pino, Upstash)
 
 ---
 
@@ -381,6 +381,17 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET_NAME=
 R2_PUBLIC_URL=  # ex: https://pub-xxxxx.r2.dev OU custom domain
+
+# Cloudflare Turnstile (anti-bot — opcional, sem essas o widget não renderiza)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
+# Upstash Redis (rate-limit em Redis — opcional, fallback Postgres bucket)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Logger
+LOG_LEVEL=  # default: info em produção, debug em dev
 ```
 
 ---
@@ -504,7 +515,8 @@ export async function GET(request: NextRequest) {
 - ✅ **Banner de cookies** (LGPD)
 - ✅ **Exportar dados** + **Excluir conta** (anonimização)
 - ✅ **Avise quando voltar** em produtos esgotados
-- ✅ **Avaliações de produto** (cliente pode avaliar produtos comprados; rating exibido no ProductCard)
+- ✅ **Avaliações de produto** (cliente pode avaliar produtos comprados; rating exibido no ProductCard, seção "O que nossos clientes dizem" na home)
+- ✅ **SEO estruturado** — Product JSON-LD com aggregateRating, OpenGraph/Twitter por produto, Organization + WebSite na home
 - ✅ **Header mobile responsivo** (auditoria UX 02/05/2026)
 - ✅ Logout funcional
 
@@ -521,6 +533,8 @@ export async function GET(request: NextRequest) {
 - ✅ `/admin/avaliacoes` — moderação das reviews de produto (aprovar/ocultar/excluir)
 - ✅ `/admin/impressoras` — CRUD de impressoras (capacidade, status, materiais)
 - ✅ `/admin/producao` — coluna de impressora com select inline para atribuir tarefas
+- ✅ `/admin/producao/board` — visão Kanban por impressora (carga estimada vs capacidade diária)
+- ✅ Sidebar admin com link "Painel" + todas as seções (incluindo as criadas nesta sessão)
 - ✅ Login scrypt restrito por env var (com fluxo de redefinição via email)
 - ✅ Guard de role em todas as APIs admin
 
@@ -528,7 +542,9 @@ export async function GET(request: NextRequest) {
 - ✅ Sessão JWT em cookie httpOnly (TTL 7 dias)
 - ✅ Webhook MP com HMAC + idempotência via WebhookEvent
 - ✅ **Webhook Melhor Envio** com HMAC-SHA256 + idempotência + atualização automática do fulfillment + emails
-- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP), `/api/auth/verify-code` (5/10min por email + 30/10min por IP), `/api/auth/password-login` (5/10min por email + 20/10min por IP), `/api/auth/request-password-reset` (3/15min email + 10/15min IP), `/api/auth/reset-password` (10/15min IP) — bucket compartilhado em `lib/rate-limit.ts`
+- ✅ **Captcha Cloudflare Turnstile** (DSN-opcional via `TURNSTILE_SECRET_KEY`) em `/login` (OTP+senha), `/login/esqueci-senha` e formulário de restock alert. `verifyTurnstileToken` em `lib/turnstile.ts` com `skipped:true` quando não configurado.
+- ✅ **Logs estruturados (pino)** em `lib/logger.ts` com redact automático de `password`/`token`/`authorization`/`cookie`. Já adotado em webhook MP/ME e `/api/orders`. Demais sites migram incrementalmente.
+- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP), `/api/auth/verify-code` (5/10min por email + 30/10min por IP), `/api/auth/password-login` (5/10min por email + 20/10min por IP), `/api/auth/request-password-reset` (3/15min email + 10/15min IP), `/api/auth/reset-password` (10/15min IP). Storage com prioridade **Upstash Redis (REST) → Postgres `RateLimitBucket` → memória**, fallback automático em erro.
 - ✅ **Notificações por e-mail centralizadas** em `lib/order-notifications.ts:notifyOrderStatusChange` — disparam ao admin alterar status (paid → in_production → shipped → delivered → cancelled/refunded). Webhook ME envia próprios emails para evitar dupla via PUT
 - ✅ **Refund Mercado Pago** — `POST /v1/payments/{id}/refunds` via `refundMercadoPagoPayment` com X-Idempotency-Key
 - ✅ Validação de CPF/CEP/telefone/email server-side
@@ -561,9 +577,9 @@ export async function GET(request: NextRequest) {
 - ✅ **"Exportar meus dados"** (LGPD, PR #30)
 - ✅ Sentry / observability (DSN-opcional — sem DSN o app funciona normal; com DSN setado começa a reportar automaticamente). Helpers `captureException`/`captureMessage` em `lib/observability.ts`. Adotado em webhook MP, webhook ME, `lib/mercadopago.ts`, `lib/payment.ts`, `app/api/orders` e `app/api/producao/[id]`. PII scrub best-effort em `lib/sentry-scrub.ts`.
 - ✅ Object storage (Cloudflare R2 — DSN-opcional)
-- ❌ Rate limit nos demais endpoints sensíveis (Upstash Redis)
-- ❌ Captcha (Turnstile)
-- ❌ Logs estruturados (pino)
+- ✅ **Rate limit em Upstash Redis** opcional como tier prioritário (PR #47)
+- ✅ **Captcha Turnstile** (PR #45)
+- ✅ **Logs estruturados (pino)** com redact (PR #46)
 - ✅ **CI/CD com lint/typecheck/build** (PR #36, `.github/workflows/ci.yml` + `tsconfig.ci.json`)
 - ❌ Carrinho persistente em DB (modelo `Cart` existe, sem uso)
 - ✅ **Reviews/avaliações** de produtos (PR #39)
