@@ -203,6 +203,32 @@ export async function sendPasswordResetEmail(
   }
 }
 
+export async function sendOrderDelivered(
+  email: string,
+  orderNumber: string,
+): Promise<boolean> {
+  if (!resend) return true
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Pedido ${orderNumber} entregue! - Forma 3D`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+          <h2 style="color: #1D7A72;">Seu pedido foi entregue!</h2>
+          <p>O pedido <strong>${orderNumber}</strong> foi marcado como entregue.</p>
+          <p>Esperamos que você ame o que pediu! Se tiver qualquer feedback ou problema, é só responder este e-mail.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending delivered email:', error)
+    return false
+  }
+}
+
 export async function sendOrderShipped(
   email: string,
   orderNumber: string,
