@@ -61,6 +61,13 @@ const cards: DashboardCard[] = [
     cta: 'Ver cupons →',
     accent: '#1D7A72',
   },
+  {
+    href: '/admin/auditoria',
+    title: 'Auditoria',
+    description: 'Log de ações sensíveis (estornos, exclusões, alterações).',
+    cta: 'Ver auditoria →',
+    accent: '#6B7494',
+  },
 ]
 
 function formatBRL(value: number): string {

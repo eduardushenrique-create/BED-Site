@@ -207,6 +207,19 @@ export type WishlistItemRecord = {
   createdAt: string
 }
 
+export type AuditLogRecord = {
+  id: string
+  actorEmail: string
+  actorRole?: string | null
+  action: string
+  targetType: string
+  targetId?: string | null
+  summary?: string | null
+  metadata?: Record<string, unknown> | null
+  ip?: string | null
+  createdAt: string
+}
+
 export type RestockAlertRecord = {
   id: string
   email: string
@@ -241,6 +254,7 @@ export type Database = {
   wishlistItems: WishlistItemRecord[]
   passwordResetTokens: PasswordResetTokenRecord[]
   restockAlerts: RestockAlertRecord[]
+  auditLogs: AuditLogRecord[]
 }
 
 const defaultData: Database = {
@@ -279,6 +293,7 @@ const defaultData: Database = {
   wishlistItems: [],
   passwordResetTokens: [],
   restockAlerts: [],
+  auditLogs: [],
 }
 
 function ensureDir() {
@@ -318,6 +333,7 @@ export function readDB(): Database {
       wishlistItems: parsed.wishlistItems || [],
       passwordResetTokens: parsed.passwordResetTokens || [],
       restockAlerts: parsed.restockAlerts || [],
+      auditLogs: parsed.auditLogs || [],
     }
   } catch {
     return defaultData

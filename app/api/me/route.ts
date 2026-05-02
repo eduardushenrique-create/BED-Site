@@ -4,6 +4,7 @@ import { anonymizeCustomer, getCustomerByEmail, updateCustomer } from '@/lib/dat
 import { clearSession } from '@/lib/auth'
 import { validateCPF } from '@/lib/validation'
 import { captureException } from '@/lib/observability'
+import { recordAuditEntry } from '@/lib/audit-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,6 +99,16 @@ export async function DELETE() {
     if (!result.ok) {
       return NextResponse.json({ error: 'Não foi possível excluir a conta.' }, { status: 500 })
     }
+
+    recordAuditEntry({
+      actorEmail: customer.email,
+      actorRole: 'customer',
+      action: 'customer.delete',
+      targetType: 'Customer',
+      targetId: customer.id,
+      summary: `Cliente solicitou exclusão da conta (anonimização)`,
+      metadata: { customerId: customer.id },
+    }).catch(() => {})
 
     await clearSession()
     return NextResponse.json({ ok: true })
