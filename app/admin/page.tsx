@@ -68,6 +68,13 @@ const cards: DashboardCard[] = [
     cta: 'Ver auditoria →',
     accent: '#6B7494',
   },
+  {
+    href: '/admin/avaliacoes',
+    title: 'Avaliações',
+    description: 'Modere as avaliações dos clientes antes de publicar.',
+    cta: 'Ver avaliações →',
+    accent: '#F59E0B',
+  },
 ]
 
 function formatBRL(value: number): string {

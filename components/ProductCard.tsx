@@ -27,6 +27,8 @@ interface Product {
   isPersonalizable: boolean
   images: ProductImage[]
   variants: ProductVariant[]
+  averageRating?: number | null
+  reviewCount?: number
 }
 
 interface ProductCardProps {
@@ -190,6 +192,14 @@ export default function ProductCard({ product }: ProductCardProps) {
               </span>
             )}
           </div>
+
+          {product.averageRating != null && (product.reviewCount ?? 0) > 0 && (
+            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#6B7494' }}>
+              <span style={{ color: '#F59E0B', fontSize: '14px', lineHeight: 1 }} aria-hidden="true">★</span>
+              <span style={{ fontWeight: 600, color: '#1D2235' }}>{product.averageRating.toFixed(1).replace('.', ',')}</span>
+              <span aria-label={`${product.reviewCount} avaliações`}>({product.reviewCount})</span>
+            </div>
+          )}
         </div>
       </article>
     </Link>

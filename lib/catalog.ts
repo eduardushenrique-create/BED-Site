@@ -2,6 +2,7 @@
 import { Product } from '@/lib/types'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
+import { getRatingsForProductIds } from '@/lib/reviews'
 
 type CatalogFilters = {
   category?: string
@@ -125,7 +126,12 @@ export async function getLocalCatalogProducts(filters: CatalogFilters = {}): Pro
       orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
     })
 
-    return products.map(serializePrismaProduct)
+    const serialized = products.map(serializePrismaProduct)
+    const ratings: Record<string, { averageRating: number | null; approvedCount: number }> = await getRatingsForProductIds(serialized.map(p => p.id)).catch(() => ({}))
+    return serialized.map(p => {
+      const r = ratings[p.id]
+      return r ? { ...p, averageRating: r.averageRating, reviewCount: r.approvedCount } : p
+    })
   } catch (error) {
     console.error('[catalog] Prisma failed while listing public products:', error)
     return []
@@ -178,7 +184,11 @@ export async function getLocalCatalogProductBySlug(slug: string): Promise<Produc
       },
     })
 
-    return product ? serializePrismaProduct(product) : null
+    if (!product) return null
+    const serialized = serializePrismaProduct(product)
+    const ratings: Record<string, { averageRating: number | null; approvedCount: number }> = await getRatingsForProductIds([serialized.id]).catch(() => ({}))
+    const r = ratings[serialized.id]
+    return r ? { ...serialized, averageRating: r.averageRating, reviewCount: r.approvedCount } : serialized
   } catch (error) {
     console.error('[catalog] Prisma failed on slug lookup:', error)
     return null
