@@ -2,7 +2,7 @@
 
 > **Como usar este documento:** abra uma nova sessão do Claude Code no diretório `C:\PROJETOS\BED-Site` e cole o conteúdo abaixo na primeira mensagem (ou referencie o arquivo `docs/implementation/HANDOFF.md`). O assistente terá contexto completo para continuar de onde paramos.
 >
-> **Última sessão:** 2026-05-02
+> **Última sessão:** 2026-05-02 (sessão de fechamento massivo do backlog — 13 PRs entregues)
 
 ---
 
@@ -46,6 +46,20 @@ Antes de qualquer trabalho, leia:
 | [#14](https://github.com/eduardushenrique-create/BED-Site/pull/14) | Sentry observability (DSN-opcional) + ADR-001 object storage | ✅ |
 | [#15](https://github.com/eduardushenrique-create/BED-Site/pull/15) | Cloudflare R2 storage com fallback inline + `productionMinutesPerUnit` na API | ✅ |
 | [#16](https://github.com/eduardushenrique-create/BED-Site/pull/16) | Variações de produto com estoque e imagens próprias | ✅ |
+| [#17](https://github.com/eduardushenrique-create/BED-Site/pull/17) | docs: HANDOFF.md inicial | ✅ |
+| [#18](https://github.com/eduardushenrique-create/BED-Site/pull/18) | **BUG-3** Página detalhe pedido admin (endpoint dedicado + enums alinhados) | ✅ |
+| [#19](https://github.com/eduardushenrique-create/BED-Site/pull/19) | **BUG-2** Redirect cartão MP (instrumentação + UX + 502 quando sem checkoutUrl) | ✅ |
+| [#20](https://github.com/eduardushenrique-create/BED-Site/pull/20) | **BUG-1** Wishlist (modelo + API + ProductCard + /minha-conta/favoritos) | ✅ |
+| [#21](https://github.com/eduardushenrique-create/BED-Site/pull/21) | Esqueci minha senha (PasswordResetToken + email + /login/redefinir-senha) | ✅ |
+| [#22](https://github.com/eduardushenrique-create/BED-Site/pull/22) | Webhook Melhor Envio (HMAC + tracking automático + emails) | ✅ |
+| [#23](https://github.com/eduardushenrique-create/BED-Site/pull/23) | Refund flow MP integrado no admin | ✅ |
+| [#24](https://github.com/eduardushenrique-create/BED-Site/pull/24) | Dashboard KPIs admin (vendas hoje/mês, ticket, top produto) | ✅ |
+| [#25](https://github.com/eduardushenrique-create/BED-Site/pull/25) | Drill-down cliente `/admin/clientes/[id]` (single fetch + totais) | ✅ |
+| [#26](https://github.com/eduardushenrique-create/BED-Site/pull/26) | E-mails de mudança de status (notifyOrderStatusChange) | ✅ |
+| [#27](https://github.com/eduardushenrique-create/BED-Site/pull/27) | Cancelamento de pedido pelo cliente (pending only) | ✅ |
+| [#28](https://github.com/eduardushenrique-create/BED-Site/pull/28) | Refazer Pix expirado (POST /api/me/orders/[orderNumber]/regenerate-pix) | ✅ |
+| [#29](https://github.com/eduardushenrique-create/BED-Site/pull/29) | Filtros avançados de pedidos + export CSV | ✅ |
+| [#30](https://github.com/eduardushenrique-create/BED-Site/pull/30) | LGPD: banner cookies + export dados + excluir conta (anonimização) | ✅ |
 
 ## 3. ⚠️ Pendências do stakeholder (configuração externa)
 
@@ -67,70 +81,39 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 - Sem credenciais → app continua salvando imagens como base64 inline (zero regressão)
 - Após ativar, rodar `POST /api/admin/migrate-images` para mover imagens antigas
 
-## 4. 🐛 Bugs reportados pelo stakeholder na última sessão (NÃO corrigidos)
+## 4. 🐛 Bugs reportados pelo stakeholder — TODOS RESOLVIDOS ✅
 
-### BUG-1 — Botão de favorito (coração) no `ProductCard` é decorativo
-- **Arquivo:** `components/ProductCard.tsx:118-142` — botão tem `aria-label="Adicionar aos favoritos"` mas o `onClick` só faz `e.preventDefault()`
-- **Causa:** Wishlist está planejada mas nunca foi implementada. O modelo `Wishlist` não existe ainda no schema
-- **Solução proposta:** implementar Fase 3 (busca já feita) — modelo `Wishlist`, endpoints `/api/me/wishlist`, integrar no botão (não logado → redirecionar para login com next param; logado → toggle favorito)
-- **Esforço:** Médio (~2-3h)
-
-### BUG-2 — Pedido não redireciona para Mercado Pago
-- **Sintoma:** stakeholder fez pedido teste, esperava ir pra tela do MP para pagar com cartão; não foi
-- **Provável causa:** o `paymentMethod` selecionado no checkout pode estar como `pix` por default. Verificar `app/checkout/page.tsx:55` — `paymentMethod = useState('pix')`. Se cliente quer cartão, precisa selecionar
-- **OU:** se foi cartão e mesmo assim não redirecionou, problema é em `lib/payment.ts` — `createPaymentForOrder` com cartão chama `createPaymentPreference`. Verificar:
-  - Se `MERCADOPAGO_ACCESS_TOKEN` está com credenciais válidas em prod
-  - Se `data.payment.checkoutUrl` está vindo na response do POST `/api/orders`
-  - Se o `app/checkout/page.tsx` (handleSubmit) trata o redirect com `window.location.href = data.payment.checkoutUrl`
-- **Verificação rápida:** abrir DevTools no checkout, fazer pedido cartão, ver response do POST `/api/orders` na aba Network
-- **Esforço:** Baixo se for config; Médio se for bug
-- **Logs**: depois do PR #14 (Sentry), erros vão pra `console.error` + Sentry. Verificar logs do Railway
-
-### BUG-3 — Página de detalhe de pedido (admin) com erro
-- **Sintoma:** stakeholder vê pedido na lista admin, clica em ver detalhes, página dá erro
-- **Status:** página `app/admin/pedidos/[id]/page.tsx` EXISTE mas:
-  - Faz `fetch('/api/pedidos')` (lista todos os pedidos) e procura por id no client — ineficiente
-  - `fulfillmentStatuses` ainda está com `'production'` em vez de `'in_production'` (mesmo bug do PR #12 que foi corrigido só em `app/admin/pedidos/page.tsx`, não em `/[id]/page.tsx`)
-  - Provavelmente o erro é o uso de `production` em algum lugar OU o tipo `Order` local não tem alguns campos novos (`discountTotal`, `couponCode`, etc.)
-- **Solução:** criar endpoint `GET /api/pedidos/[id]` (ou usar `/api/orders/[orderNumber]` admin-aware), atualizar a página para fazer fetch direto, alinhar status enums
-- **Esforço:** Baixo-Médio (~2h)
-
-### BUG-4 — Cliente em `/meus-pedidos/[orderNumber]` (provavelmente OK)
-- A página existe e foi criada no PR #7. Se também der erro, verificar se o problema é só no `/admin/pedidos/[id]`
-
-## 5. 📋 Backlog priorizado para próxima sessão
-
-### 🔥 Críticos (bugs reportados)
-| # | Item | Esforço | Detalhe acima |
-|---|---|---|---|
-| 1 | **BUG-3** página detalhe pedido admin | Baixo-Médio | seção 4 |
-| 2 | **BUG-2** redirect cartão pro MP | Baixo-Médio | seção 4 |
-| 3 | **BUG-1** botão favorito não funciona (= implementar Wishlist) | Médio | seção 4 |
-
-### ⚡ Alta prioridade
-| # | Item | Esforço |
+| Bug | PR | Resumo |
 |---|---|---|
-| 4 | Webhook Melhor Envio (tracking automático) | Médio |
-| 5 | Esqueci minha senha (admin, com `PasswordResetToken`) | Médio |
-| 6 | Refund flow MP integrado (admin pode reembolsar pedido) | Médio |
+| BUG-1 — Botão de favorito decorativo | [#20](https://github.com/eduardushenrique-create/BED-Site/pull/20) | Wishlist completa: modelo, API `/api/me/wishlist`, integração no `ProductCard` com redirect pra login se não-logado, página `/minha-conta/favoritos` |
+| BUG-2 — Cartão não redireciona pro MP | [#19](https://github.com/eduardushenrique-create/BED-Site/pull/19) | (1) Default paymentMethod removido (era 'pix'), (2) instrumentação `captureMessage` no `lib/payment.ts` e `lib/mercadopago.ts` para descobrir causa real em prod, (3) `/api/orders` retorna **502 com mensagem clara** quando method=card e MP não devolveu URL — não silencia mais o erro |
+| BUG-3 — Página detalhe pedido admin | [#18](https://github.com/eduardushenrique-create/BED-Site/pull/18) | Novo `GET /api/pedidos/[id]`, single fetch, enums alinhados (`production`→`in_production`, `failed`→`rejected`), exibição de desconto/cupom |
 
-### 🎯 Média
-| # | Item | Esforço |
+## 5. 📋 Backlog atualizado
+
+### ✅ Entregues nesta sessão
+- BUG-1, BUG-2, BUG-3 (3 bugs reportados pelo stakeholder)
+- Item #4 — Webhook Melhor Envio
+- Item #5 — Esqueci minha senha
+- Item #6 — Refund flow MP integrado
+- Item #8 — Dashboard KPIs admin
+- Item #9 — Drill-down cliente
+- Item #10 — LGPD (banner + export + delete)
+- Item #11 — Filtros avançados + CSV
+- Item #12 — E-mails de mudança de status
+- Item #13 — Cancelamento de pedido pelo cliente
+- Item #16 — Refazer Pix expirado
+
+### ⏳ Pendentes (precisam de configuração externa do stakeholder antes)
+| # | Item | Bloqueio |
 |---|---|---|
-| 7 | Migrar `<SafeImage>` → `next/image` (depois R2 ativo) | Baixo |
-| 8 | Dashboard KPIs admin (vendas hoje/mês, ticket médio, top produtos) | Médio |
-| 9 | Drill-down de cliente no admin (`/admin/clientes/[id]`) | Médio |
-| 10 | Banner LGPD + tela de excluir conta + exportar dados | Médio |
-| 11 | Edição em lote da página de pedidos (filtros avançados, exportar CSV) | Médio |
-| 12 | E-mails de mudança de status (pago → em produção → enviado → entregue) | Baixo |
-| 13 | Cancelamento de pedido pelo cliente (quando ainda `pending_payment`) | Baixo |
+| 7 | Migrar `<SafeImage>` → `next/image` | Depende do R2 ativo (5 envs no Railway) |
 
-### 🔵 Baixa
+### 🎯 Backlog futuro
 | # | Item | Esforço |
 |---|---|---|
 | 14 | Reviews/avaliações de produtos | Alto |
 | 15 | Auditoria admin (`AuditLog` para mudanças sensíveis) | Médio |
-| 16 | Refazer Pix expirado (regenerar com novo QR) | Baixo |
 | 17 | Notificações "avise quando voltar" para produtos sem estoque | Baixo |
 | 18 | CRUD de impressoras + fila por máquina (evolução de produção) | Alto |
 | 19 | CI/CD com lint+typecheck+Playwright antes do merge | Médio |
@@ -179,11 +162,16 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 5. **NUNCA migration com BOM** (`head -c 3 ... | xxd` deve mostrar `2d2d 20`, não `efbb bf`)
 6. **Fallback localDb obrigatório** em todas as funções de `lib/database.ts`
 7. **OTP cria conta automaticamente**, mas tem aba "Criar conta" com nome+telefone para enriquecer
-8. **Webhook MP rejeita 503 sem secret** (fail-closed)
+8. **Webhook MP rejeita 503 sem secret** (fail-closed). Mesmo padrão para webhook ME (PR #22).
 9. **Server SEMPRE revalida** preço/cupom/estoque/variação no `POST /api/orders`
 10. **Cliente NUNCA recebe** `notes`/`priority`/`risk.reason`/`createdByEmail` — `serializeCustomerProduction` cuida
 11. **Storage adapter** (`lib/storage`): R2 se 5 envs setadas, senão InlineStorage (data URL)
 12. **`productionMinutesPerUnit`** persistido na API de produtos (TODO removido)
+13. **`paymentStatus` enum**: `pending | paid | rejected | cancelled | refunded` (NUNCA `failed`)
+14. **`fulfillmentStatus` enum**: `pending | in_production | ready_to_ship | shipped | delivered | cancelled` (NUNCA `production`)
+15. **Notificações ao cliente** centralizadas em `lib/order-notifications.ts:notifyOrderStatusChange` — `PUT /api/pedidos` chama; webhook ME envia próprios emails para shipped/delivered
+16. **Anonimização (LGPD)**: `anonymizeCustomer` preserva pedidos antigos para fins fiscais; substitui dados pessoais e detacha `customerId` (`SET NULL`)
+17. **Wishlist** vive em `WishlistContext` mountado entre `AuthProvider` e `CartProvider` no `SiteShell`
 
 ## 8. Variáveis de ambiente — estado atual
 

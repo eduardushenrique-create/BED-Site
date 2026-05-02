@@ -2,7 +2,7 @@
 
 > **Como usar este documento:** copie e cole o conteúdo abaixo no início de uma conversa com o ChatGPT. Em seguida, descreva o feature/funcionalidade que você quer adicionar. O assistente terá o contexto completo da arquitetura, schema, rotas, padrões e estado atual — e poderá propor implementação alinhada ao que já existe.
 >
-> **Última atualização:** 2026-05-01 (após Fase 1 — área do cliente)
+> **Última atualização:** 2026-05-02 (sessão pós-backlog: 13 PRs entregues — Wishlist, Refund, Webhook ME, Esqueci-senha, KPIs, LGPD, etc.)
 
 ---
 
@@ -103,10 +103,11 @@ lib/                    Lógica server-side
 prisma/
   ├ schema.prisma       Modelos: Category, Product, ProductImage, ProductVariant,
   │                     PersonalizationField, Customer, CustomerAddress, AdminUser,
-  │                     Banner, Order, OrderItem, Address, Payment, Shipment,
-  │                     Cart (não usado), CartItem (não usado), Coupon,
-  │                     AuthCode, WebhookEvent
-  └ migrations/         4 migrations versionadas
+  │                     PasswordResetToken, Banner, Order, OrderItem, Address,
+  │                     Payment, Shipment, Cart (não usado), CartItem (não usado),
+  │                     Coupon, AuthCode, WebhookEvent, WishlistItem,
+  │                     RateLimitBucket, ProductionTask/Log/Settings
+  └ migrations/         11 migrations versionadas (até 20260507)
 
 docs/
   └ implementation/     Plano de evolução em 5 fases (este arquivo + outros)
@@ -235,6 +236,8 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 7. `20260503000000_rate_limit_bucket` — RateLimitBucket compartilhado (substitui Map em memória em prod)
 8. `20260504000000_storage_keys` — `ProductImage.storageKey` + `Banner.storageKey` (suporte ao Cloudflare R2)
 9. `20260505000000_variant_images` — `ProductImage.variantId` (FK SetNull) + `ProductVariant.priceOverride` (Decimal opcional). ProductVariant sai do estado "legado" e passa a USO FUNCIONAL.
+10. `20260506000000_wishlist` — `WishlistItem` (BUG-1 resolvido — favoritos persistidos)
+11. `20260507000000_password_reset_token` — `PasswordResetToken` (esqueci minha senha do admin)
 
 ---
 
@@ -245,7 +248,9 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 |---|---|---|
 | POST | `/api/auth/request-code` | Envia OTP por e-mail (rate limit 5/15min) |
 | POST | `/api/auth/verify-code` | Valida OTP + cria sessão + upsert Customer |
-| POST | `/api/auth/password-login` | Login bcrypt para AdminUser |
+| POST | `/api/auth/password-login` | Login scrypt para AdminUser |
+| POST | `/api/auth/request-password-reset` | Envia link de redefinição (1h TTL, rate-limit 3/15min email + 10/15min IP) |
+| POST | `/api/auth/reset-password` | Consome token + atualiza senha (rate-limit 10/15min IP) |
 | GET | `/api/auth/google/start` | Inicia OAuth Google |
 | GET | `/api/auth/google/callback` | Callback OAuth |
 | POST | `/api/auth/logout` | Limpa cookie de sessão |
@@ -256,11 +261,18 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 |---|---|---|
 | GET | `/api/me` | Perfil completo (Customer) |
 | PATCH | `/api/me` | Atualiza nome/telefone/CPF |
+| DELETE | `/api/me` | Anonimiza dados pessoais (LGPD); preserva histórico de pedidos detachado |
+| GET | `/api/me/export` | Download JSON com perfil + endereços + pedidos + wishlist (LGPD) |
 | GET | `/api/me/orders?status=&limit=&offset=` | Pedidos paginados, filtro por status |
+| POST | `/api/me/orders/[orderNumber]/cancel` | Cancela pedido em pending_payment do próprio cliente |
+| POST | `/api/me/orders/[orderNumber]/regenerate-pix` | Gera novo Pix para pedido pending (Pix expirado) |
 | GET | `/api/me/addresses` | Lista endereços salvos |
 | POST | `/api/me/addresses` | Cria (limite 5, transação para isDefault) |
 | PUT | `/api/me/addresses/[id]` | Atualiza |
 | DELETE | `/api/me/addresses/[id]` | Remove (promove próximo a default se necessário) |
+| GET | `/api/me/wishlist` | Lista favoritos com Product join |
+| POST | `/api/me/wishlist` body=`{productId}` | Adiciona favorito (idempotente via upsert) |
+| DELETE | `/api/me/wishlist/[productId]` | Remove favorito |
 
 ### Catálogo público
 | Método | Rota | Descrição |
@@ -274,8 +286,10 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 ### Pedidos
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| POST | `/api/orders` | customer | Cria pedido + payment + revalida estoque/preço/frete server-side |
-| GET | `/api/orders/[orderNumber]` | dono ou admin | Detalhe (guard de "dono" linha 22) |
+| POST | `/api/orders` | customer | Cria pedido + payment + revalida estoque/preço/frete server-side. **502 quando method=card e MP não devolveu checkoutUrl** |
+| GET | `/api/orders/[orderNumber]` | dono ou admin | Detalhe (guard de "dono") |
+| GET | `/api/pedidos/[id]` | admin | Detalhe por id ou orderNumber para o painel admin |
+| POST | `/api/pedidos/[id]/refund` body=`{amount?}` | admin | Estorna no MP (total ou parcial). Atualiza Order para refunded em estorno total |
 
 ### Frete
 | Método | Rota | Descrição |
@@ -295,6 +309,8 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 | Método | Rota | Descrição |
 |---|---|---|
 | POST | `/api/webhooks/mercadopago` | Atualiza pedido (HMAC + idempotência via WebhookEvent) |
+| POST | `/api/webhooks/melhor-envio` | Atualiza fulfillment (HMAC SHA256 + idempotência). Envia email shipped/delivered |
+| GET | `/api/clientes/[id]` | Drill-down admin: customer + orders (50) + addresses + totais |
 
 ---
 
@@ -462,30 +478,40 @@ export async function GET(request: NextRequest) {
 - ✅ Catálogo `/produtos` com filtros por categoria
 - ✅ Detalhe `/produtos/[slug]` com personalização
 - ✅ Carrinho (Context + localStorage, drawer lateral)
-- ✅ Checkout completo com cálculo de frete e pagamento
+- ✅ Checkout completo com cálculo de frete e pagamento (paymentMethod default vazio → escolha obrigatória)
 - ✅ Páginas estáticas: sobre, contato, faq, presentes, personalizados, políticas
 - ✅ Login + cadastro em abas
 - ✅ Login por OTP, senha, Google
+- ✅ **Esqueci minha senha** (`/login/esqueci-senha`, `/login/redefinir-senha?token=...`)
 - ✅ Header com avatar/dropdown quando logado
-- ✅ `/minha-conta` (dashboard) + `/dados` + `/enderecos`
+- ✅ `/minha-conta` (dashboard) + `/dados` + `/enderecos` + `/favoritos` + `/privacidade`
 - ✅ `/meus-pedidos` (lista com filtro) + detalhe com timeline
+- ✅ **Cancelamento self-service** de pedido pending payment
+- ✅ **Regenerar Pix** expirado direto na tela do pedido
+- ✅ **Wishlist** (coração no ProductCard funcional, página de favoritos)
+- ✅ **Banner de cookies** (LGPD)
+- ✅ **Exportar dados** + **Excluir conta** (anonimização)
 - ✅ Logout funcional
 
 ### Admin
-- ✅ `/admin` (homepage simples)
+- ✅ `/admin` com **KPIs em tempo real** (vendas hoje/mês, ticket médio, em produção, top produto)
 - ✅ `/admin/produtos` CRUD com upload de imagem
 - ✅ `/admin/categorias` CRUD
 - ✅ `/admin/banners` CRUD com tempo de exibição
-- ✅ `/admin/clientes` lista + busca
-- ✅ `/admin/pedidos` lista
+- ✅ `/admin/clientes` lista + busca + **drill-down `/admin/clientes/[id]`** (totais + pedidos + endereços)
+- ✅ `/admin/pedidos` lista com **filtros avançados** (status, pagamento, intervalo de datas, total mínimo) + **export CSV**
+- ✅ `/admin/pedidos/[id]` detalhe com **botão Estorno** (refund MP) e cupom/desconto
 - ✅ `/admin/cupons` CRUD com ativação, validade e limite de uso
-- ✅ Login bcrypt restrito por env var
+- ✅ Login scrypt restrito por env var (com fluxo de redefinição via email)
 - ✅ Guard de role em todas as APIs admin
 
 ### Backend / infra
 - ✅ Sessão JWT em cookie httpOnly (TTL 7 dias)
 - ✅ Webhook MP com HMAC + idempotência via WebhookEvent
-- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP), `/api/auth/verify-code` (5/10min por email + 30/10min por IP) e `/api/auth/password-login` (5/10min por email + 20/10min por IP) — bucket compartilhado em `lib/rate-limit.ts` (Postgres `RateLimitBucket` em prod, `Map` em memória em dev)
+- ✅ **Webhook Melhor Envio** com HMAC-SHA256 + idempotência + atualização automática do fulfillment + emails
+- ✅ Rate limit em `/api/auth/request-code` (5/15min por email+IP), `/api/auth/verify-code` (5/10min por email + 30/10min por IP), `/api/auth/password-login` (5/10min por email + 20/10min por IP), `/api/auth/request-password-reset` (3/15min email + 10/15min IP), `/api/auth/reset-password` (10/15min IP) — bucket compartilhado em `lib/rate-limit.ts`
+- ✅ **Notificações por e-mail centralizadas** em `lib/order-notifications.ts:notifyOrderStatusChange` — disparam ao admin alterar status (paid → in_production → shipped → delivered → cancelled/refunded). Webhook ME envia próprios emails para evitar dupla via PUT
+- ✅ **Refund Mercado Pago** — `POST /v1/payments/{id}/refunds` via `refundMercadoPagoPayment` com X-Idempotency-Key
 - ✅ Validação de CPF/CEP/telefone/email server-side
 - ✅ Fallback `localDb` para dev sem Postgres
 - ✅ Migrations versionadas
@@ -496,31 +522,36 @@ export async function GET(request: NextRequest) {
 ## 10. O que NÃO está implementado (próximas fases planejadas)
 
 ### Fase 3 — UX e descoberta
-- ❌ Busca de produtos no header (botão existe mas não faz nada)
-- ❌ Wishlist/favoritos (precisa modelo `Wishlist`)
+- ✅ Busca de produtos no header
+- ✅ **Wishlist/favoritos** (PR #20)
 - ✅ Cupons no checkout (validação server-side, UI no `/checkout`, snapshot do código gravado em `Payment.rawPayload.couponCode`)
-- ❌ "Esqueci minha senha" (admin) — precisa modelo `PasswordResetToken`
-- ❌ Refazer Pix expirado
+- ✅ **Esqueci minha senha** do admin (PR #21)
+- ✅ **Refazer Pix expirado** (PR #28)
 
 ### Fase 4 — Admin operacional
-- ❌ Dashboard com KPIs
+- ✅ **Dashboard com KPIs** (PR #24)
 - ✅ CRUD admin de cupons (`/admin/cupons` + `/api/cupons`)
-- ❌ Drill-down de cliente → seus pedidos
-- ❌ Webhook do Melhor Envio para tracking automático
-- ❌ Filtros avançados em pedidos
-- ❌ Refund flow integrado ao MP
+- ✅ **Drill-down de cliente** → seus pedidos (PR #25)
+- ✅ **Webhook do Melhor Envio** para tracking automático (PR #22)
+- ✅ **Filtros avançados em pedidos** + export CSV (PR #29)
+- ✅ **Refund flow integrado ao MP** (PR #23)
 
 ### Fase 5 — Compliance + observability
-- ❌ Banner de cookies LGPD
-- ❌ "Excluir minha conta" (anonimização)
-- ❌ "Exportar meus dados" (LGPD)
-- ✅ Sentry / observability (DSN-opcional — sem DSN o app funciona normal; com DSN setado começa a reportar automaticamente). Helpers `captureException`/`captureMessage` em `lib/observability.ts`. Adotado em webhook MP, `lib/mercadopago.ts`, `app/api/orders` e `app/api/producao/[id]`. PII scrub best-effort em `lib/sentry-scrub.ts`. Smoke test admin em `GET /api/admin/sentry-test?type=error|message`. Setup do stakeholder em `docs/implementation/setup-sentry.md`.
-- ✅ Object storage (Cloudflare R2 — DSN-opcional). Adapter em `lib/storage/` com fallback automático: sem as 5 envs `R2_*` o sistema mantém base64 inline (zero regressão); com envs setadas, uploads novos sobem pro R2 e gravam `ProductImage.storageKey`/`Banner.storageKey` para limpeza posterior. Endpoint admin de migração em batch para imagens existentes: `POST /api/admin/migrate-images` (idempotente, default 20 por chamada, 503 se R2 não configurado). Setup do stakeholder em `docs/implementation/setup-r2.md`. ADR em `docs/implementation/adr/ADR-001-object-storage-for-images.md`.
+- ✅ **Banner de cookies LGPD** (PR #30)
+- ✅ **"Excluir minha conta"** (anonimização, PR #30)
+- ✅ **"Exportar meus dados"** (LGPD, PR #30)
+- ✅ Sentry / observability (DSN-opcional — sem DSN o app funciona normal; com DSN setado começa a reportar automaticamente). Helpers `captureException`/`captureMessage` em `lib/observability.ts`. Adotado em webhook MP, webhook ME, `lib/mercadopago.ts`, `lib/payment.ts`, `app/api/orders` e `app/api/producao/[id]`. PII scrub best-effort em `lib/sentry-scrub.ts`.
+- ✅ Object storage (Cloudflare R2 — DSN-opcional)
 - ❌ Rate limit nos demais endpoints sensíveis (Upstash Redis)
 - ❌ Captcha (Turnstile)
 - ❌ Logs estruturados (pino)
 - ❌ CI/CD com lint/typecheck/teste antes do merge
 - ❌ Carrinho persistente em DB (modelo `Cart` existe, sem uso)
+- ❌ Reviews/avaliações de produtos
+- ❌ Auditoria admin (`AuditLog`)
+- ❌ "Avise quando voltar" para produtos sem estoque
+- ❌ CRUD de impressoras + fila por máquina
+- ❌ Migração `<SafeImage>` → `next/image` (depende de R2 ativo)
 
 ### Bugs conhecidos / dívidas
 - `tests/e2e.spec.ts` tem erros de tipo, não roda no CI
