@@ -27,7 +27,8 @@ type Order = {
 
 const fulfillmentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'production', label: 'Em producao', color: '#3B82F6' },
+  { value: 'in_production', label: 'Em produção', color: '#3B82F6' },
+  { value: 'ready_to_ship', label: 'Pronto p/ envio', color: '#0EA5E9' },
   { value: 'shipped', label: 'Enviado', color: '#8B5CF6' },
   { value: 'delivered', label: 'Entregue', color: '#10B981' },
   { value: 'cancelled', label: 'Cancelado', color: '#EF4444' },
@@ -36,7 +37,8 @@ const fulfillmentStatuses = [
 const paymentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
   { value: 'paid', label: 'Pago', color: '#10B981' },
-  { value: 'failed', label: 'Recusado', color: '#EF4444' },
+  { value: 'rejected', label: 'Recusado', color: '#EF4444' },
+  { value: 'cancelled', label: 'Cancelado', color: '#6B7494' },
   { value: 'refunded', label: 'Estornado', color: '#8B5CF6' },
 ]
 
@@ -73,21 +75,18 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
     async function loadCustomerDetail() {
       setLoading(true)
       try {
-        const [usersRes, ordersRes] = await Promise.all([
-          fetch('/api/clientes'),
-          fetch('/api/pedidos'),
-        ])
-        const users: User[] = await usersRes.json()
-        const allOrders: Order[] = await ordersRes.json()
-        const found = users.find(item => item.id === id) || null
-
-        setUser(found)
-        if (found) {
-          setEditForm({ name: found.name, email: found.email, phone: found.phone || '' })
-          setOrders(allOrders.filter(order => order.customerEmail.toLowerCase() === found.email.toLowerCase()))
-        } else {
+        const res = await fetch(`/api/clientes/${encodeURIComponent(id)}`, { cache: 'no-store' })
+        if (!res.ok) {
+          setUser(null)
           setOrders([])
+          return
         }
+        const data: { customer: User; orders: Order[] } = await res.json()
+        setUser(data.customer)
+        if (data.customer) {
+          setEditForm({ name: data.customer.name, email: data.customer.email, phone: data.customer.phone || '' })
+        }
+        setOrders(data.orders || [])
       } catch (error) {
         console.error('Error loading customer detail:', error)
       } finally {
