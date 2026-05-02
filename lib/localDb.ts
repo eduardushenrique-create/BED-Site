@@ -207,6 +207,20 @@ export type WishlistItemRecord = {
   createdAt: string
 }
 
+export type PrinterRecord = {
+  id: string
+  name: string
+  model?: string | null
+  buildVolume?: string | null
+  materials?: string | null
+  dailyCapacityMinutes: number
+  status: 'active' | 'maintenance' | 'offline'
+  color?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type ReviewRecord = {
   id: string
   productId: string
@@ -263,6 +277,7 @@ export type Database = {
   users: User[]
   customerAddresses: CustomerAddress[]
   webhookEvents: WebhookEvent[]
+  printers: PrinterRecord[]
   productionTasks: ProductionTaskRecord[]
   productionLogs: ProductionLogRecord[]
   productionSettings: ProductionSettingsRecord[]
@@ -294,6 +309,7 @@ const defaultData: Database = {
   users: [],
   customerAddresses: [],
   webhookEvents: [],
+  printers: [],
   productionTasks: [],
   productionLogs: [],
   productionSettings: [
@@ -341,6 +357,7 @@ export function readDB(): Database {
       users: parsed.users || [],
       webhookEvents: parsed.webhookEvents || [],
       customerAddresses: parsed.customerAddresses || [],
+      printers: parsed.printers || [],
       productionTasks: parsed.productionTasks || [],
       productionLogs: parsed.productionLogs || [],
       productionSettings:

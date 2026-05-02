@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ProductionSummaryCards, { ProductionSummary } from '@/components/admin/ProductionSummaryCards'
 import ProductionTaskFilters, { ProductionFiltersState } from '@/components/admin/ProductionTaskFilters'
-import ProductionTaskTable, { ProductionTaskRow } from '@/components/admin/ProductionTaskTable'
+import ProductionTaskTable, { ProductionTaskRow, PrinterOption } from '@/components/admin/ProductionTaskTable'
 
 interface ProductionListResponse {
   items: ProductionTaskRow[]
@@ -38,6 +38,7 @@ export default function AdminProducaoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [printers, setPrinters] = useState<PrinterOption[]>([])
   const [syncing, setSyncing] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -81,6 +82,50 @@ export default function AdminProducaoPage() {
   useEffect(() => {
     loadTasks()
   }, [loadTasks])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadPrinters() {
+      try {
+        const res = await fetch('/api/impressoras', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) {
+          setPrinters(data.map((p: { id: string; name: string; status: 'active' | 'maintenance' | 'offline'; color: string | null }) => ({
+            id: p.id,
+            name: p.name,
+            status: p.status,
+            color: p.color,
+          })))
+        }
+      } catch {
+        /* silencioso */
+      }
+    }
+    loadPrinters()
+    return () => { cancelled = true }
+  }, [])
+
+  async function handleAssign(task: ProductionTaskRow, printerId: string | null) {
+    setBusyId(task.id)
+    try {
+      const res = await fetch(`/api/producao/${task.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ printerId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || `Erro ${res.status}`)
+      }
+      await loadTasks()
+    } catch (e) {
+      console.error('Erro ao atribuir impressora:', e)
+      alert(e instanceof Error ? e.message : 'Erro ao atribuir impressora.')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   // Reset offset whenever filters change
   useEffect(() => {
@@ -319,7 +364,7 @@ export default function AdminProducaoPage() {
         </div>
       ) : (
         <>
-          <ProductionTaskTable items={items} busyId={busyId} onIncrement={handleIncrement} />
+          <ProductionTaskTable items={items} busyId={busyId} onIncrement={handleIncrement} printers={printers} onAssign={handleAssign} />
 
           <div
             style={{

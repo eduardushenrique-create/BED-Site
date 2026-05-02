@@ -356,6 +356,7 @@ export interface SerializedProductionTaskAdmin {
   id: string
   status: ProductionTaskStatus
   priority: ProductionPriority
+  printerId: string | null
   requiredQuantity: number
   producedQuantity: number
   remainingQuantity: number
@@ -452,6 +453,7 @@ export function serializeProductionTask(
     id: task.id,
     status,
     priority,
+    printerId: (task as any).printerId ?? null,
     requiredQuantity: task.requiredQuantity,
     producedQuantity: task.producedQuantity,
     remainingQuantity,

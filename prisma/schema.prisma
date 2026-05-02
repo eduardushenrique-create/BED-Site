@@ -311,6 +311,23 @@ model AdminUser {
   resetTokens  PasswordResetToken[]
 }
 
+model Printer {
+  id                   String           @id @default(cuid())
+  name                 String
+  model                String?
+  buildVolume          String?          // ex: "180x180x180"
+  materials            String?          // ex: "PLA, PETG"
+  dailyCapacityMinutes Int              @default(480)
+  status               String           @default("active") // active | maintenance | offline
+  color                String?          // hex tag para UI
+  notes                String?          @db.Text
+  productionTasks      ProductionTask[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([status])
+}
+
 model Review {
   id             String    @id @default(cuid())
   productId      String
@@ -437,6 +454,8 @@ model ProductionTask {
   order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItemId String    @unique
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  printerId   String?
+  printer     Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
 
   requiredQuantity Int
   producedQuantity Int @default(0)
@@ -456,6 +475,7 @@ model ProductionTask {
 
   @@index([orderId])
   @@index([status, dueAt])
+  @@index([printerId])
   @@index([priority, dueAt])
 }
 

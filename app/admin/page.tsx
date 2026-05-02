@@ -27,6 +27,13 @@ const cards: DashboardCard[] = [
     accent: '#2A4F8A',
   },
   {
+    href: '/admin/impressoras',
+    title: 'Impressoras',
+    description: 'Cadastre máquinas, capacidade e status. Atribua tarefas por impressora.',
+    cta: 'Ver impressoras →',
+    accent: '#0EA5E9',
+  },
+  {
     href: '/admin/produtos',
     title: 'Produtos',
     description: 'Gerencie catálogo, fotos e personalizações.',
