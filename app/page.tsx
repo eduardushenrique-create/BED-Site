@@ -27,7 +27,7 @@ export default async function Home() {
         <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>
           Categorias
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+        <div className="home-categories-grid">
           {categories.map((category) => (
             <Link
               key={category.id}

@@ -137,15 +137,29 @@ export default function Footer() {
         >
           <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px' }}>© {year} B&D Artes & Impressões. Todos os direitos reservados.</p>
           <div style={{ display: 'flex', gap: '16px' }}>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.78)" strokeWidth="1.5">
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram (abre em nova aba)"
+              className="icon-btn"
+              style={{ display: 'inline-flex' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.78)" strokeWidth="1.5" aria-hidden="true" focusable="false">
                 <rect x="2" y="2" width="20" height="20" rx="5" />
                 <circle cx="12" cy="12" r="4" />
                 <circle cx="18" cy="6" r="1.5" fill="rgba(255,255,255,0.78)" />
               </svg>
             </a>
-            <a href="https://wa.me/55" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.78)" strokeWidth="1.5">
+            <a
+              href="https://wa.me/55"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp (abre em nova aba)"
+              className="icon-btn"
+              style={{ display: 'inline-flex' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.78)" strokeWidth="1.5" aria-hidden="true" focusable="false">
                 <path d="M17.5 6.5c-2.5 0-4.5 2-4.5 4.5 0 1.5.5 3 1.5 4l-1 3 3-1c1.5 1 3 1.5 4.5 1.5 2.5 0 4.5-2 4.5-4.5s-2-4.5-4.5-4.5z" />
                 <path d="M12 8c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4z" />
               </svg>

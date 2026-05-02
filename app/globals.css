@@ -54,6 +54,24 @@ html, body {
   color: var(--color-dark);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Defense-in-depth: prevent horizontal scroll caused by overflowing children. */
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+img, video, svg {
+  max-width: 100%;
+}
+
+/* Touch target floor for accessibility (WCAG 2.5.5). Applied to icon-only
+   buttons via the .icon-btn class so we keep the visual icon size while
+   guaranteeing a 44x44 hit area. */
+.icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -85,5 +103,36 @@ button {
 @media (min-width: 768px) {
   .container {
     padding: 0 var(--spacing-xl);
+  }
+}
+
+/* Product detail page: stack into a single column on mobile so the image and
+   info don't compete for ~50% of a 375px viewport (which made the description
+   wrap word-by-word). */
+.product-detail-layout {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .product-detail-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  }
+}
+
+/* Home categories: avoid an orphan card on the last row when the count is
+   odd in the 2-column mobile layout. Single column at very narrow widths,
+   3 cols at tablet, 4+ at desktop. */
+.home-categories-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 480px) {
+  .home-categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 768px) {
+  .home-categories-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }

@@ -115,10 +115,15 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
           zIndex: 1,
         }}
       >
-        <div style={{ maxWidth: '640px' }}>
-          <div style={{ marginBottom: '18px' }}>
+        <div style={{ maxWidth: '640px', minWidth: 0 }}>
+          <div className="banner-brand-logo" style={{ marginBottom: '18px' }}>
             <BrandLogo dark={false} size="md" />
           </div>
+          <style>{`
+            @media (max-width: 480px) {
+              .banner-brand-logo { display: none; }
+            }
+          `}</style>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <div style={{ width: '28px', height: '1.5px', background: '#BBCFEB', borderRadius: '999px' }} />
             <span
@@ -136,13 +141,15 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
           </div>
           <h1
             style={{
-              fontSize: 'clamp(40px, 5vw, 68px)',
+              fontSize: 'clamp(28px, 6.5vw, 68px)',
               fontWeight: 700,
               color: '#F0F5FB',
               marginBottom: '18px',
               lineHeight: 1.08,
               letterSpacing: 0,
               textShadow: hasImage ? '0 2px 24px rgba(0,0,0,0.45)' : 'none',
+              wordBreak: 'break-word',
+              hyphens: 'auto',
             }}
           >
             {current.title}
@@ -204,10 +211,17 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
       {activeBanners.length > 1 && (
         <>
-          <button type="button" aria-label="Banner anterior" onClick={goPrev} style={arrowStyle('left')}>
+          <style>{`
+            @media (max-width: 640px) {
+              .banner-arrow { width: 36px !important; height: 36px !important; }
+              .banner-arrow-left { left: 8px !important; }
+              .banner-arrow-right { right: 8px !important; }
+            }
+          `}</style>
+          <button type="button" aria-label="Banner anterior" onClick={goPrev} className="banner-arrow banner-arrow-left" style={arrowStyle('left')}>
             <ArrowIcon direction="left" />
           </button>
-          <button type="button" aria-label="Próximo banner" onClick={goNext} style={arrowStyle('right')}>
+          <button type="button" aria-label="Próximo banner" onClick={goNext} className="banner-arrow banner-arrow-right" style={arrowStyle('right')}>
             <ArrowIcon direction="right" />
           </button>
           <div

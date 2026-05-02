@@ -80,18 +80,22 @@ export default function Header() {
         right: 0,
         backgroundColor: 'rgba(255,255,255,0.96)',
         borderBottom: '1px solid #D8DCE8',
+        boxShadow: '0 2px 8px rgba(29,34,53,0.06)',
         zIndex: 100,
         backdropFilter: 'blur(14px)',
+        maxWidth: '100%',
       }}
     >
       <div
-        className="container"
+        className="container site-header-row"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '20px',
+          gap: '12px',
           minHeight: '68px',
+          minWidth: 0,
+          maxWidth: '100%',
         }}
       >
         <BrandLogo size="md" />
@@ -115,9 +119,10 @@ export default function Header() {
           ))}
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="site-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
           <button
             onClick={() => setSearchOpen(true)}
+            className="icon-btn"
             style={{
               background: 'none',
               border: 'none',
@@ -137,6 +142,7 @@ export default function Header() {
 
           <button
             onClick={() => setIsOpen(true)}
+            className="icon-btn"
             style={{
               background: 'none',
               border: 'none',
@@ -146,7 +152,7 @@ export default function Header() {
               color: '#3D4460',
               borderRadius: '8px',
             }}
-            aria-label="Carrinho"
+            aria-label={`Carrinho${itemCount > 0 ? ` (${itemCount} ${itemCount === 1 ? 'item' : 'itens'})` : ''}`}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M6 6h15l-1.5 9h-12z" />
@@ -178,11 +184,12 @@ export default function Header() {
           </button>
 
           {!loading && (user ? (
-            <div ref={userMenuRef} style={{ position: 'relative' }}>
+            <div ref={userMenuRef} style={{ position: 'relative', minWidth: 0 }}>
               <button
                 onClick={() => setUserMenuOpen(prev => !prev)}
                 aria-label="Menu da conta"
                 aria-expanded={userMenuOpen}
+                className="user-menu-trigger icon-btn"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -190,18 +197,19 @@ export default function Header() {
                   background: '#F0F5FB',
                   border: '1px solid #D8DCE8',
                   cursor: 'pointer',
-                  padding: '6px 12px 6px 6px',
+                  padding: '4px',
                   borderRadius: '999px',
                   color: '#1D2235',
                   fontWeight: 600,
                   fontSize: '14px',
+                  maxWidth: '100%',
                 }}
               >
                 <span
                   aria-hidden="true"
                   style={{
-                    width: '28px',
-                    height: '28px',
+                    width: '32px',
+                    height: '32px',
                     borderRadius: '50%',
                     background: '#1D2235',
                     color: '#F0F5FB',
@@ -210,12 +218,13 @@ export default function Header() {
                     justifyContent: 'center',
                     fontSize: '12px',
                     fontWeight: 700,
+                    flexShrink: 0,
                   }}
                 >
                   {getInitials(user.name || user.email)}
                 </span>
                 <span className="user-menu-name">{user.name?.split(' ')[0] || 'Conta'}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="user-menu-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
@@ -290,8 +299,9 @@ export default function Header() {
               padding: '8px',
               color: '#3D4460',
               borderRadius: '8px',
+              flexShrink: 0,
             }}
-            className="mobile-menu-btn"
+            className="mobile-menu-btn icon-btn"
             aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
             aria-expanded={menuOpen}
           >
@@ -339,8 +349,13 @@ export default function Header() {
           .mobile-menu-btn { display: none !important; }
         }
         @media (max-width: 767px) {
-          .mobile-menu-btn { display: block !important; }
+          .mobile-menu-btn { display: inline-flex !important; }
+          /* Below 768px the user pill collapses to just the avatar so the
+             hamburger never gets pushed off-screen. */
           .user-menu-name { display: none; }
+          .user-menu-chevron { display: none; }
+          .user-menu-trigger { padding: 4px !important; gap: 0 !important; }
+          .site-header-actions { gap: 0 !important; }
         }
         .desktop-nav a:hover {
           background: #F0F5FB;
