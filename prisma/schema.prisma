@@ -94,6 +94,7 @@ model Banner {
   title                  String
   subtitle               String?
   imageUrl               String
+  storageKey             String?
   ctaText                String?
   ctaLink                String?
   isActive               Boolean  @default(true)
@@ -103,13 +104,14 @@ model Banner {
 }
 
 model ProductImage {
-  id        String  @id @default(cuid())
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url       String
-  alt       String?
-  sortOrder Int     @default(0)
-  isMain    Boolean @default(false)
+  id         String  @id @default(cuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url        String
+  storageKey String?
+  alt        String?
+  sortOrder  Int     @default(0)
+  isMain     Boolean @default(false)
 }
 
 model ProductVariant {

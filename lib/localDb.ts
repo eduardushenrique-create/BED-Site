@@ -18,6 +18,7 @@ export type Product = {
   stock: number
   underOrder: boolean
   sku?: string
+  productionMinutesPerUnit?: number | null
 }
 
 export type Category = {

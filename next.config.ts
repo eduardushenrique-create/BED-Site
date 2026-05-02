@@ -1,7 +1,28 @@
 import type { NextConfig } from "next";
 
+// Configura `next/image` para liberar o host do Cloudflare R2 quando
+// `R2_PUBLIC_URL` está setada. Sem a env, mantém o array vazio (não regride o
+// comportamento atual onde imagens são data URLs inline e SafeImage usa <img>).
+function buildRemotePatterns(): NonNullable<NonNullable<NextConfig['images']>['remotePatterns']> {
+  const publicUrl = process.env.R2_PUBLIC_URL
+  if (!publicUrl) return []
+  try {
+    const parsed = new URL(publicUrl)
+    return [
+      {
+        protocol: parsed.protocol.replace(':', '') as 'http' | 'https',
+        hostname: parsed.hostname,
+      },
+    ]
+  } catch {
+    return []
+  }
+}
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: buildRemotePatterns(),
+  },
 };
 
 // Wrap with Sentry only when a DSN is configured. Without a DSN we keep the

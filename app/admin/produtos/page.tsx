@@ -151,10 +151,9 @@ export default function AdminProductsPage() {
       stock: parseInt(formData.stock, 10) || 0,
       underOrder: formData.underOrder,
       sku: formData.sku,
-      // TODO: backend POST/PUT precisa aceitar productionMinutesPerUnit
       ...(typeof productionMinutes === 'number' && Number.isFinite(productionMinutes) && productionMinutes > 0
         ? { productionMinutesPerUnit: productionMinutes }
-        : {}),
+        : { productionMinutesPerUnit: null }),
     }
 
     try {
