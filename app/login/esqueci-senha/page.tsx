@@ -4,12 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -23,7 +25,7 @@ export default function EsqueciSenhaPage() {
       const res = await fetch('/api/auth/request-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), turnstileToken }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -68,6 +70,7 @@ export default function EsqueciSenhaPage() {
               autoComplete="email"
               required
             />
+            <TurnstileWidget onToken={setTurnstileToken} />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={loading}>
               {loading ? 'Enviando...' : 'Enviar link de redefinição'}

@@ -7,6 +7,7 @@ import {
   getClientIp,
   rateLimitResponseBody,
 } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 import { captureException } from '@/lib/observability'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request)
+
+  const captcha = await verifyTurnstileToken(body?.turnstileToken, ip)
+  if (!captcha.ok) {
+    return NextResponse.json({ error: 'Verificação anti-bot falhou. Recarregue a página e tente novamente.' }, { status: 400 })
+  }
   const ipLimit = await consumeRateLimit(buildRateLimitKey('restock-alert:ip', ip), 10, 600)
   if (!ipLimit.ok) {
     const { body: rlBody, status, headers } = rateLimitResponseBody(ipLimit)
