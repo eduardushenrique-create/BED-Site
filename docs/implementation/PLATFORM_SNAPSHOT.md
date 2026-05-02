@@ -159,8 +159,9 @@ model Product {
   cartItems             CartItem[]
 }
 
-model ProductImage   { id, productId, url, alt?, sortOrder, isMain }
-model ProductVariant { id, productId, name, sku?, color?, size?, material?, finish?, priceDelta?, stockQuantity, isAvailable }
+model ProductImage   { id, productId, variantId?, url, alt?, sortOrder, isMain }
+// ProductVariant: USO FUNCIONAL (CRUD admin + storefront via lib/database.ts)
+model ProductVariant { id, productId, name, sku?, color?, size?, material?, finish?, priceDelta?, priceOverride?, stockQuantity, isAvailable, images ProductImage[] }
 model PersonalizationField { id, productId, label, fieldType, placeholder?, helpText?, isRequired, minLength?, maxLength?, sortOrder }
 
 model Customer {
@@ -233,6 +234,7 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 6. `20260502120000_production_control` — controle de produção (ProductionTask, ProductionLog, ProductionSettings)
 7. `20260503000000_rate_limit_bucket` — RateLimitBucket compartilhado (substitui Map em memória em prod)
 8. `20260504000000_storage_keys` — `ProductImage.storageKey` + `Banner.storageKey` (suporte ao Cloudflare R2)
+9. `20260505000000_variant_images` — `ProductImage.variantId` (FK SetNull) + `ProductVariant.priceOverride` (Decimal opcional). ProductVariant sai do estado "legado" e passa a USO FUNCIONAL.
 
 ---
 

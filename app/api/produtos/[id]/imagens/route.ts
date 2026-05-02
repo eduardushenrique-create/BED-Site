@@ -31,6 +31,18 @@ export async function POST(
     return NextResponse.json({ error: 'URL da imagem é obrigatória.' }, { status: 400 })
   }
 
+  let variantId: string | null | undefined
+  if ('variantId' in body) {
+    if (body.variantId !== null && typeof body.variantId !== 'string') {
+      return NextResponse.json({ error: 'variantId deve ser string ou null.' }, { status: 400 })
+    }
+    variantId = body.variantId
+  }
+
+  if (body.alt !== undefined && typeof body.alt !== 'string') {
+    return NextResponse.json({ error: 'alt deve ser string.' }, { status: 400 })
+  }
+
   // Se a `url` recebida é uma data URL, faz upload aqui via storage adapter
   // (R2 quando configurado; senão InlineStorage devolve a própria data URL).
   let url = body.url as string
@@ -47,9 +59,15 @@ export async function POST(
     }
   }
 
-  const result = await addProductImage(id, { url, alt: body.alt, storageKey })
+  const result = await addProductImage(id, { url, alt: body.alt, storageKey, variantId })
   if (!result.image) {
-    return NextResponse.json({ error: result.error || 'Erro ao salvar imagem.' }, { status: 400 })
+    const message = result.error || 'Erro ao salvar imagem.'
+    const status =
+      message === 'Produto não encontrado.' ||
+      message === 'Variação não encontrada para este produto.'
+        ? 404
+        : 400
+    return NextResponse.json({ error: message }, { status })
   }
 
   return NextResponse.json(result.image, { status: 201 })

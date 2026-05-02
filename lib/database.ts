@@ -15,6 +15,7 @@ import {
   ProductionLogRecord,
   ProductionSettingsRecord,
   CouponRecord,
+  ProductVariantRecord,
 } from '@/lib/localDb'
 import {
   serializeProductionTask,
@@ -430,6 +431,7 @@ export type ProductImageDto = {
   alt: string | null
   sortOrder: number
   isMain: boolean
+  variantId: string | null
 }
 
 const MAX_PRODUCT_IMAGES = 8
@@ -442,6 +444,7 @@ function serializeProductImage(img: any): ProductImageDto {
     alt: img.alt || null,
     sortOrder: img.sortOrder,
     isMain: img.isMain,
+    variantId: img.variantId || null,
   }
 }
 
@@ -461,7 +464,7 @@ export async function listProductImages(productId: string): Promise<ProductImage
 
 export async function addProductImage(
   productId: string,
-  data: { url: string; alt?: string; storageKey?: string | null }
+  data: { url: string; alt?: string; storageKey?: string | null; variantId?: string | null }
 ): Promise<{ image: ProductImageDto | null; error?: string }> {
   if (!hasDatabase || !prisma?.productImage || !prisma?.product) {
     return { image: null, error: 'Banco de dados indisponível.' }
@@ -472,6 +475,17 @@ export async function addProductImage(
     if (!product) return { image: null, error: 'Produto não encontrado.' }
     if (product._count.images >= MAX_PRODUCT_IMAGES) {
       return { image: null, error: `Limite de ${MAX_PRODUCT_IMAGES} imagens por produto.` }
+    }
+
+    // Se variantId foi informado, garante que a variação pertence ao produto.
+    let resolvedVariantId: string | null = null
+    if (data.variantId) {
+      const variant = await prisma.productVariant.findFirst({
+        where: { id: data.variantId, productId },
+        select: { id: true },
+      })
+      if (!variant) return { image: null, error: 'Variação não encontrada para este produto.' }
+      resolvedVariantId = variant.id
     }
 
     const isFirst = product._count.images === 0
@@ -491,6 +505,7 @@ export async function addProductImage(
     const image = await prisma.productImage.create({
       data: {
         productId,
+        variantId: resolvedVariantId,
         url: finalUrl,
         storageKey: finalStorageKey,
         alt: data.alt || product.name,
@@ -502,6 +517,38 @@ export async function addProductImage(
   } catch (error) {
     console.error('[database] addProductImage Prisma failed:', error)
     return { image: null, error: 'Erro ao salvar imagem.' }
+  }
+}
+
+export async function setVariantForImage(
+  productId: string,
+  imageId: string,
+  variantId: string | null
+): Promise<{ ok: boolean; image?: ProductImageDto; error?: string }> {
+  if (!hasDatabase || !prisma?.productImage) {
+    return { ok: false, error: 'Banco de dados indisponível.' }
+  }
+
+  try {
+    const image = await prisma.productImage.findFirst({ where: { id: imageId, productId } })
+    if (!image) return { ok: false, error: 'Imagem não encontrada.' }
+
+    if (variantId) {
+      const variant = await prisma.productVariant.findFirst({
+        where: { id: variantId, productId },
+        select: { id: true },
+      })
+      if (!variant) return { ok: false, error: 'Variação não encontrada para este produto.' }
+    }
+
+    const updated = await prisma.productImage.update({
+      where: { id: imageId },
+      data: { variantId: variantId || null },
+    })
+    return { ok: true, image: serializeProductImage(updated) }
+  } catch (error) {
+    console.error('[database] setVariantForImage Prisma failed:', error)
+    return { ok: false, error: 'Erro ao vincular imagem à variação.' }
   }
 }
 
@@ -1328,6 +1375,7 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
         items: {
           create: data.items.map(item => ({
             productId: item.productId,
+            variantId: item.variantId ?? null,
             productNameSnapshot: item.productName,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -3100,4 +3148,371 @@ export async function incrementCouponUsage(code: string): Promise<void> {
   } catch (error) {
     console.error('[database] incrementCouponUsage Prisma failed:', error)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Variações de produto (CRUD)
+// ---------------------------------------------------------------------------
+
+export type ProductVariantDto = {
+  id: string
+  productId: string
+  name: string
+  sku: string | null
+  color: string | null
+  size: string | null
+  material: string | null
+  finish: string | null
+  priceDelta: number | null
+  priceOverride: number | null
+  stockQuantity: number
+  isAvailable: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type ProductVariantInput = {
+  name?: string
+  sku?: string | null
+  color?: string | null
+  size?: string | null
+  material?: string | null
+  finish?: string | null
+  priceDelta?: number | null
+  priceOverride?: number | null
+  stockQuantity?: number
+  isAvailable?: boolean
+}
+
+function serializeVariant(v: any): ProductVariantDto {
+  const toIso = (d: any) =>
+    d instanceof Date ? d.toISOString() : typeof d === 'string' ? d : new Date().toISOString()
+  return {
+    id: v.id,
+    productId: v.productId,
+    name: v.name,
+    sku: v.sku ?? null,
+    color: v.color ?? null,
+    size: v.size ?? null,
+    material: v.material ?? null,
+    finish: v.finish ?? null,
+    priceDelta: v.priceDelta != null ? Number(v.priceDelta) : null,
+    priceOverride: v.priceOverride != null ? Number(v.priceOverride) : null,
+    stockQuantity: typeof v.stockQuantity === 'number' ? v.stockQuantity : 0,
+    isAvailable: v.isAvailable !== false,
+    createdAt: toIso(v.createdAt),
+    updatedAt: toIso(v.updatedAt),
+  }
+}
+
+function sanitizeOptionalString(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  const trimmed = String(value).trim()
+  return trimmed.length === 0 ? null : trimmed
+}
+
+function sanitizeDecimalOrNull(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return null
+  return num
+}
+
+function validateVariantPricing(
+  priceDelta: number | null | undefined,
+  priceOverride: number | null | undefined
+): string | null {
+  const hasDelta = priceDelta !== undefined && priceDelta !== null
+  const hasOverride = priceOverride !== undefined && priceOverride !== null
+  if (hasDelta && hasOverride) {
+    return 'Use priceDelta OU priceOverride, não ambos.'
+  }
+  if (hasOverride && (priceOverride as number) <= 0) {
+    return 'priceOverride deve ser maior que zero.'
+  }
+  return null
+}
+
+function validateVariantStock(stock: unknown): { value: number } | { error: string } {
+  if (stock === undefined) return { value: 0 }
+  const num = typeof stock === 'number' ? stock : Number(stock)
+  if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
+    return { error: 'stockQuantity deve ser inteiro >= 0.' }
+  }
+  return { value: num }
+}
+
+export async function listProductVariants(productId: string): Promise<ProductVariantDto[]> {
+  if (!hasDatabase || !prisma?.productVariant) {
+    const db = readDB()
+    return (db.productVariants || [])
+      .filter(v => v.productId === productId)
+      .map(serializeVariant)
+  }
+  try {
+    const variants = await prisma.productVariant.findMany({
+      where: { productId },
+      orderBy: [{ createdAt: 'asc' }],
+    })
+    return variants.map(serializeVariant)
+  } catch (error) {
+    console.error('[database] listProductVariants Prisma failed:', error)
+    return []
+  }
+}
+
+export async function createProductVariant(
+  productId: string,
+  input: ProductVariantInput
+): Promise<{ ok: boolean; variant?: ProductVariantDto; error?: string }> {
+  const name = sanitizeOptionalString(input.name)
+  if (!name) return { ok: false, error: 'name é obrigatório.' }
+
+  const stockResult = validateVariantStock(input.stockQuantity)
+  if ('error' in stockResult) return { ok: false, error: stockResult.error }
+
+  const priceDelta = sanitizeDecimalOrNull(input.priceDelta)
+  const priceOverride = sanitizeDecimalOrNull(input.priceOverride)
+  const pricingError = validateVariantPricing(priceDelta, priceOverride)
+  if (pricingError) return { ok: false, error: pricingError }
+
+  const sku = sanitizeOptionalString(input.sku)
+
+  if (!hasDatabase || !prisma?.productVariant) {
+    const db = readDB()
+    if (sku) {
+      const dup = (db.productVariants || []).find(
+        v => v.productId === productId && (v.sku || '').toLowerCase() === sku.toLowerCase()
+      )
+      if (dup) return { ok: false, error: 'Já existe uma variação com este SKU para este produto.' }
+    }
+    const now = new Date().toISOString()
+    const record: ProductVariantRecord = {
+      id: `var_${Date.now()}`,
+      productId,
+      name,
+      sku: sku ?? null,
+      color: sanitizeOptionalString(input.color) ?? null,
+      size: sanitizeOptionalString(input.size) ?? null,
+      material: sanitizeOptionalString(input.material) ?? null,
+      finish: sanitizeOptionalString(input.finish) ?? null,
+      priceDelta: priceDelta ?? null,
+      priceOverride: priceOverride ?? null,
+      stockQuantity: stockResult.value,
+      isAvailable: input.isAvailable !== false,
+      createdAt: now,
+      updatedAt: now,
+    }
+    db.productVariants = [...(db.productVariants || []), record]
+    writeDB(db)
+    return { ok: true, variant: serializeVariant(record) }
+  }
+
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } })
+    if (!product) return { ok: false, error: 'Produto não encontrado.' }
+
+    if (sku) {
+      const dup = await prisma.productVariant.findFirst({
+        where: { productId, sku: { equals: sku, mode: 'insensitive' } },
+        select: { id: true },
+      })
+      if (dup) return { ok: false, error: 'Já existe uma variação com este SKU para este produto.' }
+    }
+
+    const variant = await prisma.productVariant.create({
+      data: {
+        productId,
+        name,
+        sku: sku ?? null,
+        color: sanitizeOptionalString(input.color) ?? null,
+        size: sanitizeOptionalString(input.size) ?? null,
+        material: sanitizeOptionalString(input.material) ?? null,
+        finish: sanitizeOptionalString(input.finish) ?? null,
+        priceDelta: priceDelta ?? null,
+        priceOverride: priceOverride ?? null,
+        stockQuantity: stockResult.value,
+        isAvailable: input.isAvailable !== false,
+      },
+    })
+    return { ok: true, variant: serializeVariant(variant) }
+  } catch (error) {
+    console.error('[database] createProductVariant Prisma failed:', error)
+    return { ok: false, error: 'Erro ao criar variação.' }
+  }
+}
+
+export async function updateProductVariant(
+  productId: string,
+  variantId: string,
+  input: ProductVariantInput
+): Promise<{ ok: boolean; variant?: ProductVariantDto; error?: string }> {
+  const nameProvided = input.name !== undefined
+  let name: string | undefined
+  if (nameProvided) {
+    const trimmed = sanitizeOptionalString(input.name)
+    if (!trimmed) return { ok: false, error: 'name não pode ser vazio.' }
+    name = trimmed
+  }
+
+  let stockValue: number | undefined
+  if (input.stockQuantity !== undefined) {
+    const stockResult = validateVariantStock(input.stockQuantity)
+    if ('error' in stockResult) return { ok: false, error: stockResult.error }
+    stockValue = stockResult.value
+  }
+
+  const priceDelta = sanitizeDecimalOrNull(input.priceDelta)
+  const priceOverride = sanitizeDecimalOrNull(input.priceOverride)
+  const pricingError = validateVariantPricing(priceDelta, priceOverride)
+  if (pricingError) return { ok: false, error: pricingError }
+
+  const sku = input.sku !== undefined ? sanitizeOptionalString(input.sku) : undefined
+
+  if (!hasDatabase || !prisma?.productVariant) {
+    const db = readDB()
+    const list = db.productVariants || []
+    const idx = list.findIndex(v => v.id === variantId && v.productId === productId)
+    if (idx === -1) return { ok: false, error: 'Variação não encontrada.' }
+    if (sku && sku !== list[idx].sku) {
+      const dup = list.find(
+        v =>
+          v.productId === productId &&
+          v.id !== variantId &&
+          (v.sku || '').toLowerCase() === sku.toLowerCase()
+      )
+      if (dup) return { ok: false, error: 'Já existe uma variação com este SKU para este produto.' }
+    }
+    const updated: ProductVariantRecord = {
+      ...list[idx],
+      ...(name !== undefined ? { name } : {}),
+      ...(input.color !== undefined ? { color: sanitizeOptionalString(input.color) ?? null } : {}),
+      ...(input.size !== undefined ? { size: sanitizeOptionalString(input.size) ?? null } : {}),
+      ...(input.material !== undefined ? { material: sanitizeOptionalString(input.material) ?? null } : {}),
+      ...(input.finish !== undefined ? { finish: sanitizeOptionalString(input.finish) ?? null } : {}),
+      ...(sku !== undefined ? { sku: sku ?? null } : {}),
+      ...(input.priceDelta !== undefined ? { priceDelta: priceDelta ?? null } : {}),
+      ...(input.priceOverride !== undefined ? { priceOverride: priceOverride ?? null } : {}),
+      ...(stockValue !== undefined ? { stockQuantity: stockValue } : {}),
+      ...(input.isAvailable !== undefined ? { isAvailable: !!input.isAvailable } : {}),
+      updatedAt: new Date().toISOString(),
+    }
+    list[idx] = updated
+    db.productVariants = list
+    writeDB(db)
+    return { ok: true, variant: serializeVariant(updated) }
+  }
+
+  try {
+    const existing = await prisma.productVariant.findFirst({ where: { id: variantId, productId } })
+    if (!existing) return { ok: false, error: 'Variação não encontrada.' }
+
+    if (sku && sku !== existing.sku) {
+      const dup = await prisma.productVariant.findFirst({
+        where: { productId, sku: { equals: sku, mode: 'insensitive' }, NOT: { id: variantId } },
+        select: { id: true },
+      })
+      if (dup) return { ok: false, error: 'Já existe uma variação com este SKU para este produto.' }
+    }
+
+    const updated = await prisma.productVariant.update({
+      where: { id: variantId },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(input.color !== undefined ? { color: sanitizeOptionalString(input.color) ?? null } : {}),
+        ...(input.size !== undefined ? { size: sanitizeOptionalString(input.size) ?? null } : {}),
+        ...(input.material !== undefined ? { material: sanitizeOptionalString(input.material) ?? null } : {}),
+        ...(input.finish !== undefined ? { finish: sanitizeOptionalString(input.finish) ?? null } : {}),
+        ...(sku !== undefined ? { sku: sku ?? null } : {}),
+        ...(input.priceDelta !== undefined ? { priceDelta: priceDelta ?? null } : {}),
+        ...(input.priceOverride !== undefined ? { priceOverride: priceOverride ?? null } : {}),
+        ...(stockValue !== undefined ? { stockQuantity: stockValue } : {}),
+        ...(input.isAvailable !== undefined ? { isAvailable: !!input.isAvailable } : {}),
+      },
+    })
+    return { ok: true, variant: serializeVariant(updated) }
+  } catch (error) {
+    console.error('[database] updateProductVariant Prisma failed:', error)
+    return { ok: false, error: 'Erro ao atualizar variação.' }
+  }
+}
+
+export async function deleteProductVariant(
+  productId: string,
+  variantId: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!hasDatabase || !prisma?.productVariant) {
+    const db = readDB()
+    const list = db.productVariants || []
+    const idx = list.findIndex(v => v.id === variantId && v.productId === productId)
+    if (idx === -1) return { ok: false, error: 'Variação não encontrada.' }
+    list.splice(idx, 1)
+    db.productVariants = list
+    writeDB(db)
+    return { ok: true }
+  }
+
+  try {
+    const existing = await prisma.productVariant.findFirst({ where: { id: variantId, productId }, select: { id: true } })
+    if (!existing) return { ok: false, error: 'Variação não encontrada.' }
+    // Cascade: ProductImage.variantId vira NULL via FK ON DELETE SET NULL.
+    // OrderItem.variantId também é SetNull (configurado no schema atual) — preserva histórico.
+    await prisma.productVariant.delete({ where: { id: variantId } })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] deleteProductVariant Prisma failed:', error)
+    return { ok: false, error: 'Erro ao remover variação.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stock decrement after order creation
+// Best-effort: caller must catch failures and not block order completion.
+// ---------------------------------------------------------------------------
+export async function decrementOrderStock(
+  items: Array<{ productId: string; variantId?: string | null; quantity: number }>,
+): Promise<void> {
+  if (!Array.isArray(items) || items.length === 0) return
+
+  if (!hasDatabase || !prisma?.product) {
+    // Local JSON fallback: only product-level stock; variant-level not tracked here.
+    const db = readDB()
+    let mutated = false
+    for (const item of items) {
+      if (item.variantId) {
+        const variant = db.productVariants.find(v => v.id === item.variantId)
+        if (variant) {
+          variant.stockQuantity = Math.max(0, (variant.stockQuantity ?? 0) - item.quantity)
+          mutated = true
+        }
+        continue
+      }
+      const product = db.products.find(p => p.id === item.productId)
+      if (product && typeof product.stock === 'number') {
+        product.stock = Math.max(0, product.stock - item.quantity)
+        mutated = true
+      }
+    }
+    if (mutated) writeDB(db)
+    return
+  }
+
+  // Prisma path — run inside a transaction for atomicity per call.
+  const client = prisma
+  await client.$transaction(
+    items.map(item => {
+      if (item.variantId) {
+        return client.productVariant.update({
+          where: { id: item.variantId },
+          data: { stockQuantity: { decrement: item.quantity } },
+        })
+      }
+      return client.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: item.quantity } },
+      })
+    }),
+  )
 }

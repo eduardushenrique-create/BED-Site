@@ -8,8 +8,8 @@
 |---|---|---|
 | `Category` | id, name, slug (uniq), isActive, sortOrder | → Product[] |
 | `Product` | id, name, slug (uniq), price, status, isActive, isFeatured, stock, underOrder | ← Category, → ProductImage[], ProductVariant[], PersonalizationField[] |
-| `ProductImage` | id, productId, url, isMain | ← Product |
-| `ProductVariant` | id, productId, name, sku, priceDelta | ← Product |
+| `ProductImage` | id, productId, variantId?, url, isMain | ← Product, ← ProductVariant? (FK SetNull) |
+| `ProductVariant` | id, productId, name, sku, priceDelta, priceOverride?, stockQuantity, isAvailable | ← Product, → ProductImage[] |
 | `PersonalizationField` | id, productId, label, fieldType, isRequired | ← Product |
 | `Customer` | id, name, email (uniq), phone, isVerified | (sem relações ainda) |
 | `AdminUser` | id, name, email (uniq), role, passwordHash | — |

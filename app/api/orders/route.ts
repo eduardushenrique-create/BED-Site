@@ -4,6 +4,7 @@ import {
   updateOrderPaymentByNumber,
   validateAndCalculateCoupon,
   incrementCouponUsage,
+  decrementOrderStock,
 } from '@/lib/database'
 import { requireApiUser } from '@/lib/api-auth'
 import { getLocalCatalogProducts } from '@/lib/catalog'
@@ -113,14 +114,48 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Um item do carrinho não está disponível.' }, { status: 400 })
       }
 
-      const stock = product.stock || 0
       const underOrder = product.underOrder || false
-      if (!underOrder && stock < item.quantity) {
-        return NextResponse.json({ error: `Estoque insuficiente para ${product.name}.` }, { status: 400 })
+      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1))
+
+      // Variant resolution and validation
+      const productHasVariants = Array.isArray(product.variants) && product.variants.length > 0
+      let resolvedVariant: typeof product.variants[number] | null = null
+
+      if (item.variantId) {
+        resolvedVariant = product.variants.find(v => v.id === item.variantId) || null
+        if (!resolvedVariant) {
+          return NextResponse.json({ error: 'Variação inválida.' }, { status: 400 })
+        }
+        if (resolvedVariant.isAvailable === false && !underOrder) {
+          return NextResponse.json({ error: `Variação indisponível para ${product.name}.` }, { status: 400 })
+        }
+        const variantStock = resolvedVariant.stockQuantity ?? 0
+        if (!underOrder && variantStock < quantity) {
+          return NextResponse.json(
+            { error: `Estoque insuficiente para a variação de ${product.name}.` },
+            { status: 400 },
+          )
+        }
+      } else if (productHasVariants) {
+        return NextResponse.json(
+          { error: `Selecione uma variação para ${product.name}.` },
+          { status: 400 },
+        )
+      } else {
+        const stock = product.stock || 0
+        if (!underOrder && stock < quantity) {
+          return NextResponse.json({ error: `Estoque insuficiente para ${product.name}.` }, { status: 400 })
+        }
       }
 
-      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1))
-      const lineTotal = product.price * quantity
+      // Effective unit price
+      const effectiveUnitPrice = resolvedVariant
+        ? (resolvedVariant.priceOverride != null
+            ? resolvedVariant.priceOverride
+            : product.price + (resolvedVariant.priceDelta || 0))
+        : product.price
+
+      const lineTotal = effectiveUnitPrice * quantity
       safeSubtotal += lineTotal
       packageWeight += (product.weightGrams || 200) * quantity
       packageWidth = Math.max(packageWidth, product.widthCm || 11)
@@ -130,10 +165,12 @@ export async function POST(request: Request) {
       orderItems.push({
         productId: product.id,
         productName: product.name,
-        variantId: item.variantId,
-        variantName: item.variantName,
+        variantId: resolvedVariant?.id || null,
+        variantName: resolvedVariant
+          ? (item.variantName || resolvedVariant.name)
+          : null,
         quantity,
-        unitPrice: product.price,
+        unitPrice: effectiveUnitPrice,
         personalization: item.personalization,
       })
     }
@@ -186,7 +223,9 @@ export async function POST(request: Request) {
       },
       items: orderItems.map(item => ({
         productId: item.productId,
-        productName: item.productName,
+        productName: item.variantName ? `${item.productName} (${item.variantName})` : item.productName,
+        variantId: item.variantId,
+        variantName: item.variantName,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         observation: item.personalization ? JSON.stringify(item.personalization) : undefined,
@@ -248,6 +287,23 @@ export async function POST(request: Request) {
 
     if (appliedCouponCode) {
       await incrementCouponUsage(appliedCouponCode)
+    }
+
+    // Best-effort stock decrement. Never block the order if this fails.
+    try {
+      await decrementOrderStock(
+        orderItems.map(item => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        })),
+      )
+    } catch (stockError) {
+      captureException(stockError, {
+        context: 'api.orders',
+        detail: 'decrementOrderStock failed',
+        orderNumber,
+      })
     }
 
     console.log('Order created:', orderNumber)
