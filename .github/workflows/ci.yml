@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint + Typecheck + Build
+    runs-on: ubuntu-latest
+
+    env:
+      # Build-time defaults so prisma generate and next build don't crash
+      # without real production secrets. Runtime envs come from Railway.
+      DATABASE_URL: postgresql://johndoe:randompassword@localhost:5432/mydb?schema=public
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_STORE_ORIGIN_ZIP: '01001000'
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true # warning-only enforcement; non-blocking until rules stabilize
+
+      - name: Typecheck
+        # tsconfig.ci.json excludes tests/e2e.spec.ts which has 2 pre-existing
+        # Playwright type errors the team has chosen not to fix in this gate.
+        run: npx tsc --noEmit --project tsconfig.ci.json
+
+      - name: Build
+        run: npx next build
+
+      - name: Migration BOM check
+        # Postgres rejects migrations with a UTF-8 BOM. Catch it early.
+        run: |
+          set -e
+          shopt -s nullglob
+          for f in prisma/migrations/*/migration.sql; do
+            head_bytes=$(head -c 3 "$f" | xxd -p)
+            if [ "$head_bytes" = "efbbbf" ]; then
+              echo "::error file=$f::Migration starts with UTF-8 BOM (efbbbf)"
+              exit 1
+            fi
+          done
