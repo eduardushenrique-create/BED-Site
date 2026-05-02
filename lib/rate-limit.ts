@@ -3,6 +3,10 @@ import 'server-only'
 import type { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
+import { isUpstashConfigured, pipeline } from '@/lib/upstash'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'rate-limit' })
 
 export type RateLimitResult = {
   ok: boolean
@@ -118,10 +122,51 @@ async function consumeInDatabase(
   }
 }
 
+async function consumeInUpstash(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<RateLimitResult> {
+  // Atomic INCR + (set TTL on first hit) via single pipeline call.
+  const namespacedKey = `bed:rl:${key}`
+  const results = await pipeline([
+    ['INCR', namespacedKey],
+    ['EXPIRE', namespacedKey, windowSeconds, 'NX'],
+    ['PTTL', namespacedKey],
+  ])
+
+  const count = Number(results[0])
+  // results[1] = EXPIRE result (1 set, 0 not set)
+  const pttl = Number(results[2])
+  const ttlMs = Number.isFinite(pttl) && pttl > 0 ? pttl : windowSeconds * 1000
+  const resetAt = new Date(Date.now() + ttlMs)
+
+  if (!Number.isFinite(count) || count <= 0) {
+    // Defensive: treat as ok-but-zero (don't block legit traffic on weird response).
+    return { ok: true, remaining: limit, resetAt }
+  }
+
+  if (count > limit) {
+    return {
+      ok: false,
+      remaining: 0,
+      resetAt,
+      retryAfterSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
+    }
+  }
+
+  return {
+    ok: true,
+    remaining: Math.max(0, limit - count),
+    resetAt,
+  }
+}
+
 /**
  * Try to consume one token from the bucket identified by `key`.
  *
- * Storage:
+ * Storage (in priority order):
+ * - Upstash Redis REST when `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` are configured.
  * - Postgres (`RateLimitBucket`) when `hasDatabase` is true and the prisma client is available.
  * - In-process `Map` fallback otherwise (dev / no-DB mode).
  *
@@ -139,6 +184,14 @@ export async function consumeRateLimit(
     return { ok: true, remaining: limit, resetAt }
   }
 
+  if (isUpstashConfigured()) {
+    try {
+      return await consumeInUpstash(key, limit, windowSeconds)
+    } catch (error) {
+      log.warn({ err: error instanceof Error ? error.message : String(error) }, 'Upstash failed, falling back to DB/memory')
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hasBucketModel = Boolean(hasDatabase && (prisma as any)?.rateLimitBucket)
 
@@ -146,7 +199,7 @@ export async function consumeRateLimit(
     try {
       return await consumeInDatabase(key, limit, windowSeconds)
     } catch (error) {
-      console.warn('[rate-limit] DB bucket failed, falling back to memory:', error)
+      log.warn({ err: error instanceof Error ? error.message : String(error) }, 'DB bucket failed, falling back to memory')
       return consumeInMemory(key, limit, windowSeconds)
     }
   }
