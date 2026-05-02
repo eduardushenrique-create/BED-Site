@@ -3,6 +3,7 @@ export interface ProductImage {
   url: string
   alt: string | null
   isMain: boolean
+  variantId?: string | null
 }
 
 export interface ProductVariant {
@@ -10,6 +11,14 @@ export interface ProductVariant {
   name: string
   sku: string | null
   priceDelta: number | null
+  priceOverride?: number | null
+  color?: string | null
+  size?: string | null
+  material?: string | null
+  finish?: string | null
+  stockQuantity?: number
+  isAvailable?: boolean
+  images?: ProductImage[]
 }
 
 export interface PersonalizationField {

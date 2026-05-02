@@ -1,51 +1,114 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import SafeImage from '@/components/SafeImage'
 import { useCart } from '@/context/CartContext'
-import { Product } from '@/lib/types'
+import { Product, ProductImage, ProductVariant } from '@/lib/types'
 
 interface ProductDetailClientProps {
   product: Product | null | undefined
 }
 
+function describeVariant(variant: ProductVariant): string {
+  const parts = [variant.color, variant.size, variant.material, variant.finish].filter(
+    (value): value is string => Boolean(value && value.trim()),
+  )
+  if (parts.length === 0) return variant.name
+  // If the saved name already encodes the attributes, prefer it; otherwise compose.
+  const composed = parts.join(' - ')
+  return variant.name && variant.name.trim() && variant.name !== 'Padrao'
+    ? variant.name
+    : composed
+}
+
+function variantEffectivePrice(basePrice: number, variant: ProductVariant | null): number {
+  if (!variant) return basePrice
+  if (variant.priceOverride != null) return variant.priceOverride
+  return basePrice + (variant.priceDelta || 0)
+}
+
 export default function ProductDetailClient({ product }: ProductDetailClientProps) {
-  const [selectedImage, setSelectedImage] = useState(0)
-  const [selectedVariant, setSelectedVariant] = useState(product?.variants[0]?.id || null)
+  const initialVariantId = useMemo(() => {
+    if (!product || product.variants.length === 0) return null
+    const firstAvailable = product.variants.find(v => v.isAvailable !== false)
+    return (firstAvailable || product.variants[0]).id
+  }, [product])
+
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(initialVariantId)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [personalization, setPersonalization] = useState<Record<string, string>>({})
   const { addItem } = useCart()
 
+  const selectedVariant: ProductVariant | null = useMemo(() => {
+    if (!product || !selectedVariantId) return null
+    return product.variants.find(v => v.id === selectedVariantId) || null
+  }, [product, selectedVariantId])
+
+  // Filter gallery: variant-specific images first, then global product images (no variantId).
+  const visibleImages: ProductImage[] = useMemo(() => {
+    if (!product) return []
+    if (!selectedVariant) {
+      return product.images.filter(img => !img.variantId)
+        .concat(product.images.filter(img => img.variantId))
+    }
+    const variantImages = product.images.filter(img => img.variantId === selectedVariant.id)
+    const globalImages = product.images.filter(img => !img.variantId)
+    if (variantImages.length > 0) return [...variantImages, ...globalImages]
+    return globalImages.length > 0 ? globalImages : product.images
+  }, [product, selectedVariant])
+
   if (!product) {
     return (
       <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px', textAlign: 'center' }}>
-        <h1 style={{ color: '#1D2235' }}>Produto não encontrado</h1>
-        <p style={{ color: '#6B7494' }}>Este produto não está disponível.</p>
+        <h1 style={{ color: '#1D2235' }}>Produto nao encontrado</h1>
+        <p style={{ color: '#6B7494' }}>Este produto nao esta disponivel.</p>
       </main>
     )
   }
 
-  const currentPrice = product.price + (product.variants.find(v => v.id === selectedVariant)?.priceDelta || 0)
+  const currentPrice = variantEffectivePrice(product.price, selectedVariant)
+  const safeImageIndex = Math.min(selectedImageIndex, Math.max(0, visibleImages.length - 1))
+  const heroImage = visibleImages[safeImageIndex] || product.images[0]
+
+  // Availability rules
+  const hasVariants = product.variants.length > 0
+  const variantStock = selectedVariant?.stockQuantity ?? 0
+  const variantAvailable = selectedVariant ? selectedVariant.isAvailable !== false : true
+  const underOrder = !!product.underOrder
+  const outOfStockForVariant = hasVariants
+    ? !underOrder && (!variantAvailable || variantStock <= 0)
+    : !underOrder && (product.stock ?? 0) <= 0
+
+  const handleSelectVariant = (variantId: string) => {
+    setSelectedVariantId(variantId)
+    setSelectedImageIndex(0)
+  }
 
   const handleAddToCart = () => {
+    if (outOfStockForVariant) return
+    if (hasVariants && !selectedVariant) {
+      alert('Selecione uma variacao.')
+      return
+    }
+
     const requiredFields = product.personalizationFields.filter(f => f.isRequired)
     const missingRequired = requiredFields.find(f => !personalization[f.id])
-
     if (missingRequired) {
       alert(`Por favor, preencha o campo: ${missingRequired.label}`)
       return
     }
 
-    const selectedVariantObj = product.variants.find(v => v.id === selectedVariant)
+    const variantLabel = selectedVariant ? describeVariant(selectedVariant) : null
 
     addItem({
       productId: product.id,
       productName: product.name,
-      productImage: product.images[0]?.url || null,
-      variantId: selectedVariant,
-      variantName: selectedVariantObj?.name || null,
+      productImage: heroImage?.url || product.images[0]?.url || null,
+      variantId: selectedVariant?.id || null,
+      variantName: variantLabel,
       quantity,
       unitPrice: currentPrice,
       personalization: Object.keys(personalization).length > 0 ? personalization : null,
@@ -74,24 +137,24 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             }}
           >
             <SafeImage
-              src={product.images[selectedImage]?.url}
-              alt={product.images[selectedImage]?.alt || product.name}
+              src={heroImage?.url}
+              alt={heroImage?.alt || product.name}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
 
-          {product.images.length > 1 && (
+          {visibleImages.length > 1 && (
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
-              {product.images.map((img, idx) => (
+              {visibleImages.map((img, idx) => (
                 <button
                   key={img.id}
-                  onClick={() => setSelectedImage(idx)}
+                  onClick={() => setSelectedImageIndex(idx)}
                   style={{
                     width: '84px',
                     height: '84px',
                     borderRadius: '12px',
                     overflow: 'hidden',
-                    border: selectedImage === idx ? '2px solid #BBCFEB' : '2px solid transparent',
+                    border: safeImageIndex === idx ? '2px solid #BBCFEB' : '2px solid transparent',
                     padding: 0,
                     cursor: 'pointer',
                     flexShrink: 0,
@@ -125,7 +188,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
 
           {product.sku && (
             <p style={{ color: '#6B7494', fontSize: '14px', fontFamily: 'var(--font-mono)', marginBottom: '18px' }}>
-              SKU: {product.sku}
+              SKU: {selectedVariant?.sku || product.sku}
             </p>
           )}
 
@@ -160,29 +223,56 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </p>
           )}
 
-          {product.variants.length > 0 && (
+          {hasVariants && (
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: '#1D2235' }}>
-                Opção
+                Variacao
               </label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {product.variants.map(variant => (
-                  <button
-                    key={variant.id}
-                    onClick={() => setSelectedVariant(variant.id)}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '10px',
-                      border: selectedVariant === variant.id ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
-                      backgroundColor: selectedVariant === variant.id ? '#F0F5FB' : 'white',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: '#1D2235',
-                    }}
-                  >
-                    {variant.name}
-                  </button>
-                ))}
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {product.variants.map(variant => {
+                  const label = describeVariant(variant)
+                  const price = variantEffectivePrice(product.price, variant)
+                  const stock = variant.stockQuantity ?? 0
+                  const available = variant.isAvailable !== false
+                  const isSoldOut = !underOrder && (!available || stock <= 0)
+                  const isSelected = selectedVariantId === variant.id
+                  return (
+                    <button
+                      type="button"
+                      key={variant.id}
+                      onClick={() => handleSelectVariant(variant.id)}
+                      disabled={isSoldOut}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+                        backgroundColor: isSelected ? '#F0F5FB' : 'white',
+                        cursor: isSoldOut ? 'not-allowed' : 'pointer',
+                        opacity: isSoldOut ? 0.55 : 1,
+                        textAlign: 'left',
+                        color: '#1D2235',
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#6B7494' }}>
+                        {isSoldOut ? (
+                          <span style={{ color: '#A3526A', fontWeight: 600 }}>Esgotado</span>
+                        ) : underOrder ? (
+                          <span>Sob encomenda</span>
+                        ) : (
+                          <span>{stock} em estoque</span>
+                        )}
+                        <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)' }}>
+                          R$ {price.toFixed(2).replace('.', ',')}
+                        </strong>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -190,7 +280,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           {product.personalizationFields.length > 0 && (
             <div style={{ marginBottom: '24px', padding: '18px', backgroundColor: '#FAFCFE', borderRadius: '14px', border: '1px solid #E3E9F4' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>
-                Personalização
+                Personalizacao
               </h3>
               {product.personalizationFields.map(field => (
                 <div key={field.id} style={{ marginBottom: '16px' }}>
@@ -273,13 +363,13 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </div>
 
             <p style={{ color: '#6B7494', fontSize: '14px' }}>
-              Prazo de produção: {product.productionTimeMinDays}-{product.productionTimeMaxDays} dias úteis
+              Prazo de producao: {product.productionTimeMinDays}-{product.productionTimeMaxDays} dias uteis
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
-            <Button onClick={handleAddToCart} fullWidth>
-              Adicionar ao carrinho
+            <Button onClick={handleAddToCart} fullWidth disabled={outOfStockForVariant}>
+              {outOfStockForVariant ? 'Esgotado' : 'Adicionar ao carrinho'}
             </Button>
             <Button variant="outline" style={{ padding: '12px 14px' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -291,7 +381,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           {product.description && (
             <div style={{ borderTop: '1px solid #E3E9F4', paddingTop: '24px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>
-                Descrição
+                Descricao
               </h3>
               <div style={{ color: '#6B7494', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: product.description }} />
             </div>

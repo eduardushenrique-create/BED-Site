@@ -40,12 +40,31 @@ function serializePrismaProduct(product: any): Product {
       url: image.url,
       alt: image.alt,
       isMain: image.isMain,
+      variantId: image.variantId || null,
     })),
     variants: product.variants.map((variant: any) => ({
       id: String(variant.id),
       name: variant.name || 'Padrao',
       sku: variant.sku || null,
-      priceDelta: variant.priceDelta ? Number(variant.priceDelta) : null,
+      color: variant.color || null,
+      size: variant.size || null,
+      material: variant.material || null,
+      finish: variant.finish || null,
+      priceDelta: variant.priceDelta != null ? Number(variant.priceDelta) : null,
+      priceOverride: variant.priceOverride != null ? Number(variant.priceOverride) : null,
+      stockQuantity: typeof variant.stockQuantity === 'number' ? variant.stockQuantity : 0,
+      isAvailable: variant.isAvailable !== false,
+      images: Array.isArray(product.images)
+        ? product.images
+            .filter((image: any) => image.variantId === variant.id)
+            .map((image: any) => ({
+              id: image.id,
+              url: image.url,
+              alt: image.alt,
+              isMain: image.isMain,
+              variantId: image.variantId || null,
+            }))
+        : [],
     })),
     personalizationFields: product.personalizationFields.map((field: any) => ({
       id: field.id,

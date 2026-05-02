@@ -64,7 +64,7 @@ export type Order = {
     pixCopyPaste?: string
   }
   createdAt: string
-  items: { productId: string; productName: string; quantity: number; unitPrice: number; observation?: string }[]
+  items: { productId: string; productName: string; variantId?: string | null; variantName?: string | null; quantity: number; unitPrice: number; observation?: string }[]
   trackingCode: string | null
 }
 
@@ -167,6 +167,23 @@ export type ProductionSettingsRecord = {
   updatedAt: string
 }
 
+export type ProductVariantRecord = {
+  id: string
+  productId: string
+  name: string
+  sku?: string | null
+  color?: string | null
+  size?: string | null
+  material?: string | null
+  finish?: string | null
+  priceDelta?: number | null
+  priceOverride?: number | null
+  stockQuantity: number
+  isAvailable: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export type CouponRecord = {
   id: string
   code: string
@@ -193,6 +210,7 @@ export type Database = {
   productionLogs: ProductionLogRecord[]
   productionSettings: ProductionSettingsRecord[]
   coupons: CouponRecord[]
+  productVariants: ProductVariantRecord[]
 }
 
 const defaultData: Database = {
@@ -227,6 +245,7 @@ const defaultData: Database = {
     },
   ],
   coupons: [],
+  productVariants: [],
 }
 
 function ensureDir() {
@@ -262,6 +281,7 @@ export function readDB(): Database {
           ? parsed.productionSettings
           : defaultData.productionSettings,
       coupons: parsed.coupons || [],
+      productVariants: parsed.productVariants || [],
     }
   } catch {
     return defaultData
