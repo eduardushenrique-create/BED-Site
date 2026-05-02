@@ -309,6 +309,20 @@ model AdminUser {
   resetTokens  PasswordResetToken[]
 }
 
+model RestockAlert {
+  id        String   @id @default(cuid())
+  email     String
+  productId String
+  variantId String?
+  notifiedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([email, productId, variantId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([notifiedAt])
+}
+
 model PasswordResetToken {
   id          String    @id @default(cuid())
   adminUserId String

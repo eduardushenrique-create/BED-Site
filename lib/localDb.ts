@@ -207,6 +207,15 @@ export type WishlistItemRecord = {
   createdAt: string
 }
 
+export type RestockAlertRecord = {
+  id: string
+  email: string
+  productId: string
+  variantId?: string | null
+  notifiedAt?: string | null
+  createdAt: string
+}
+
 export type PasswordResetTokenRecord = {
   id: string
   adminUserId: string
@@ -231,6 +240,7 @@ export type Database = {
   productVariants: ProductVariantRecord[]
   wishlistItems: WishlistItemRecord[]
   passwordResetTokens: PasswordResetTokenRecord[]
+  restockAlerts: RestockAlertRecord[]
 }
 
 const defaultData: Database = {
@@ -268,6 +278,7 @@ const defaultData: Database = {
   productVariants: [],
   wishlistItems: [],
   passwordResetTokens: [],
+  restockAlerts: [],
 }
 
 function ensureDir() {
@@ -306,6 +317,7 @@ export function readDB(): Database {
       productVariants: parsed.productVariants || [],
       wishlistItems: parsed.wishlistItems || [],
       passwordResetTokens: parsed.passwordResetTokens || [],
+      restockAlerts: parsed.restockAlerts || [],
     }
   } catch {
     return defaultData
