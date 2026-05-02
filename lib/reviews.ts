@@ -164,6 +164,47 @@ export async function createReview(input: CreateReviewInput): Promise<{ ok: bool
   }
 }
 
+export type FeaturedReview = PublicReview & {
+  productName: string | null
+  productSlug: string | null
+}
+
+export async function listFeaturedApprovedReviews(limit = 6): Promise<FeaturedReview[]> {
+  if (!hasDatabase || !reviewClient()) {
+    const db = readDB()
+    const products = new Map(db.products.map(p => [p.id, p]))
+    return (db.reviews || [])
+      .filter(r => r.status === 'approved')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit)
+      .map(r => {
+        const product = products.get(r.productId)
+        return {
+          ...serializePublicReview(r),
+          productName: product?.name || null,
+          productSlug: product?.slug || null,
+        }
+      })
+  }
+
+  try {
+    const records = await reviewClient().findMany({
+      where: { status: 'approved' },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { product: { select: { name: true, slug: true } } },
+    })
+    return records.map((r: any) => ({
+      ...serializePublicReview(r),
+      productName: r.product?.name ?? null,
+      productSlug: r.product?.slug ?? null,
+    }))
+  } catch (error) {
+    console.error('[reviews] listFeaturedApprovedReviews failed:', error)
+    return []
+  }
+}
+
 export async function listApprovedReviewsForProduct(productId: string, limit = 50): Promise<{ reviews: PublicReview[]; aggregate: ReviewAggregate }> {
   if (!hasDatabase || !reviewClient()) {
     const all = (readDB().reviews || []).filter(r => r.productId === productId)

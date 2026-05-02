@@ -4,16 +4,18 @@ import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
 import { getLocalCatalogProducts, getPublicCatalogCategories } from '@/lib/catalog'
 import { listBanners } from '@/lib/database'
+import { listFeaturedApprovedReviews } from '@/lib/reviews'
 
 export const dynamic = 'force-dynamic'
 
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
 export default async function Home() {
-  const [products, categories, allBanners] = await Promise.all([
+  const [products, categories, allBanners, featuredReviews] = await Promise.all([
     getLocalCatalogProducts({ featured: true }),
     getPublicCatalogCategories(),
     listBanners(),
+    listFeaturedApprovedReviews(6).catch(() => []),
   ])
   const activeBanners = allBanners.filter(b => b.isActive)
   const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
@@ -108,6 +110,47 @@ export default async function Home() {
           </p>
         )}
       </section>
+
+      {featuredReviews.length > 0 && (
+        <section style={{ marginTop: '64px' }}>
+          <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>
+            O que nossos clientes dizem
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            {featuredReviews.map(review => (
+              <article
+                key={review.id}
+                style={{
+                  background: 'white',
+                  borderRadius: '14px',
+                  padding: '20px',
+                  boxShadow: '0 1px 4px rgba(29,34,53,0.07), 0 4px 12px rgba(29,34,53,0.05)',
+                }}
+              >
+                <div aria-label={`${review.rating} de 5 estrelas`} style={{ color: '#F59E0B', letterSpacing: '2px', fontSize: '16px', lineHeight: 1, marginBottom: '8px' }}>
+                  {'★'.repeat(review.rating)}<span style={{ color: '#D8DCE8' }}>{'★'.repeat(5 - review.rating)}</span>
+                </div>
+                {review.title && <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1D2235', margin: '0 0 6px' }}>{review.title}</h3>}
+                {review.body && (
+                  <p style={{ margin: '0 0 12px', color: '#3D4460', fontSize: '14px', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {review.body}
+                  </p>
+                )}
+                <p style={{ margin: 0, fontSize: '13px', color: '#6B7494' }}>
+                  — {review.customerName}
+                  {review.productName && review.productSlug && (
+                    <>{' '}sobre{' '}
+                      <Link href={`/produtos/${review.productSlug}`} style={{ color: '#4A7AB5', fontWeight: 600 }}>
+                        {review.productName}
+                      </Link>
+                    </>
+                  )}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   )
 }
