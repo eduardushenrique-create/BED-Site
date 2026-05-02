@@ -63,6 +63,8 @@ export interface Product {
   heightCm?: number | null
   depthCm?: number | null
   productionMinutesPerUnit?: number | null
+  averageRating?: number | null
+  reviewCount?: number
   createdAt?: Date | null
   updatedAt?: Date | null
 }

@@ -49,6 +49,7 @@ model Product {
   variants              ProductVariant[]
   personalizationFields PersonalizationField[]
   orderItems            OrderItem[]
+  reviews               Review[]
 
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -65,6 +66,7 @@ model Customer {
   addresses  CustomerAddress[]
   orders     Order[]
   wishlist   WishlistItem[]
+  reviews    Review[]
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 }
@@ -307,6 +309,29 @@ model AdminUser {
   passwordHash String
   createdAt    DateTime             @default(now())
   resetTokens  PasswordResetToken[]
+}
+
+model Review {
+  id             String    @id @default(cuid())
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String
+  customerEmail  String
+  orderNumber    String?
+  rating         Int
+  title          String?
+  body           String?   @db.Text
+  status         String    @default("pending") // pending | approved | hidden
+  moderatedAt    DateTime?
+  moderatedBy    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([productId, status])
+  @@index([customerId])
+  @@index([status])
 }
 
 model AuditLog {

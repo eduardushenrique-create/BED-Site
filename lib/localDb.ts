@@ -207,6 +207,23 @@ export type WishlistItemRecord = {
   createdAt: string
 }
 
+export type ReviewRecord = {
+  id: string
+  productId: string
+  customerId?: string | null
+  customerName: string
+  customerEmail: string
+  orderNumber?: string | null
+  rating: number
+  title?: string | null
+  body?: string | null
+  status: 'pending' | 'approved' | 'hidden'
+  moderatedAt?: string | null
+  moderatedBy?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type AuditLogRecord = {
   id: string
   actorEmail: string
@@ -255,6 +272,7 @@ export type Database = {
   passwordResetTokens: PasswordResetTokenRecord[]
   restockAlerts: RestockAlertRecord[]
   auditLogs: AuditLogRecord[]
+  reviews: ReviewRecord[]
 }
 
 const defaultData: Database = {
@@ -294,6 +312,7 @@ const defaultData: Database = {
   passwordResetTokens: [],
   restockAlerts: [],
   auditLogs: [],
+  reviews: [],
 }
 
 function ensureDir() {
@@ -334,6 +353,7 @@ export function readDB(): Database {
       passwordResetTokens: parsed.passwordResetTokens || [],
       restockAlerts: parsed.restockAlerts || [],
       auditLogs: parsed.auditLogs || [],
+      reviews: parsed.reviews || [],
     }
   } catch {
     return defaultData

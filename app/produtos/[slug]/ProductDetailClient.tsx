@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import SafeImage from '@/components/SafeImage'
@@ -390,9 +390,251 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               <div style={{ color: '#6B7494', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: product.description }} />
             </div>
           )}
+
+          <div style={{ marginTop: '32px', borderTop: '1px solid #E3E9F4', paddingTop: '24px' }}>
+            <ReviewsSection productId={product.id} />
+          </div>
         </div>
       </div>
     </main>
+  )
+}
+
+function StarsDisplay({ rating, size = 16 }: { rating: number; size?: number }) {
+  const stars = []
+  for (let i = 1; i <= 5; i++) {
+    stars.push(
+      <span key={i} style={{ color: i <= rating ? '#F59E0B' : '#D8DCE8', fontSize: `${size}px`, lineHeight: 1 }}>★</span>,
+    )
+  }
+  return <span aria-label={`${rating} de 5 estrelas`}>{stars}</span>
+}
+
+function StarsInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Sua avaliação">
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          onClick={() => onChange(n)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: n <= value ? '#F59E0B' : '#D8DCE8',
+            fontSize: '28px',
+            padding: '4px',
+            lineHeight: 1,
+          }}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
+type ApiReview = {
+  id: string
+  customerName: string
+  rating: number
+  title: string | null
+  body: string | null
+  createdAt: string
+}
+
+type Aggregate = {
+  count: number
+  approvedCount: number
+  averageRating: number | null
+  distribution: Record<string, number>
+}
+
+function ReviewsSection({ productId }: { productId: string }) {
+  const [reviews, setReviews] = useState<ApiReview[]>([])
+  const [aggregate, setAggregate] = useState<Aggregate | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(productId)}/reviews`, { cache: 'no-store' })
+      if (!res.ok) {
+        setReviews([]); setAggregate(null); return
+      }
+      const data = await res.json()
+      setReviews(data.reviews || [])
+      setAggregate(data.aggregate || null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() /* eslint-disable-next-line */ }, [productId])
+
+  return (
+    <div>
+      <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', color: '#1D2235' }}>Avaliações</h3>
+      {aggregate && aggregate.approvedCount > 0 ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <StarsDisplay rating={Math.round(aggregate.averageRating || 0)} size={20} />
+          <span style={{ fontWeight: 600, color: '#1D2235' }}>
+            {aggregate.averageRating?.toFixed(1).replace('.', ',')} de 5
+          </span>
+          <span style={{ color: '#6B7494', fontSize: '14px' }}>
+            ({aggregate.approvedCount} {aggregate.approvedCount === 1 ? 'avaliação' : 'avaliações'})
+          </span>
+        </div>
+      ) : (
+        <p style={{ color: '#6B7494', marginBottom: '20px' }}>Ainda não há avaliações deste produto.</p>
+      )}
+
+      <ReviewForm productId={productId} onSubmitted={load} />
+
+      {loading ? (
+        <p style={{ color: '#6B7494', marginTop: '20px' }}>Carregando avaliações...</p>
+      ) : reviews.length > 0 ? (
+        <ul style={{ listStyle: 'none', padding: 0, marginTop: '24px', display: 'grid', gap: '16px' }}>
+          {reviews.map(review => (
+            <li key={review.id} style={{ background: '#F9FBFD', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontWeight: 600, color: '#1D2235' }}>{review.customerName}</div>
+                <StarsDisplay rating={review.rating} size={14} />
+              </div>
+              {review.title && <p style={{ fontWeight: 600, margin: '8px 0 4px', color: '#1D2235' }}>{review.title}</p>}
+              {review.body && <p style={{ margin: 0, color: '#3D4460', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{review.body}</p>}
+              <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '8px' }}>
+                {new Date(review.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+function ReviewForm({ productId, onSubmitted }: { productId: string; onSubmitted: () => void }) {
+  const [eligibility, setEligibility] = useState<{ eligible: boolean; reason?: string } | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [rating, setRating] = useState(5)
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    async function check() {
+      try {
+        const res = await fetch(`/api/me/reviews?productId=${encodeURIComponent(productId)}`, { cache: 'no-store' })
+        if (cancelled) return
+        if (res.status === 401) {
+          setEligibility(null)
+        } else if (res.ok) {
+          setEligibility(await res.json())
+        } else {
+          setEligibility({ eligible: false, reason: 'no_paid_order' })
+        }
+      } catch {
+        setEligibility(null)
+      } finally {
+        if (!cancelled) setAuthChecked(true)
+      }
+    }
+    check()
+    return () => { cancelled = true }
+  }, [productId])
+
+  if (!authChecked) return null
+
+  if (!eligibility) {
+    return null // not logged in — don't show the form
+  }
+
+  if (!eligibility.eligible) {
+    if (eligibility.reason === 'already_reviewed') {
+      return (
+        <p style={{ marginTop: '12px', fontSize: '13px', color: '#6B7494' }}>
+          Você já avaliou este produto. Obrigado!
+        </p>
+      )
+    }
+    return null // not eligible (no paid order) — don't expose UI noise
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/me/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, rating, title: title.trim() || null, body: body.trim() || null }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Não foi possível enviar.')
+        return
+      }
+      setSubmitted(true)
+      setTitle('')
+      setBody('')
+      onSubmitted()
+    } catch {
+      setError('Erro de conexão.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div style={{ marginTop: '12px', padding: '12px 16px', background: '#DCFCE7', borderRadius: '10px', color: '#166534', fontSize: '14px' }}>
+        Sua avaliação foi enviada e está aguardando moderação. Obrigado!
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: '16px', padding: '16px', background: '#F9FBFD', borderRadius: '12px', border: '1px solid #E3E9F4' }}>
+      <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0, color: '#1D2235' }}>Avalie sua compra</h4>
+      <p style={{ fontSize: '13px', color: '#6B7494', margin: '4px 0 12px' }}>
+        Sua avaliação será exibida após aprovação.
+      </p>
+      <StarsInput value={rating} onChange={setRating} />
+      <div style={{ display: 'grid', gap: '10px', marginTop: '12px' }}>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Título (opcional)"
+          maxLength={120}
+          style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
+        />
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder="Conte como foi sua experiência (opcional)"
+          maxLength={2000}
+          rows={4}
+          style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', resize: 'vertical', fontFamily: 'inherit' }}
+        />
+        {error && <p role="alert" style={{ margin: 0, color: '#B42318', fontSize: '13px' }}>{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#1D2235', color: 'white', fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', justifySelf: 'start', opacity: submitting ? 0.7 : 1 }}
+        >
+          {submitting ? 'Enviando...' : 'Enviar avaliação'}
+        </button>
+      </div>
+    </form>
   )
 }
 
