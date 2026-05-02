@@ -261,6 +261,21 @@ export default function AdminProducaoPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <a
+            href="/admin/producao/board"
+            style={{
+              padding: '11px 18px',
+              backgroundColor: 'white',
+              border: '1px solid #D8DCE8',
+              borderRadius: '10px',
+              color: '#1D2235',
+              fontSize: '14px',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Visão Kanban
+          </a>
           <button
             type="button"
             onClick={openSettings}
