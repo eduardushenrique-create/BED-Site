@@ -48,6 +48,8 @@ export type Order = {
   total: number
   subtotal: number
   shippingCost: number
+  discountTotal?: number
+  couponCode?: string | null
   status: string
   paymentStatus: string
   fulfillmentStatus: string
