@@ -145,7 +145,14 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 | — | Rate limit em Redis (PR #47) | Setar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` no Railway |
 
 ### 🎯 Backlog futuro
-Nada de prioridade alta-esforço pendente. Itens entregues nesta sessão incluem reviews (PR #39) e CRUD de impressoras (PR #40).
+
+**Pedidos do stakeholder em 02/05/2026 (durante onboarding das envs):**
+
+- **CRUD de templates de email no admin** — gerenciar `/admin/emails/templates` em vez de editar código a cada ajuste de copy. Escopo: novo modelo `EmailTemplate { id, slug, subject, htmlBody, textBody?, variables (Json), updatedAt }`, página admin com editor (textarea ou rich-text simples), helper que busca template por slug e renderiza com variáveis, override de templates do `lib/email.ts` (envio em-stock-back, password-reset, order-* etc.). Mantém os defaults hardcoded como fallback se admin não criou template ainda. Esforço: Médio (~1 dia).
+
+- **Disparo em massa de promoções** — `/admin/emails/campanha`. Admin escolhe segmento (todos cadastrados, com pedido pago nos últimos 60 dias, top-spenders, com wishlist ativa, etc.), seleciona ou escreve template, agenda ou dispara. Escopo: novo `EmailCampaign { id, name, segment Json, templateId|content, scheduledAt?, sentAt?, recipientCount }` + endpoint de preview de segmento + dispatcher em background (queue) + tracking de bounce/unsubscribe via Resend webhooks. Conformidade LGPD: link de "descadastrar" obrigatório no rodapé, modelo `EmailUnsubscribe` para opt-outs. Esforço: Alto (~2 dias).
+
+Outros futuros:
 
 ### 🧹 Dívidas técnicas conhecidas
 - 2 erros pré-existentes em `tests/e2e.spec.ts` (Playwright, linhas 26 e 34)
