@@ -257,9 +257,9 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
             <Row label="Total" value={`R$ ${order.total.toFixed(2).replace('.', ',')}`} bold />
           </Section>
 
-          {order.paymentMethod === 'pix' && order.paymentDetails?.pixCopyPaste && order.paymentStatus !== 'paid' && (
+          {order.paymentMethod === 'pix' && order.paymentStatus !== 'paid' && order.status !== 'cancelled' && (
             <Section title="Pague com Pix">
-              {order.paymentDetails.pixQrCodeBase64 && (
+              {order.paymentDetails?.pixQrCodeBase64 && (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={`data:image/png;base64,${order.paymentDetails.pixQrCodeBase64}`}
@@ -267,11 +267,18 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
                   style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto 12px' }}
                 />
               )}
-              <textarea
-                readOnly
-                value={order.paymentDetails.pixCopyPaste}
-                style={{ width: '100%', minHeight: '90px', padding: '10px', fontSize: '12px', borderRadius: '8px', border: '1px solid #BBCFEB' }}
-              />
+              {order.paymentDetails?.pixCopyPaste ? (
+                <textarea
+                  readOnly
+                  value={order.paymentDetails.pixCopyPaste}
+                  style={{ width: '100%', minHeight: '90px', padding: '10px', fontSize: '12px', borderRadius: '8px', border: '1px solid #BBCFEB' }}
+                />
+              ) : (
+                <p style={{ margin: '0 0 12px', color: '#6B7494', fontSize: '13px' }}>
+                  Nenhum Pix ativo no momento. Gere um novo abaixo.
+                </p>
+              )}
+              <RegeneratePixButton orderNumber={order.orderNumber} />
             </Section>
           )}
 
@@ -438,6 +445,54 @@ function formatDate(iso: string) {
   } catch {
     return iso
   }
+}
+
+function RegeneratePixButton({ orderNumber }: { orderNumber: string }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleClick() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/me/orders/${encodeURIComponent(orderNumber)}/regenerate-pix`, {
+        method: 'POST',
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Não foi possível gerar um novo Pix.')
+        return
+      }
+      window.location.reload()
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        style={{
+          width: '100%',
+          padding: '10px',
+          background: 'white',
+          border: '1px solid #4A7AB5',
+          borderRadius: '10px',
+          color: '#4A7AB5',
+          fontWeight: 600,
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+        }}
+      >
+        {loading ? 'Gerando...' : 'Gerar novo Pix'}
+      </button>
+      {error && <p role="alert" style={{ marginTop: '8px', color: '#B42318', fontSize: '13px' }}>{error}</p>}
+    </div>
+  )
 }
 
 const backBtnStyle: React.CSSProperties = {

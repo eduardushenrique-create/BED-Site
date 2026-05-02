@@ -123,15 +123,19 @@ export type MercadoPagoPixRequest = {
   }
 }
 
-export async function createPixPayment(data: MercadoPagoPixRequest) {
+export async function createPixPayment(data: MercadoPagoPixRequest, options: { idempotencySuffix?: string } = {}) {
   if (!MERCADOPAGO_ACCESS_TOKEN) return null
+
+  const idempotencyKey = options.idempotencySuffix
+    ? `${data.externalReference}-pix-${options.idempotencySuffix}`
+    : `${data.externalReference}-pix`
 
   const response = await fetch(`${MERCADOPAGO_BASE_URL}/v1/payments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
-      'X-Idempotency-Key': `${data.externalReference}-pix`,
+      'X-Idempotency-Key': idempotencyKey,
     },
     body: JSON.stringify({
       transaction_amount: data.amount,
