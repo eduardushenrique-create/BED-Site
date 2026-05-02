@@ -1330,6 +1330,63 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 }
 
+export async function getOrderByTrackingCode(trackingCode: string) {
+  const code = trackingCode?.trim()
+  if (!code) return null
+
+  if (!hasDatabase || !prisma?.order) {
+    return readDB().orders.find(order => order.trackingCode === code) || null
+  }
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { trackingCode: code },
+      include: { address: true, payment: true, items: true },
+    })
+    return order ? serializeOrder(order) : null
+  } catch (error) {
+    console.error('[database] getOrderByTrackingCode Prisma failed, using fallback:', error)
+    return readDB().orders.find(order => order.trackingCode === code) || null
+  }
+}
+
+export async function setOrderFulfillmentByTracking(
+  trackingCode: string,
+  fulfillmentStatus: string,
+): Promise<{ ok: boolean; orderNumber?: string; previousStatus?: string }> {
+  const code = trackingCode?.trim()
+  if (!code) return { ok: false }
+
+  if (!hasDatabase || !prisma?.order) {
+    const db = readDB()
+    const idx = db.orders.findIndex(order => order.trackingCode === code)
+    if (idx === -1) return { ok: false }
+    const previous = db.orders[idx].fulfillmentStatus
+    db.orders[idx].fulfillmentStatus = fulfillmentStatus
+    writeDB(db)
+    return { ok: true, orderNumber: db.orders[idx].orderNumber, previousStatus: previous }
+  }
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { trackingCode: code },
+      select: { orderNumber: true, fulfillmentStatus: true },
+    })
+    if (!order) return { ok: false }
+    if (order.fulfillmentStatus === fulfillmentStatus) {
+      return { ok: true, orderNumber: order.orderNumber, previousStatus: order.fulfillmentStatus }
+    }
+    await prisma.order.updateMany({
+      where: { trackingCode: code },
+      data: { fulfillmentStatus },
+    })
+    return { ok: true, orderNumber: order.orderNumber, previousStatus: order.fulfillmentStatus }
+  } catch (error) {
+    console.error('[database] setOrderFulfillmentByTracking Prisma failed:', error)
+    return { ok: false }
+  }
+}
+
 export async function getOrderByIdOrNumber(idOrNumber: string) {
   if (!hasDatabase || !prisma?.order) {
     const orders = readDB().orders
