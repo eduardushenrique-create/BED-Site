@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiUser } from '@/lib/api-auth'
-import { getCustomerByEmail, updateCustomer } from '@/lib/database'
+import { anonymizeCustomer, getCustomerByEmail, updateCustomer } from '@/lib/database'
+import { clearSession } from '@/lib/auth'
 import { validateCPF } from '@/lib/validation'
+import { captureException } from '@/lib/observability'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,4 +74,35 @@ export async function PATCH(request: NextRequest) {
     phone: updated.phone || null,
     cpf: updated.cpf || null,
   })
+}
+
+export async function DELETE() {
+  const auth = await requireApiUser()
+  if (auth.response) return auth.response
+
+  // Admins can't self-delete via this endpoint — they should use dedicated tooling.
+  if (auth.user!.role !== 'customer') {
+    return NextResponse.json(
+      { error: 'Contas administrativas não podem ser excluídas por este endpoint.' },
+      { status: 403 },
+    )
+  }
+
+  try {
+    const customer = await getCustomerByEmail(auth.user!.email)
+    if (!customer) {
+      return NextResponse.json({ error: 'Cliente não encontrado.' }, { status: 404 })
+    }
+
+    const result = await anonymizeCustomer(customer.id, customer.email)
+    if (!result.ok) {
+      return NextResponse.json({ error: 'Não foi possível excluir a conta.' }, { status: 500 })
+    }
+
+    await clearSession()
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    captureException(error, { context: 'api.me.DELETE' })
+    return NextResponse.json({ error: 'Erro ao excluir conta.' }, { status: 500 })
+  }
 }

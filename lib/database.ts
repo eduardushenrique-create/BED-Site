@@ -1350,6 +1350,67 @@ export async function getOrderByTrackingCode(trackingCode: string) {
   }
 }
 
+export async function anonymizeCustomer(customerId: string, email: string): Promise<{ ok: boolean; error?: string }> {
+  if (!customerId) return { ok: false, error: 'invalid_input' }
+
+  const placeholderEmail = `removed-${customerId}@deleted.local`
+  const placeholderName = 'Cliente removido'
+
+  if (!hasDatabase || !prisma?.customer) {
+    const db = readDB()
+    const idx = db.users.findIndex(u => u.id === customerId)
+    if (idx === -1) return { ok: false, error: 'not_found' }
+    db.users[idx] = {
+      ...db.users[idx],
+      name: placeholderName,
+      email: placeholderEmail,
+      phone: undefined,
+      cpf: undefined,
+      passwordHash: undefined,
+      googleId: undefined,
+      isVerified: false,
+      updatedAt: new Date().toISOString(),
+    }
+    db.wishlistItems = (db.wishlistItems || []).filter(w => w.customerId !== customerId)
+    db.passwordResetTokens = (db.passwordResetTokens || []).filter(t => t.adminUserId !== customerId)
+    writeDB(db)
+    return { ok: true }
+  }
+
+  try {
+    await prisma.$transaction(async tx => {
+      // Wipe related personal records first.
+      await tx.customerAddress.deleteMany({ where: { customerId } })
+      const wishlistClient = (tx as any).wishlistItem
+      if (wishlistClient) await wishlistClient.deleteMany({ where: { customerId } })
+
+      await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          name: placeholderName,
+          email: placeholderEmail,
+          phone: null,
+          cpf: null,
+          isVerified: false,
+        },
+      })
+
+      // Order history is preserved (Order has its own snapshot fields). We
+      // only blank the customerId link by leaving the FK as is — pedidos
+      // continuam ligados pelo customerEmail antigo (já desligado), mas
+      // não vinculados ao Customer renomeado.
+      await tx.order.updateMany({
+        where: { customerEmail: { equals: email, mode: 'insensitive' } },
+        data: { customerId: null },
+      })
+    })
+    return { ok: true }
+  } catch (error) {
+    console.error('[database] anonymizeCustomer Prisma failed:', error)
+    return { ok: false, error: 'persist_failed' }
+  }
+}
+
 export async function cancelOrderByOwner(
   orderNumber: string,
   customerEmail: string,
