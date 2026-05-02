@@ -162,6 +162,47 @@ export async function sendPaymentApproved(data: OrderEmailData): Promise<boolean
   }
 }
 
+export async function sendPasswordResetEmail(
+  email: string,
+  name: string,
+  resetUrl: string,
+): Promise<boolean> {
+  if (!resend) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[auth] Link de redefinição de senha para ${email}: ${resetUrl}`)
+    }
+    return true
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Redefinição de senha - B&D Artes & Impressões',
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+          <h2 style="color: #1D2235;">Olá${name ? `, ${name.split(' ')[0]}` : ''}!</h2>
+          <p>Recebemos uma solicitação para redefinir a senha da sua conta de administrador.</p>
+          <p>Clique no botão abaixo para escolher uma nova senha. O link expira em 1 hora.</p>
+          <p style="margin: 32px 0;">
+            <a href="${resetUrl}" style="display: inline-block; padding: 14px 28px; background: #1D2235; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+              Redefinir senha
+            </a>
+          </p>
+          <p style="color: #6B7494; font-size: 14px;">Se o botão não funcionar, copie e cole este link no navegador:</p>
+          <p style="color: #6B7494; font-size: 13px; word-break: break-all;">${resetUrl}</p>
+          <hr style="border: none; border-top: 1px solid #E3E9F4; margin: 24px 0;" />
+          <p style="color: #6B7494; font-size: 13px;">Se você não solicitou esta redefinição, ignore este e-mail. Sua senha continua a mesma.</p>
+        </div>
+      `,
+    })
+    return true
+  } catch (error) {
+    console.error('Error sending password reset email:', error)
+    return false
+  }
+}
+
 export async function sendOrderShipped(
   email: string,
   orderNumber: string,

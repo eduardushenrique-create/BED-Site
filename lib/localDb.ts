@@ -207,6 +207,15 @@ export type WishlistItemRecord = {
   createdAt: string
 }
 
+export type PasswordResetTokenRecord = {
+  id: string
+  adminUserId: string
+  tokenHash: string
+  expiresAt: string
+  usedAt?: string | null
+  createdAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
@@ -221,6 +230,7 @@ export type Database = {
   coupons: CouponRecord[]
   productVariants: ProductVariantRecord[]
   wishlistItems: WishlistItemRecord[]
+  passwordResetTokens: PasswordResetTokenRecord[]
 }
 
 const defaultData: Database = {
@@ -257,6 +267,7 @@ const defaultData: Database = {
   coupons: [],
   productVariants: [],
   wishlistItems: [],
+  passwordResetTokens: [],
 }
 
 function ensureDir() {
@@ -294,6 +305,7 @@ export function readDB(): Database {
       coupons: parsed.coupons || [],
       productVariants: parsed.productVariants || [],
       wishlistItems: parsed.wishlistItems || [],
+      passwordResetTokens: parsed.passwordResetTokens || [],
     }
   } catch {
     return defaultData
