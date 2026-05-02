@@ -22,6 +22,8 @@ type Order = {
   total: number
   subtotal: number
   shippingCost: number
+  discountTotal?: number
+  couponCode?: string | null
   status: string
   paymentStatus: string
   fulfillmentStatus: string
@@ -42,7 +44,8 @@ type Product = {
 
 const fulfillmentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'production', label: 'Em produção', color: '#3B82F6' },
+  { value: 'in_production', label: 'Em produção', color: '#3B82F6' },
+  { value: 'ready_to_ship', label: 'Pronto para envio', color: '#0EA5E9' },
   { value: 'shipped', label: 'Enviado', color: '#8B5CF6' },
   { value: 'delivered', label: 'Entregue', color: '#10B981' },
   { value: 'cancelled', label: 'Cancelado', color: '#EF4444' },
@@ -51,7 +54,8 @@ const fulfillmentStatuses = [
 const paymentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
   { value: 'paid', label: 'Pago', color: '#10B981' },
-  { value: 'failed', label: 'Recusado', color: '#EF4444' },
+  { value: 'rejected', label: 'Recusado', color: '#EF4444' },
+  { value: 'cancelled', label: 'Cancelado', color: '#6B7494' },
   { value: 'refunded', label: 'Estornado', color: '#8B5CF6' },
 ]
 
@@ -96,18 +100,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   async function loadOrder() {
     setLoading(true)
     try {
-      const res = await fetch('/api/pedidos')
-      const orders = await res.json()
-      const found = orders.find((o: Order) => o.id === resolvedParams.id) || orders.find((o: Order) => o.orderNumber === resolvedParams.id)
-      if (found) {
-        setOrder(found)
-        setFormData({
-          fulfillmentStatus: found.fulfillmentStatus,
-          paymentStatus: found.paymentStatus,
-          trackingCode: found.trackingCode || '',
-        })
-        setEditingItems(found.items)
+      const res = await fetch(`/api/pedidos/${encodeURIComponent(resolvedParams.id)}`, { cache: 'no-store' })
+      if (!res.ok) {
+        setOrder(null)
+        return
       }
+      const found: Order = await res.json()
+      setOrder(found)
+      setFormData({
+        fulfillmentStatus: found.fulfillmentStatus,
+        paymentStatus: found.paymentStatus,
+        trackingCode: found.trackingCode || '',
+      })
+      setEditingItems(found.items)
     } catch (e) {
       console.error('Error loading order:', e)
     } finally {
@@ -120,17 +125,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
     async function loadInitialData() {
       try {
-        const [ordersRes, productsRes] = await Promise.all([
-          fetch('/api/pedidos'),
-          fetch('/api/produtos'),
+        const [orderRes, productsRes] = await Promise.all([
+          fetch(`/api/pedidos/${encodeURIComponent(resolvedParams.id)}`, { cache: 'no-store' }),
+          fetch('/api/produtos', { cache: 'no-store' }),
         ])
-        const orders = await ordersRes.json()
-        const productsData = await productsRes.json()
 
         if (cancelled) return
 
-        const found = orders.find((o: Order) => o.id === resolvedParams.id) || orders.find((o: Order) => o.orderNumber === resolvedParams.id)
-        if (found) {
+        if (orderRes.ok) {
+          const found: Order = await orderRes.json()
           setOrder(found)
           setFormData({
             fulfillmentStatus: found.fulfillmentStatus,
@@ -139,7 +142,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           })
           setEditingItems(found.items)
         }
-        setProducts(productsData.filter((p: Product) => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder)))
+
+        if (productsRes.ok) {
+          const productsData = await productsRes.json()
+          if (Array.isArray(productsData)) {
+            setProducts(productsData.filter((p: Product) => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder)))
+          }
+        }
       } catch (e) {
         console.error('Error loading order detail:', e)
       } finally {
@@ -414,6 +423,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div style={{ padding: '16px 0', borderTop: '2px solid #D8DCE8', marginTop: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#6B7494' }}><span>Subtotal</span><span style={{ fontFamily: 'var(--font-mono)' }}>R$ {order.subtotal.toFixed(2).replace('.', ',')}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#6B7494' }}><span>Frete</span><span style={{ fontFamily: 'var(--font-mono)' }}>R$ {order.shippingCost.toFixed(2).replace('.', ',')}</span></div>
+                {order.discountTotal && order.discountTotal > 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#1D7A72' }}>
+                    <span>Desconto{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>-R$ {order.discountTotal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                ) : null}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 700 }}><span>Total</span><span style={{ fontFamily: 'var(--font-mono)' }}>R$ {order.total.toFixed(2).replace('.', ',')}</span></div>
               </div>
             </div>

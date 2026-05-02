@@ -194,6 +194,8 @@ function serializeOrder(order: any): Order {
     total: money(order.total),
     subtotal: money(order.subtotal),
     shippingCost: money(order.shippingTotal),
+    discountTotal: money(order.discountTotal ?? 0),
+    couponCode: typeof paymentPayload?.couponCode === 'string' ? paymentPayload.couponCode : null,
     status: order.status,
     paymentStatus: order.paymentStatus,
     fulfillmentStatus: order.fulfillmentStatus,
@@ -1325,6 +1327,33 @@ export async function getOrderByNumber(orderNumber: string) {
   } catch (error) {
     console.error('[database] getOrderByNumber Prisma failed, using fallback:', error)
     return readDB().orders.find(order => order.orderNumber === orderNumber) || null
+  }
+}
+
+export async function getOrderByIdOrNumber(idOrNumber: string) {
+  if (!hasDatabase || !prisma?.order) {
+    const orders = readDB().orders
+    return (
+      orders.find(order => order.id === idOrNumber) ||
+      orders.find(order => order.orderNumber === idOrNumber) ||
+      null
+    )
+  }
+
+  try {
+    const order = await prisma.order.findFirst({
+      where: { OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }] },
+      include: { address: true, payment: true, items: true },
+    })
+    return order ? serializeOrder(order) : null
+  } catch (error) {
+    console.error('[database] getOrderByIdOrNumber Prisma failed, using fallback:', error)
+    const orders = readDB().orders
+    return (
+      orders.find(order => order.id === idOrNumber) ||
+      orders.find(order => order.orderNumber === idOrNumber) ||
+      null
+    )
   }
 }
 
