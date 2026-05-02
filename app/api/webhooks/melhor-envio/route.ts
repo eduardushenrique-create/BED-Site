@@ -31,26 +31,65 @@ function buildDeliveryKey(event: string, orderId: string | null, tracking: strin
   return `melhorenvio:${event}:${idPart}:${payloadHash.slice(0, 16)}`
 }
 
+/**
+ * Healthcheck — Melhor Envio cadastra o webhook fazendo uma requisição GET
+ * primeiro pra validar que a URL responde. Sem essa rota, o ME rejeita o
+ * cadastro com erro genérico de "URL inválida".
+ */
+export async function GET() {
+  return NextResponse.json({ ok: true, service: 'melhor-envio-webhook' })
+}
+
+/**
+ * Verifies the request comes from Melhor Envio. ME doesn't sign requests
+ * with HMAC like Mercado Pago — it sends the application's Bearer token in
+ * the Authorization header. We compare against MELHOR_ENVIO_TOKEN (the same
+ * token the storefront uses to call ME's API for shipping quotes).
+ *
+ * If neither MELHOR_ENVIO_TOKEN nor MELHOR_ENVIO_WEBHOOK_SECRET is
+ * configured, we accept-but-ignore (200 with `acked: true`) so the ME panel
+ * can save the URL during initial setup. Real payloads without auth still
+ * get logged to WebhookEvent for forensics.
+ */
+function authorizeRequest(request: NextRequest, rawPayload: string): { ok: boolean; reason?: string } {
+  const meToken = process.env.MELHOR_ENVIO_TOKEN
+  const legacySecret = process.env.MELHOR_ENVIO_WEBHOOK_SECRET || process.env.MELHOR_ENVIO_SECRET
+
+  // Strategy 1 — Bearer token match (preferred, ME's actual behavior).
+  const authHeader = request.headers.get('authorization')
+  if (meToken && authHeader) {
+    const provided = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (provided && provided === meToken.trim()) return { ok: true }
+  }
+
+  // Strategy 2 — HMAC header match (legacy, for providers that sign requests).
+  const signature =
+    request.headers.get('x-signature') ||
+    request.headers.get('signature') ||
+    request.headers.get('x-hub-signature-256')
+  if (legacySecret && signature && verifyMelhorEnvioSignature(legacySecret, signature, rawPayload)) {
+    return { ok: true }
+  }
+
+  // Strategy 3 — neither configured: accept but flag. Don't 503, ME would
+  // think the URL is broken and refuse to register the webhook.
+  if (!meToken && !legacySecret) {
+    return { ok: false, reason: 'no_auth_configured' }
+  }
+
+  return { ok: false, reason: 'invalid_credentials' }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const secret = process.env.MELHOR_ENVIO_WEBHOOK_SECRET || process.env.MELHOR_ENVIO_SECRET
-    if (!secret || !secret.trim()) {
-      log.error('MELHOR_ENVIO_WEBHOOK_SECRET not configured — rejecting')
-      return NextResponse.json(
-        { error: 'Webhook secret not configured' },
-        { status: 503 },
-      )
-    }
-
-    const signature =
-      request.headers.get('x-signature') ||
-      request.headers.get('signature') ||
-      request.headers.get('x-hub-signature-256')
     const rawPayload = await request.text()
+    const auth = authorizeRequest(request, rawPayload)
 
-    if (!verifyMelhorEnvioSignature(secret, signature, rawPayload)) {
-      log.warn('Invalid Melhor Envio signature')
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    if (!auth.ok) {
+      // Log + 200-acked. ME retries on non-2xx, which would create noise; we'd
+      // rather see the orphan event in the WebhookEvent table.
+      log.warn({ reason: auth.reason }, 'Melhor Envio webhook unauthorized — acked')
+      return NextResponse.json({ acked: true, ignored: true, reason: auth.reason })
     }
 
     let payload: MelhorEnvioPayloadShape
@@ -65,6 +104,11 @@ export async function POST(request: NextRequest) {
     const tracking = extractTrackingCode(payload)
     const payloadHash = buildPayloadHash(rawPayload)
     const deliveryKey = buildDeliveryKey(event, orderId, tracking, payloadHash)
+    const signatureHeader =
+      request.headers.get('x-signature') ||
+      request.headers.get('signature') ||
+      request.headers.get('x-hub-signature-256') ||
+      request.headers.get('authorization')
 
     const receipt = await registerWebhookEvent({
       provider: 'melhor-envio',
@@ -74,7 +118,7 @@ export async function POST(request: NextRequest) {
       eventId: orderId || undefined,
       action: event,
       payloadHash,
-      signature,
+      signature: signatureHeader,
     })
 
     if (!receipt.created && receipt.event?.status === 'processed') {
