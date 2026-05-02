@@ -8,16 +8,23 @@ import {
   getClientIp,
   rateLimitResponseBody,
 } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json()
+    const body = await request.json()
+    const { email, turnstileToken } = body || {}
     if (!email || !validateEmail(email)) {
       return NextResponse.json({ error: 'Informe um e-mail válido.' }, { status: 400 })
     }
 
     const normalizedEmail = String(email).trim().toLowerCase()
     const ip = getClientIp(request)
+
+    const captcha = await verifyTurnstileToken(turnstileToken, ip)
+    if (!captcha.ok) {
+      return NextResponse.json({ error: 'Verificação anti-bot falhou. Recarregue a página e tente novamente.' }, { status: 400 })
+    }
 
     const limit = await consumeRateLimit(
       buildRateLimitKey('request-code', normalizedEmail, ip),

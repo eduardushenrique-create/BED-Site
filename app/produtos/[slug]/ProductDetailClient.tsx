@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import SafeImage from '@/components/SafeImage'
+import TurnstileWidget from '@/components/TurnstileWidget'
 import { useCart } from '@/context/CartContext'
 import { Product, ProductImage, ProductVariant } from '@/lib/types'
 
@@ -643,6 +644,7 @@ function RestockAlertForm({ productId, variantId }: { productId: string; variant
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -656,7 +658,7 @@ function RestockAlertForm({ productId, variantId }: { productId: string; variant
       const res = await fetch('/api/products/restock-alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), productId, variantId }),
+        body: JSON.stringify({ email: email.trim(), productId, variantId, turnstileToken }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -693,32 +695,35 @@ function RestockAlertForm({ productId, variantId }: { productId: string; variant
           Pronto! Vamos te avisar.
         </p>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            required
-            style={{ flex: 1, minWidth: '200px', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: '10px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#1D2235',
-              color: 'white',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? 'Salvando...' : 'Avise-me'}
-          </button>
-          {error && <p role="alert" style={{ width: '100%', margin: 0, color: '#B42318', fontSize: '13px' }}>{error}</p>}
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              required
+              style={{ flex: 1, minWidth: '200px', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#1D2235',
+                color: 'white',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Salvando...' : 'Avise-me'}
+            </button>
+          </div>
+          <TurnstileWidget onToken={setTurnstileToken} />
+          {error && <p role="alert" style={{ margin: 0, color: '#B42318', fontSize: '13px' }}>{error}</p>}
         </form>
       )}
     </div>

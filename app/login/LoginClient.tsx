@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 type Tab = 'login' | 'signup'
 type Mode = 'code' | 'password'
@@ -28,6 +29,7 @@ export default function LoginClient() {
   const [error, setError] = useState('')
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   useEffect(() => {
     if (cooldownSeconds <= 0) {
@@ -84,7 +86,7 @@ export default function LoginClient() {
     const response = await fetch('/api/auth/request-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, turnstileToken }),
     })
     const data = await response.json()
     setLoading(false)
@@ -151,7 +153,7 @@ export default function LoginClient() {
     const response = await fetch('/api/auth/password-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, turnstileToken }),
     })
     const data = await response.json()
     setLoading(false)
@@ -216,6 +218,7 @@ export default function LoginClient() {
           <form onSubmit={loginWithPassword} style={{ display: 'grid', gap: '16px' }}>
             <Input label="E-mail" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
             <Input label="Senha" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
+            <TurnstileWidget onToken={setTurnstileToken} />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={submitDisabled}>
               {loading
@@ -237,6 +240,7 @@ export default function LoginClient() {
               </>
             )}
             <Input label="E-mail *" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+            <TurnstileWidget onToken={setTurnstileToken} />
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={submitDisabled}>
               {loading
