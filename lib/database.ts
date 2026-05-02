@@ -39,6 +39,30 @@ import type {
   UpdateProductionTaskActor,
   UpdateProductionSettingsInput,
 } from '@/lib/types'
+import { getStorage } from '@/lib/storage'
+import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
+
+/**
+ * Helper: se `value` for uma data URL, faz upload via storage adapter (R2 ou
+ * inline) e devolve `{ url, storageKey }`. Se já for uma URL pública (https://)
+ * ou string vazia/undefined, devolve sem tocar no storage.
+ */
+async function persistImageIfDataUrl(
+  value: string | null | undefined,
+  prefix: string
+): Promise<{ url: string; storageKey: string | null }> {
+  if (!value) return { url: '', storageKey: null }
+  if (!isDataUrl(value)) return { url: value, storageKey: null }
+
+  const contentType = extractContentType(value, 'image/jpeg')
+  try {
+    const result = await getStorage().upload({ data: value, contentType, prefix })
+    return { url: result.url, storageKey: result.storageKey }
+  } catch (error) {
+    console.error('[database] storage upload failed, mantendo data URL inline:', error)
+    return { url: value, storageKey: null }
+  }
+}
 
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
@@ -86,6 +110,7 @@ function serializeProduct(product: any): Product {
     stock: product.stock || 0,
     underOrder: product.underOrder || false,
     sku: product.sku || '',
+    productionMinutesPerUnit: product.productionMinutesPerUnit ?? null,
   }
 }
 
@@ -215,10 +240,23 @@ export async function listProducts() {
   }
 }
 
+function sanitizeProductionMinutes(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num) || num <= 0) return null
+  return Math.floor(num)
+}
+
 export async function createProduct(data: Product) {
+  const productionMinutes = sanitizeProductionMinutes((data as any).productionMinutesPerUnit)
+
   if (!hasDatabase || !prisma?.product) {
     const db = readDB()
-    const newProduct: Product = { ...data, id: `prod_${Date.now()}` }
+    const newProduct: Product = {
+      ...data,
+      id: `prod_${Date.now()}`,
+      productionMinutesPerUnit: productionMinutes,
+    }
     db.products.push(newProduct)
     writeDB(db)
     return newProduct
@@ -227,6 +265,10 @@ export async function createProduct(data: Product) {
   try {
     const category = data.category
       ? await prisma.category.findUnique({ where: { slug: data.category } })
+      : null
+
+    const persistedMain = data.imageUrl
+      ? await persistImageIfDataUrl(data.imageUrl, 'products')
       : null
 
     const product = await prisma.product.create({
@@ -244,8 +286,9 @@ export async function createProduct(data: Product) {
         status: data.status,
         stock: data.stock || 0,
         underOrder: data.underOrder || false,
-        images: data.imageUrl
-          ? { create: [{ url: data.imageUrl, alt: data.name, isMain: true }] }
+        productionMinutesPerUnit: productionMinutes,
+        images: persistedMain
+          ? { create: [{ url: persistedMain.url, storageKey: persistedMain.storageKey, alt: data.name, isMain: true }] }
           : undefined,
       },
       include: { category: true, images: true },
@@ -255,7 +298,11 @@ export async function createProduct(data: Product) {
   } catch (error) {
     console.error('[database] createProduct Prisma failed, using fallback:', error)
     const db = readDB()
-    const newProduct: Product = { ...data, id: `prod_${Date.now()}` }
+    const newProduct: Product = {
+      ...data,
+      id: `prod_${Date.now()}`,
+      productionMinutesPerUnit: productionMinutes,
+    }
     db.products.push(newProduct)
     writeDB(db)
     return newProduct
@@ -263,11 +310,20 @@ export async function createProduct(data: Product) {
 }
 
 export async function updateProduct(id: string, data: Partial<Product>) {
+  const hasProductionMinutesField = Object.prototype.hasOwnProperty.call(data, 'productionMinutesPerUnit')
+  const productionMinutes = hasProductionMinutesField
+    ? sanitizeProductionMinutes((data as any).productionMinutesPerUnit)
+    : undefined
+
   if (!hasDatabase || !prisma?.product) {
     const db = readDB()
     const index = db.products.findIndex(product => product.id === id)
     if (index === -1) return null
-    db.products[index] = { ...db.products[index], ...data }
+    db.products[index] = {
+      ...db.products[index],
+      ...data,
+      ...(hasProductionMinutesField ? { productionMinutesPerUnit: productionMinutes ?? null } : {}),
+    }
     writeDB(db)
     return db.products[index]
   }
@@ -293,6 +349,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
         status: data.status,
         stock: data.stock,
         underOrder: data.underOrder,
+        ...(hasProductionMinutesField ? { productionMinutesPerUnit: productionMinutes } : {}),
       },
       include: { category: true, images: true },
     })
@@ -301,17 +358,40 @@ export async function updateProduct(id: string, data: Partial<Product>) {
       // Substitui apenas a imagem principal existente; preserva as demais imagens da galeria
       const existingMain = await prisma.productImage.findFirst({ where: { productId: id, isMain: true } })
       if (data.imageUrl) {
+        const persisted = await persistImageIfDataUrl(data.imageUrl, 'products')
         if (existingMain) {
+          // Se a imagem principal mudou e tinha storageKey antigo, tenta limpar do R2.
+          if (existingMain.storageKey && existingMain.storageKey !== persisted.storageKey) {
+            try {
+              await getStorage().delete(existingMain.storageKey)
+            } catch (deleteError) {
+              console.warn('[database] storage delete (updateProduct main) falhou:', deleteError)
+            }
+          }
           await prisma.productImage.update({
             where: { id: existingMain.id },
-            data: { url: data.imageUrl, alt: product.name },
+            data: { url: persisted.url, storageKey: persisted.storageKey, alt: product.name },
           })
         } else {
           await prisma.productImage.create({
-            data: { productId: id, url: data.imageUrl, alt: product.name, isMain: true },
+            data: {
+              productId: id,
+              url: persisted.url,
+              storageKey: persisted.storageKey,
+              alt: product.name,
+              isMain: true,
+            },
           })
         }
       } else if (existingMain) {
+        // Removendo a imagem principal: limpa do storage externo se houver.
+        if (existingMain.storageKey) {
+          try {
+            await getStorage().delete(existingMain.storageKey)
+          } catch (deleteError) {
+            console.warn('[database] storage delete (updateProduct remove main) falhou:', deleteError)
+          }
+        }
         const next = await prisma.productImage.findFirst({
           where: { productId: id, NOT: { id: existingMain.id } },
           orderBy: { sortOrder: 'asc' },
@@ -333,7 +413,11 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     const db = readDB()
     const index = db.products.findIndex(product => product.id === id)
     if (index === -1) return null
-    db.products[index] = { ...db.products[index], ...data }
+    db.products[index] = {
+      ...db.products[index],
+      ...data,
+      ...(hasProductionMinutesField ? { productionMinutesPerUnit: productionMinutes ?? null } : {}),
+    }
     writeDB(db)
     return db.products[index]
   }
@@ -342,6 +426,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
 export type ProductImageDto = {
   id: string
   url: string
+  storageKey: string | null
   alt: string | null
   sortOrder: number
   isMain: boolean
@@ -353,6 +438,7 @@ function serializeProductImage(img: any): ProductImageDto {
   return {
     id: img.id,
     url: img.url,
+    storageKey: img.storageKey || null,
     alt: img.alt || null,
     sortOrder: img.sortOrder,
     isMain: img.isMain,
@@ -373,7 +459,10 @@ export async function listProductImages(productId: string): Promise<ProductImage
   }
 }
 
-export async function addProductImage(productId: string, data: { url: string; alt?: string }): Promise<{ image: ProductImageDto | null; error?: string }> {
+export async function addProductImage(
+  productId: string,
+  data: { url: string; alt?: string; storageKey?: string | null }
+): Promise<{ image: ProductImageDto | null; error?: string }> {
   if (!hasDatabase || !prisma?.productImage || !prisma?.product) {
     return { image: null, error: 'Banco de dados indisponível.' }
   }
@@ -389,10 +478,21 @@ export async function addProductImage(productId: string, data: { url: string; al
     const maxSortOrder = await prisma.productImage.aggregate({ where: { productId }, _max: { sortOrder: true } })
     const sortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1
 
+    // Se a `url` recebida for uma data URL e o caller não tiver feito o upload,
+    // delega ao storage adapter aqui (R2 ou inline).
+    let finalUrl = data.url
+    let finalStorageKey = data.storageKey ?? null
+    if (finalStorageKey === null && isDataUrl(finalUrl)) {
+      const persisted = await persistImageIfDataUrl(finalUrl, 'products')
+      finalUrl = persisted.url
+      finalStorageKey = persisted.storageKey
+    }
+
     const image = await prisma.productImage.create({
       data: {
         productId,
-        url: data.url,
+        url: finalUrl,
+        storageKey: finalStorageKey,
         alt: data.alt || product.name,
         sortOrder,
         isMain: isFirst,
@@ -426,6 +526,16 @@ export async function removeProductImage(productId: string, imageId: string): Pr
         }
       }
     })
+
+    // Best-effort: remove o objeto do storage externo. Não falhar a operação se
+    // o R2 estiver inacessível — o registro já foi removido do DB.
+    if (image.storageKey) {
+      try {
+        await getStorage().delete(image.storageKey)
+      } catch (deleteError) {
+        console.warn('[database] storage delete (removeProductImage) falhou:', deleteError)
+      }
+    }
     return { ok: true }
   } catch (error) {
     console.error('[database] removeProductImage Prisma failed:', error)
@@ -1051,7 +1161,14 @@ export async function createBanner(data: Banner) {
   }
 
   try {
-    return serializeBanner(await prisma.banner.create({ data }))
+    const persisted = data.imageUrl ? await persistImageIfDataUrl(data.imageUrl, 'banners') : null
+    const created = await prisma.banner.create({
+      data: {
+        ...data,
+        ...(persisted ? { imageUrl: persisted.url, storageKey: persisted.storageKey } : {}),
+      },
+    })
+    return serializeBanner(created)
   } catch (error) {
     console.error('[database] createBanner Prisma failed, using fallback:', error)
     const db = readDB()
@@ -1073,7 +1190,28 @@ export async function updateBanner(id: string, data: Partial<Banner>) {
   }
 
   try {
-    return serializeBanner(await prisma.banner.update({ where: { id }, data }))
+    let payload: Record<string, unknown> = { ...data }
+
+    // Se veio uma nova imagem (data URL), faz upload e captura storageKey.
+    if (typeof data.imageUrl === 'string' && data.imageUrl) {
+      if (isDataUrl(data.imageUrl)) {
+        const persisted = await persistImageIfDataUrl(data.imageUrl, 'banners')
+        payload = { ...payload, imageUrl: persisted.url, storageKey: persisted.storageKey }
+
+        // Limpa o objeto antigo no R2, se houver.
+        const existing = await prisma.banner.findUnique({ where: { id } })
+        if (existing?.storageKey && existing.storageKey !== persisted.storageKey) {
+          try {
+            await getStorage().delete(existing.storageKey)
+          } catch (deleteError) {
+            console.warn('[database] storage delete (updateBanner) falhou:', deleteError)
+          }
+        }
+      }
+      // Se já é URL pública, mantém como veio (sem mexer em storageKey).
+    }
+
+    return serializeBanner(await prisma.banner.update({ where: { id }, data: payload }))
   } catch (error) {
     console.error('[database] updateBanner Prisma failed, using fallback:', error)
     const db = readDB()
@@ -1096,7 +1234,15 @@ export async function deleteBanner(id: string) {
   }
 
   try {
+    const existing = await prisma.banner.findUnique({ where: { id } })
     await prisma.banner.delete({ where: { id } })
+    if (existing?.storageKey) {
+      try {
+        await getStorage().delete(existing.storageKey)
+      } catch (deleteError) {
+        console.warn('[database] storage delete (deleteBanner) falhou:', deleteError)
+      }
+    }
     return true
   } catch (error) {
     console.error('[database] deleteBanner Prisma failed:', error)

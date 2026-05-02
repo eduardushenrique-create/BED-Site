@@ -230,6 +230,9 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 3. `20260501113000_webhook_events` — WebhookEvent
 4. `20260501200000_banner_display_duration` — Banner.displayDurationSeconds
 5. `20260502000000_customer_profile_addresses` — Customer.cpf + CustomerAddress + Order.customerId + backfill por LOWER(email)
+6. `20260502120000_production_control` — controle de produção (ProductionTask, ProductionLog, ProductionSettings)
+7. `20260503000000_rate_limit_bucket` — RateLimitBucket compartilhado (substitui Map em memória em prod)
+8. `20260504000000_storage_keys` — `ProductImage.storageKey` + `Banner.storageKey` (suporte ao Cloudflare R2)
 
 ---
 
@@ -279,10 +282,12 @@ model WebhookEvent { id, provider, deliveryKey (uniq), topic, resourceId?, event
 
 ### Admin (CRUD genéricos, `requireApiAdmin`)
 - `/api/produtos` (GET/POST/PUT/DELETE)
+- `/api/produtos/[id]/imagens` (GET/POST/PATCH) + `[imageId]` (PATCH/DELETE) — galeria com upload via storage adapter (R2 ou inline)
 - `/api/categorias` (GET/POST/PUT/DELETE)
 - `/api/banners` (GET/POST/PUT/DELETE)
 - `/api/clientes` (GET/POST/PUT/DELETE)
 - `/api/pedidos` (GET/POST/PUT/DELETE)
+- `/api/admin/migrate-images` (GET status / POST migra batch base64 → R2; 503 se R2 não configurado)
 
 ### Webhooks
 | Método | Rota | Descrição |
@@ -339,6 +344,13 @@ ADMIN_EMAILS=email3@z
 # Supabase (legado, opcional, não consumido)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+
+# Cloudflare R2 (object storage para imagens — opcional, fallback inline base64)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=  # ex: https://pub-xxxxx.r2.dev OU custom domain
 ```
 
 ---
@@ -501,6 +513,7 @@ export async function GET(request: NextRequest) {
 - ❌ "Excluir minha conta" (anonimização)
 - ❌ "Exportar meus dados" (LGPD)
 - ✅ Sentry / observability (DSN-opcional — sem DSN o app funciona normal; com DSN setado começa a reportar automaticamente). Helpers `captureException`/`captureMessage` em `lib/observability.ts`. Adotado em webhook MP, `lib/mercadopago.ts`, `app/api/orders` e `app/api/producao/[id]`. PII scrub best-effort em `lib/sentry-scrub.ts`. Smoke test admin em `GET /api/admin/sentry-test?type=error|message`. Setup do stakeholder em `docs/implementation/setup-sentry.md`.
+- ✅ Object storage (Cloudflare R2 — DSN-opcional). Adapter em `lib/storage/` com fallback automático: sem as 5 envs `R2_*` o sistema mantém base64 inline (zero regressão); com envs setadas, uploads novos sobem pro R2 e gravam `ProductImage.storageKey`/`Banner.storageKey` para limpeza posterior. Endpoint admin de migração em batch para imagens existentes: `POST /api/admin/migrate-images` (idempotente, default 20 por chamada, 503 se R2 não configurado). Setup do stakeholder em `docs/implementation/setup-r2.md`. ADR em `docs/implementation/adr/ADR-001-object-storage-for-images.md`.
 - ❌ Rate limit nos demais endpoints sensíveis (Upstash Redis)
 - ❌ Captcha (Turnstile)
 - ❌ Logs estruturados (pino)
