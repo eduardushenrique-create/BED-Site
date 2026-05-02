@@ -114,7 +114,7 @@ function OrderConfirmationContent() {
 
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/produtos"><Button>Continuar comprando</Button></Link>
-          <a href="https://wa.me/55" target="_blank" rel="noopener noreferrer"><Button variant="outline">Falar com atendimento</Button></a>
+          <a href="https://wa.me/5511978871566" target="_blank" rel="noopener noreferrer"><Button variant="outline">Falar com atendimento</Button></a>
         </div>
       </div>
     </main>

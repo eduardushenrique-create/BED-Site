@@ -55,9 +55,14 @@ export default function ContactPage() {
               </div>
               <div>
                 <p style={{ fontWeight: 600, color: '#1D2235' }}>WhatsApp</p>
-                <p style={{ color: '#6B7494', fontSize: '14px', margin: 0 }}>
-                  Em breve. Por enquanto, fale com a gente pelo formulário ao lado ou pelo e-mail acima.
-                </p>
+                <a
+                  href="https://wa.me/5511978871566"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#4A7AB5' }}
+                >
+                  (11) 97887-1566
+                </a>
               </div>
             </div>
 

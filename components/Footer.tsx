@@ -138,10 +138,10 @@ export default function Footer() {
           <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px' }}>© {year} B&D Artes & Impressões. Todos os direitos reservados.</p>
           <div style={{ display: 'flex', gap: '16px' }}>
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/beddesings/"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Instagram (abre em nova aba)"
+              aria-label="Instagram @beddesings (abre em nova aba)"
               className="icon-btn"
               style={{ display: 'inline-flex' }}
             >
@@ -152,10 +152,10 @@ export default function Footer() {
               </svg>
             </a>
             <a
-              href="https://wa.me/55"
+              href="https://wa.me/5511978871566"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="WhatsApp (abre em nova aba)"
+              aria-label="WhatsApp +55 11 97887-1566 (abre em nova aba)"
               className="icon-btn"
               style={{ display: 'inline-flex' }}
             >
