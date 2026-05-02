@@ -41,7 +41,7 @@ export default function EsqueciSenhaPage() {
   }
 
   return (
-    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '480px' }}>
+    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '640px' }}>
       <div style={{ background: 'white', padding: '32px', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <p style={{ fontSize: '13px', color: '#4A7AB5', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', margin: 0 }}>Recuperar acesso</p>
         <h1 style={{ fontSize: '28px', color: '#1D2235', margin: '8px 0 8px' }}>Esqueceu sua senha?</h1>

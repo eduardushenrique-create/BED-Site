@@ -4,14 +4,20 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import BrandLogo from '@/components/BrandLogo'
 
-const navItems = [
+type NavItem = { href: string; label: string; exact?: boolean }
+
+const navItems: NavItem[] = [
+  { href: '/admin', label: 'Painel', exact: true },
   { href: '/admin/pedidos', label: 'Pedidos' },
   { href: '/admin/producao', label: 'Produção' },
+  { href: '/admin/impressoras', label: 'Impressoras' },
   { href: '/admin/clientes', label: 'Clientes' },
   { href: '/admin/produtos', label: 'Produtos' },
   { href: '/admin/categorias', label: 'Categorias' },
   { href: '/admin/banners', label: 'Banners' },
   { href: '/admin/cupons', label: 'Cupons' },
+  { href: '/admin/avaliacoes', label: 'Avaliações' },
+  { href: '/admin/auditoria', label: 'Auditoria' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +47,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <nav style={{ display: 'grid', gap: '6px', padding: '0 12px' }}>
           {navItems.map(item => {
-            const active = pathname.startsWith(item.href)
+            const active = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`)
 
             return (
               <Link
