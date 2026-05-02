@@ -285,6 +285,27 @@ export async function POST(request: Request) {
       rawPayload: rawPayloadWithCoupon,
     })
 
+    // Hard-fail when the user picked card but Mercado Pago did not return a checkout URL.
+    // Without checkoutUrl the client can't redirect to MP and the customer ends up at the
+    // confirmation screen for an order that was never paid. The order stays in
+    // pending_payment so an admin can investigate.
+    if ((paymentMethod || 'pix') === 'card' && !payment.checkoutUrl) {
+      captureException(new Error('Card checkout URL missing'), {
+        context: 'api.orders',
+        detail: 'card flow without checkoutUrl',
+        orderNumber,
+        provider: payment.provider,
+        statusDetail: payment.statusDetail,
+      })
+      return NextResponse.json(
+        {
+          error: 'Não foi possível iniciar o pagamento com cartão. Tente novamente em instantes ou escolha Pix. Se persistir, fale com o suporte.',
+          orderNumber,
+        },
+        { status: 502 },
+      )
+    }
+
     if (appliedCouponCode) {
       await incrementCouponUsage(appliedCouponCode)
     }
