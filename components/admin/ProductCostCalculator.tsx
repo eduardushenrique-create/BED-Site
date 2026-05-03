@@ -224,8 +224,7 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
     }
   }
 
-  async function addFilament(e: React.FormEvent) {
-    e.preventDefault()
+  async function addFilament() {
     if (!newFilamentId || !newGrams) return
     setError('')
     try {
@@ -342,11 +341,15 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
             </div>
           )}
 
-          <form onSubmit={addFilament} style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
+          {/* Não pode ser <form> aqui — este componente é embarcado dentro do
+              form do editor de produto e HTML não permite forms aninhados. Usar
+              div + button type="button" evita que clicar em "Vincular"
+              submeta o form externo (que salva o produto e redireciona). */}
+          <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
             <h4 style={{ margin: 0, fontSize: '13px', color: '#1D2235', fontWeight: 600 }}>+ Adicionar filamento</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
               <Field label="Filamento">
-                <select required value={newFilamentId} onChange={e => setNewFilamentId(e.target.value)} style={inputStyle}>
+                <select value={newFilamentId} onChange={e => setNewFilamentId(e.target.value)} style={inputStyle}>
                   <option value="">Selecione...</option>
                   {filamentOptions.map(f => (
                     <option key={f.id} value={f.id}>
@@ -360,7 +363,6 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
                   type="number"
                   min="0"
                   step="0.1"
-                  required
                   value={newGrams}
                   onChange={e => setNewGrams(e.target.value)}
                   placeholder="Ex.: 35"
@@ -382,13 +384,14 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
               </Field>
             </div>
             <button
-              type="submit"
+              type="button"
+              onClick={addFilament}
               disabled={!newFilamentId || !newGrams}
               style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#1D2235', color: 'white', fontWeight: 600, cursor: !newFilamentId || !newGrams ? 'not-allowed' : 'pointer', fontSize: '13px', justifySelf: 'start' }}
             >
               + Vincular
             </button>
-          </form>
+          </div>
 
           <h3 style={subtitleStyle}>Tempo & equipamento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
