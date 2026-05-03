@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
+import OrderMaterialsCard from '@/components/admin/OrderMaterialsCard'
 
 type Order = {
   id: string
@@ -511,6 +512,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
           </Card>
+
+          <OrderMaterialsCard orderId={order.id} />
 
           <Card title="Status & Logística">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
