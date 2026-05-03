@@ -574,6 +574,7 @@ model Filament {
   brand      String?
   type       String             // PLA | PETG | TPU | ABS | PETG-HF | PLA-Speed+ | Other
   pricePerKg Decimal             @db.Decimal(10, 2)
+  colorHex   String?            // ex.: "#FF5733" — nullable, fila amento sem cor cadastrada
   notes      String?             @db.Text
   isActive   Boolean             @default(true)
   createdAt  DateTime            @default(now())

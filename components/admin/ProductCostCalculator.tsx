@@ -11,6 +11,7 @@ type FilamentEntry = {
   filamentName: string
   filamentBrand: string | null
   filamentType: string
+  filamentColorHex: string | null
   pricePerKg: number
   pricePerGram: number
   grams: number
@@ -38,6 +39,7 @@ type FilamentOption = {
   brand: string | null
   type: string
   pricePerKg: number
+  colorHex: string | null
   isActive: boolean
 }
 
@@ -349,14 +351,27 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
             <h4 style={{ margin: 0, fontSize: '13px', color: '#1D2235', fontWeight: 600 }}>+ Adicionar filamento</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
               <Field label="Filamento">
-                <select value={newFilamentId} onChange={e => setNewFilamentId(e.target.value)} style={inputStyle}>
-                  <option value="">Selecione...</option>
-                  {filamentOptions.map(f => (
-                    <option key={f.id} value={f.id}>
-                      {f.name} ({f.type}){f.brand ? ` · ${f.brand}` : ''} — {brl(f.pricePerKg)}/kg
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {(() => {
+                    const selected = filamentOptions.find(f => f.id === newFilamentId)
+                    if (!selected || !selected.colorHex) return null
+                    return (
+                      <span
+                        aria-label={`Cor ${selected.colorHex}`}
+                        title={selected.colorHex}
+                        style={{ display: 'inline-block', width: '18px', height: '18px', borderRadius: '50%', background: selected.colorHex, border: '1px solid #D8DCE8', flexShrink: 0 }}
+                      />
+                    )
+                  })()}
+                  <select value={newFilamentId} onChange={e => setNewFilamentId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                    <option value="">Selecione...</option>
+                    {filamentOptions.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.type}){f.brand ? ` · ${f.brand}` : ''} — {brl(f.pricePerKg)}/kg
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </Field>
               <Field label="Gramas por unidade">
                 <input
@@ -519,17 +534,34 @@ function FilamentRow({
   return (
     <div style={{ padding: '12px 14px', borderBottom: isLast ? 'none' : '1px solid #E3E9F4', display: 'grid', gap: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <div>
-          <p style={{ margin: 0, fontWeight: 600, color: '#1D2235' }}>
-            {entry.filamentName}
-            <span style={{ background: '#E4EDF8', color: '#4A7AB5', fontSize: '11px', padding: '2px 8px', borderRadius: '999px', marginLeft: '8px', fontWeight: 600 }}>
-              {entry.filamentType}
-            </span>
-          </p>
-          <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7494' }}>
-            {entry.filamentBrand ? `${entry.filamentBrand} · ` : ''}{brl(entry.pricePerKg)}/kg
-            {entry.variantName && ` · variação: ${entry.variantName}`}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {entry.filamentColorHex && (
+            <span
+              aria-label={`Cor ${entry.filamentColorHex}`}
+              title={entry.filamentColorHex}
+              style={{
+                display: 'inline-block',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: entry.filamentColorHex,
+                border: '1px solid #D8DCE8',
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, color: '#1D2235' }}>
+              {entry.filamentName}
+              <span style={{ background: '#E4EDF8', color: '#4A7AB5', fontSize: '11px', padding: '2px 8px', borderRadius: '999px', marginLeft: '8px', fontWeight: 600 }}>
+                {entry.filamentType}
+              </span>
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7494' }}>
+              {entry.filamentBrand ? `${entry.filamentBrand} · ` : ''}{brl(entry.pricePerKg)}/kg
+              {entry.variantName && ` · variação: ${entry.variantName}`}
+            </p>
+          </div>
         </div>
         {editing ? (
           <div style={{ display: 'flex', gap: '6px' }}>
