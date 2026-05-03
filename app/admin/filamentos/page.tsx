@@ -65,6 +65,7 @@ export default function FilamentosPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [search, setSearch] = useState('')
+  const [autoFilling, setAutoFilling] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -176,12 +177,42 @@ export default function FilamentosPage() {
             Catálogo de filamentos com custo por kilo. Usado pra calcular custo de produção dos produtos.
           </p>
         </div>
-        <button
-          onClick={() => { setForm(EMPTY); setShowForm(s => !s); setFeedback(null) }}
-          style={{ padding: '10px 18px', borderRadius: '10px', background: '#1D2235', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-        >
-          {showForm ? 'Fechar formulário' : '+ Novo filamento'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={async () => {
+              if (!window.confirm('Inferir cor pelo nome dos filamentos sem cor cadastrada? Filamentos que já têm cor não são alterados.')) return
+              setAutoFilling(true)
+              setFeedback(null)
+              try {
+                const res = await fetch('/api/filamentos/auto-fill-colors', { method: 'POST' })
+                const data = await res.json().catch(() => null)
+                if (!res.ok) {
+                  setFeedback({ kind: 'err', text: data?.error || 'Erro ao inferir cores.' })
+                  return
+                }
+                setFeedback({
+                  kind: 'ok',
+                  text: `${data.updated} filamento(s) atualizado(s) · ${data.skipped} ignorado(s) (cor não identificada).`,
+                })
+                load()
+              } catch {
+                setFeedback({ kind: 'err', text: 'Erro de conexão.' })
+              } finally {
+                setAutoFilling(false)
+              }
+            }}
+            disabled={autoFilling}
+            style={{ padding: '10px 18px', borderRadius: '10px', background: 'white', color: '#1D2235', border: '1px solid #D8DCE8', fontWeight: 600, cursor: autoFilling ? 'not-allowed' : 'pointer' }}
+          >
+            {autoFilling ? 'Inferindo...' : '🎨 Atualizar cores pelo nome'}
+          </button>
+          <button
+            onClick={() => { setForm(EMPTY); setShowForm(s => !s); setFeedback(null) }}
+            style={{ padding: '10px 18px', borderRadius: '10px', background: '#1D2235', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {showForm ? 'Fechar formulário' : '+ Novo filamento'}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -319,6 +350,7 @@ export default function FilamentosPage() {
                 <th style={th}>Nome</th>
                 <th style={th}>Marca</th>
                 <th style={th}>Tipo</th>
+                <th style={{ ...th, textAlign: 'center' }}>Cor</th>
                 <th style={{ ...th, textAlign: 'right' }}>R$/kg</th>
                 <th style={{ ...th, textAlign: 'right' }}>R$/g</th>
                 <th style={th}>Status</th>
@@ -329,33 +361,36 @@ export default function FilamentosPage() {
               {filtered.map(f => (
                 <tr key={f.id} style={{ borderTop: '1px solid #E3E9F4' }}>
                   <td style={td}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {f.colorHex ? (
-                        <span
-                          aria-label={`Cor ${f.colorHex}`}
-                          title={f.colorHex}
-                          style={{
-                            display: 'inline-block',
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: f.colorHex,
-                            border: '1px solid #D8DCE8',
-                            flexShrink: 0,
-                          }}
-                        />
-                      ) : (
-                        <span style={{ display: 'inline-block', width: '18px', height: '18px', flexShrink: 0 }} aria-hidden />
-                      )}
-                      <strong style={{ color: '#1D2235' }}>{f.name}</strong>
-                    </div>
-                    {f.notes && <p style={{ margin: '4px 0 0 26px', fontSize: '12px', color: '#6B7494' }}>{f.notes}</p>}
+                    <strong style={{ color: '#1D2235' }}>{f.name}</strong>
+                    {f.notes && <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7494' }}>{f.notes}</p>}
                   </td>
                   <td style={{ ...td, color: '#6B7494' }}>{f.brand || '—'}</td>
                   <td style={td}>
                     <span style={{ background: '#E4EDF8', color: '#4A7AB5', borderRadius: '999px', padding: '3px 10px', fontSize: '12px', fontWeight: 600 }}>
                       {typeLabel(f.type)}
                     </span>
+                  </td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    {f.colorHex ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                        <span
+                          aria-label={`Cor ${f.colorHex}`}
+                          title={f.colorHex}
+                          style={{
+                            display: 'inline-block',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: f.colorHex,
+                            border: '2px solid white',
+                            boxShadow: '0 0 0 1px #D8DCE8, inset 0 0 0 1px rgba(0,0,0,0.04)',
+                          }}
+                        />
+                        <span style={{ fontSize: '10px', color: '#A8AFCA', fontFamily: 'var(--font-mono)' }}>{f.colorHex}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#A8AFCA' }}>—</span>
+                    )}
                   </td>
                   <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                     {formatBRL(f.pricePerKg)}
