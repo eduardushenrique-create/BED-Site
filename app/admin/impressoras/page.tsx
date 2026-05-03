@@ -13,6 +13,9 @@ type Printer = {
   status: 'active' | 'maintenance' | 'offline'
   color: string | null
   notes: string | null
+  powerConsumptionWatts: number | null
+  acquisitionCostBRL: number | null
+  lifetimeHours: number | null
   createdAt: string
   updatedAt: string
 }
@@ -32,6 +35,9 @@ const emptyForm = {
   status: 'active' as Printer['status'],
   color: '',
   notes: '',
+  powerConsumptionWatts: '',
+  acquisitionCostBRL: '',
+  lifetimeHours: '',
 }
 
 export default function ImpressorasPage() {
@@ -73,6 +79,9 @@ export default function ImpressorasPage() {
       status: p.status,
       color: p.color || '',
       notes: p.notes || '',
+      powerConsumptionWatts: p.powerConsumptionWatts !== null ? String(p.powerConsumptionWatts) : '',
+      acquisitionCostBRL: p.acquisitionCostBRL !== null ? String(p.acquisitionCostBRL) : '',
+      lifetimeHours: p.lifetimeHours !== null ? String(p.lifetimeHours) : '',
     })
     setError('')
     setShowForm(true)
@@ -86,10 +95,17 @@ export default function ImpressorasPage() {
     try {
       const url = editingId ? `/api/impressoras/${editingId}` : '/api/impressoras'
       const method = editingId ? 'PATCH' : 'POST'
+      // Converte os campos novos: '' = null (apaga), número = persiste
+      const payload = {
+        ...form,
+        powerConsumptionWatts: form.powerConsumptionWatts === '' ? null : Number(form.powerConsumptionWatts),
+        acquisitionCostBRL: form.acquisitionCostBRL === '' ? null : Number(form.acquisitionCostBRL),
+        lifetimeHours: form.lifetimeHours === '' ? null : Number(form.lifetimeHours),
+      }
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -214,6 +230,51 @@ export default function ImpressorasPage() {
               <Field label="Cor (hex)">
                 <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="#1D7A72" style={inputStyle} />
               </Field>
+
+              <fieldset style={{ border: '1px solid #E3E9F4', borderRadius: '10px', padding: '14px', margin: 0 }}>
+                <legend style={{ padding: '0 8px', fontSize: '13px', color: '#1D2235', fontWeight: 600 }}>
+                  Cálculo de custo (opcional)
+                </legend>
+                <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#6B7494' }}>
+                  Preencha pra alimentar a calculadora de custo de produto (energia + depreciação). Pode deixar em branco e completar depois.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <Field label="Consumo (Watts)">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={form.powerConsumptionWatts}
+                      onChange={e => setForm({ ...form, powerConsumptionWatts: e.target.value })}
+                      placeholder="Ex.: 350"
+                      style={inputStyle}
+                    />
+                  </Field>
+                  <Field label="Custo de aquisição (R$)">
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.acquisitionCostBRL}
+                      onChange={e => setForm({ ...form, acquisitionCostBRL: e.target.value })}
+                      placeholder="Ex.: 3500.00"
+                      style={inputStyle}
+                    />
+                  </Field>
+                  <Field label="Vida útil (horas)">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={form.lifetimeHours}
+                      onChange={e => setForm({ ...form, lifetimeHours: e.target.value })}
+                      placeholder="Ex.: 5000"
+                      style={inputStyle}
+                    />
+                  </Field>
+                </div>
+              </fieldset>
+
               <Field label="Notas">
                 <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
               </Field>

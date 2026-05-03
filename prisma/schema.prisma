@@ -290,18 +290,22 @@ model AdminUser {
 }
 
 model Printer {
-  id                   String           @id @default(cuid())
-  name                 String
-  model                String?
-  buildVolume          String?          // ex: "180x180x180"
-  materials            String?          // ex: "PLA, PETG"
-  dailyCapacityMinutes Int              @default(480)
-  status               String           @default("active") // active | maintenance | offline
-  color                String?          // hex tag para UI
-  notes                String?          @db.Text
-  productionTasks      ProductionTask[]
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                     String           @id @default(cuid())
+  name                   String
+  model                  String?
+  buildVolume            String?          // ex: "180x180x180"
+  materials              String?          // ex: "PLA, PETG"
+  dailyCapacityMinutes   Int              @default(480)
+  status                 String           @default("active") // active | maintenance | offline
+  color                  String?          // hex tag para UI
+  notes                  String?          @db.Text
+  // Campos pra calculadora de custo (SPEC calculadora produto):
+  powerConsumptionWatts  Int?
+  acquisitionCostBRL     Decimal?         @db.Decimal(10, 2)
+  lifetimeHours          Int?
+  productionTasks        ProductionTask[]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@index([status])
 }
