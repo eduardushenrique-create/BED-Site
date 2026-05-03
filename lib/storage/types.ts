@@ -13,7 +13,7 @@ export type StorageUploadInput = {
   prefix?: string
 }
 
-export type StorageProvider = 'r2' | 'inline'
+export type StorageProvider = 'r2' | 'vercel-blob' | 'inline'
 
 export type StorageUploadResult = {
   /**
