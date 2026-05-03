@@ -236,6 +236,10 @@ function serializeOrder(order: any): Order {
       observation: item.personalizationJson || item.observation || undefined,
     })),
     trackingCode: order.trackingCode || null,
+    expectedDeliveryAt:
+      order.expectedDeliveryAt instanceof Date
+        ? order.expectedDeliveryAt.toISOString()
+        : order.expectedDeliveryAt || null,
   }
 }
 
@@ -1627,6 +1631,20 @@ export async function updateOrder(id: string, data: Partial<Order>) {
   }
 
   try {
+    // Aceita string ISO, Date, '' (limpa) e null. undefined = não mexer.
+    let expectedDelivery: Date | null | undefined
+    if (Object.prototype.hasOwnProperty.call(data, 'expectedDeliveryAt')) {
+      const raw = (data as { expectedDeliveryAt?: string | Date | null }).expectedDeliveryAt
+      if (raw === null || raw === '') {
+        expectedDelivery = null
+      } else if (raw instanceof Date) {
+        expectedDelivery = raw
+      } else if (typeof raw === 'string') {
+        const parsed = new Date(raw)
+        expectedDelivery = Number.isNaN(parsed.getTime()) ? undefined : parsed
+      }
+    }
+
     const order = await prisma.order.update({
       where: { id },
       data: {
@@ -1637,6 +1655,7 @@ export async function updateOrder(id: string, data: Partial<Order>) {
         subtotal: data.subtotal,
         shippingTotal: data.shippingCost,
         total: data.total,
+        ...(expectedDelivery !== undefined ? { expectedDeliveryAt: expectedDelivery } : {}),
       },
       include: { address: true, payment: true, items: true },
     })

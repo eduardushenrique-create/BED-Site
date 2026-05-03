@@ -68,6 +68,7 @@ export type Order = {
   createdAt: string
   items: { productId: string; productName: string; variantId?: string | null; variantName?: string | null; quantity: number; unitPrice: number; observation?: string }[]
   trackingCode: string | null
+  expectedDeliveryAt?: string | null
 }
 
 export type Banner = {
