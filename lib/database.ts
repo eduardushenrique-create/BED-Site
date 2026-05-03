@@ -42,6 +42,20 @@ import type {
 } from '@/lib/types'
 import { getStorage } from '@/lib/storage'
 import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'database' })
+
+/**
+ * Encapsula a dupla "Sentry + logger estruturado" pra cada erro pego em
+ * fallback do Prisma. Substitui o antigo `console.error('[database] X:', e)`
+ * que já estava espalhado pelo arquivo.
+ */
+function reportDbError(detail: string, error: unknown) {
+  captureException(error, { context: 'database', detail })
+  log.error({ err: error }, detail)
+}
 
 /**
  * Helper: se `value` for uma data URL, faz upload via storage adapter (R2 ou
@@ -60,7 +74,7 @@ async function persistImageIfDataUrl(
     const result = await getStorage().upload({ data: value, contentType, prefix })
     return { url: result.url, storageKey: result.storageKey }
   } catch (error) {
-    console.error('[database] storage upload failed, mantendo data URL inline:', error)
+    reportDbError('storage upload failed, mantendo data URL inline', error)
     return { url: value, storageKey: null }
   }
 }
@@ -238,7 +252,7 @@ export async function listProducts() {
 
     return products.map(serializeProduct)
   } catch (error) {
-    console.error('[database] listProducts Prisma failed, using fallback:', error)
+    reportDbError('listProducts Prisma failed, using fallback', error)
     return readDB().products
   }
 }
@@ -299,7 +313,7 @@ export async function createProduct(data: Product) {
 
     return serializeProduct(product)
   } catch (error) {
-    console.error('[database] createProduct Prisma failed, using fallback:', error)
+    reportDbError('createProduct Prisma failed, using fallback', error)
     const db = readDB()
     const newProduct: Product = {
       ...data,
@@ -416,7 +430,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     dispatchRestockNotificationsIfNeeded(id).catch(() => {})
     return final
   } catch (error) {
-    console.error('[database] updateProduct Prisma failed, using fallback:', error)
+    reportDbError('updateProduct Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.products.findIndex(product => product.id === id)
     if (index === -1) return null
@@ -463,7 +477,7 @@ export async function listProductImages(productId: string): Promise<ProductImage
     })
     return images.map(serializeProductImage)
   } catch (error) {
-    console.error('[database] listProductImages Prisma failed:', error)
+    reportDbError('listProductImages Prisma failed', error)
     return []
   }
 }
@@ -521,7 +535,7 @@ export async function addProductImage(
     })
     return { image: serializeProductImage(image) }
   } catch (error) {
-    console.error('[database] addProductImage Prisma failed:', error)
+    reportDbError('addProductImage Prisma failed', error)
     return { image: null, error: 'Erro ao salvar imagem.' }
   }
 }
@@ -553,7 +567,7 @@ export async function setVariantForImage(
     })
     return { ok: true, image: serializeProductImage(updated) }
   } catch (error) {
-    console.error('[database] setVariantForImage Prisma failed:', error)
+    reportDbError('setVariantForImage Prisma failed', error)
     return { ok: false, error: 'Erro ao vincular imagem à variação.' }
   }
 }
@@ -591,7 +605,7 @@ export async function removeProductImage(productId: string, imageId: string): Pr
     }
     return { ok: true }
   } catch (error) {
-    console.error('[database] removeProductImage Prisma failed:', error)
+    reportDbError('removeProductImage Prisma failed', error)
     return { ok: false, error: 'Erro ao remover imagem.' }
   }
 }
@@ -611,7 +625,7 @@ export async function setMainProductImage(productId: string, imageId: string): P
     ])
     return { ok: true }
   } catch (error) {
-    console.error('[database] setMainProductImage Prisma failed:', error)
+    reportDbError('setMainProductImage Prisma failed', error)
     return { ok: false, error: 'Erro ao definir imagem principal.' }
   }
 }
@@ -636,7 +650,7 @@ export async function reorderProductImages(productId: string, orderedIds: string
     )
     return { ok: true }
   } catch (error) {
-    console.error('[database] reorderProductImages Prisma failed:', error)
+    reportDbError('reorderProductImages Prisma failed', error)
     return { ok: false, error: 'Erro ao reordenar imagens.' }
   }
 }
@@ -655,7 +669,7 @@ export async function deleteProduct(id: string) {
     await prisma.product.delete({ where: { id } })
     return true
   } catch (error) {
-    console.error('[database] deleteProduct Prisma failed:', error)
+    reportDbError('deleteProduct Prisma failed', error)
     return false
   }
 }
@@ -695,7 +709,7 @@ export async function updateProductsBulk(ids: string[], updates: BulkProductUpda
         if (!cat) return { updated: 0, error: `Categoria "${updates.category}" não encontrada.` }
         data.categoryId = cat.id
       } catch (error) {
-        console.error('[database] updateProductsBulk category lookup failed:', error)
+        reportDbError('updateProductsBulk category lookup failed', error)
         return { updated: 0, error: 'Erro ao validar categoria.' }
       }
     }
@@ -729,7 +743,7 @@ export async function updateProductsBulk(ids: string[], updates: BulkProductUpda
     })
     return { updated: result.count }
   } catch (error) {
-    console.error('[database] updateProductsBulk Prisma failed:', error)
+    reportDbError('updateProductsBulk Prisma failed', error)
     return { updated: 0, error: 'Erro ao atualizar produtos no banco.' }
   }
 }
