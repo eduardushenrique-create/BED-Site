@@ -23,15 +23,14 @@ type StoredCode = {
 
 type AuthCodeDb = {
   codes: StoredCode[]
-  rateLimits: Record<string, { count: number; resetAt: string }>
 }
 
 function readStore(): AuthCodeDb {
-  if (!fs.existsSync(DB_PATH)) return { codes: [], rateLimits: {} }
+  if (!fs.existsSync(DB_PATH)) return { codes: [] }
   try {
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf8')) as AuthCodeDb
   } catch {
-    return { codes: [], rateLimits: {} }
+    return { codes: [] }
   }
 }
 
@@ -47,29 +46,6 @@ function hash(value: string) {
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
 }
-
-/**
- * @deprecated Rate limit moved to `lib/rate-limit.ts` (`consumeRateLimit`),
- * applied at the route level. Kept only for backwards compatibility with
- * the legacy fs-based JSON store; no longer invoked from the auth flow.
- */
-function assertRateLimitLegacy(email: string, ip: string) {
-  const store = readStore()
-  const now = Date.now()
-  const key = hash(`${normalizeEmail(email)}:${ip}`)
-  const current = store.rateLimits[key]
-
-  if (current && new Date(current.resetAt).getTime() > now && current.count >= 5) {
-    throw new Error('Muitas tentativas. Aguarde alguns minutos antes de pedir outro código.')
-  }
-
-  store.rateLimits[key] = current && new Date(current.resetAt).getTime() > now
-    ? { ...current, count: current.count + 1 }
-    : { count: 1, resetAt: new Date(now + 15 * 60 * 1000).toISOString() }
-
-  writeStore(store)
-}
-void assertRateLimitLegacy
 
 export function generateAccessCode() {
   return crypto.randomInt(100000, 999999).toString()
