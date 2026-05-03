@@ -479,3 +479,130 @@ export async function getOrderAlertRecipients(): Promise<string[]> {
   const fallback = process.env.RESEND_REPLY_TO_EMAIL
   return fallback ? [fallback] : []
 }
+
+// ---------------------------------------------------------------------------
+// Consumo automático de produção (Fase 3)
+// ---------------------------------------------------------------------------
+
+export interface ProductionConsumptionResult {
+  /** Saídas (delta > 0) ou reversões (delta < 0) registradas. */
+  movements: Array<{
+    componentId: string
+    componentName: string
+    quantity: number
+    balanceAfter: number
+    reverted: boolean
+  }>
+  /** Componentes que ficaram em baixa após o consumo (snapshot pra alertar). */
+  triggeredLowStock: Array<{ componentId: string; componentName: string; balanceAfter: number; threshold: number | null }>
+  /** Componentes que ficaram negativos — sinal de baseline incorreta no estoque. */
+  wentNegative: string[]
+}
+
+/**
+ * Aplica consumo de componentes para uma `ProductionTask` num `ProductionLog`
+ * recém-criado. Recebe a `tx` da transação aberta em `updateProductionTask`
+ * — todas as escritas vivem na mesma transação atômica do log de produção.
+ *
+ * - delta > 0 → cria StockMovements `type: 'out'` (consumo)
+ * - delta < 0 → cria StockMovements `type: 'reverse'` (correção; soma de volta)
+ * - delta = 0 → no-op (admin alterou status sem produzir nada)
+ *
+ * Permite estoque negativo (operação real já consumiu o material; bloquear
+ * aqui geraria fricção). O componente é criado mesmo, e quem precisa
+ * monitorar age via alerta separado.
+ *
+ * Sem BOM declarada para o produto: no-op silencioso. Banner amarelo na UI
+ * já avisa o admin.
+ */
+export async function applyProductionConsumption(
+  tx: Prisma.TransactionClient,
+  args: {
+    taskId: string
+    delta: number
+    actorEmail?: string | null
+  },
+): Promise<ProductionConsumptionResult> {
+  const empty: ProductionConsumptionResult = {
+    movements: [],
+    triggeredLowStock: [],
+    wentNegative: [],
+  }
+  if (!Number.isFinite(args.delta) || args.delta === 0) return empty
+
+  const task = await tx.productionTask.findUnique({
+    where: { id: args.taskId },
+    include: {
+      order: { select: { orderNumber: true } },
+      orderItem: { select: { productId: true, variantId: true } },
+    },
+  })
+  if (!task || !task.orderItem) return empty
+
+  // BOM: vínculos globais OR específicos da variante deste OrderItem.
+  const bomRows = await tx.productComponent.findMany({
+    where: {
+      productId: task.orderItem.productId,
+      OR: [{ variantId: null }, ...(task.orderItem.variantId ? [{ variantId: task.orderItem.variantId }] : [])],
+    },
+    include: { component: true },
+  })
+  if (bomRows.length === 0) return empty
+
+  const isReversal = args.delta < 0
+  const absUnits = Math.abs(args.delta)
+  const result: ProductionConsumptionResult = {
+    movements: [],
+    triggeredLowStock: [],
+    wentNegative: [],
+  }
+
+  for (const row of bomRows) {
+    const qpu = toNum(row.quantityPerUnit)
+    if (qpu <= 0) continue
+    const consumption = qpu * absUnits
+    const currentStock = toNum(row.component.stock)
+    const balanceAfter = isReversal ? currentStock + consumption : currentStock - consumption
+
+    await tx.component.update({
+      where: { id: row.componentId },
+      data: { stock: balanceAfter },
+    })
+
+    await tx.stockMovement.create({
+      data: {
+        componentId: row.componentId,
+        type: isReversal ? 'reverse' : 'out',
+        quantity: consumption,
+        balanceAfter,
+        reason: isReversal
+          ? `Reversão de produção (-${absUnits} un)`
+          : `Produção: ${absUnits} un consumidas`,
+        relatedTaskId: args.taskId,
+        relatedOrderNumber: task.order?.orderNumber ?? null,
+        createdByEmail: args.actorEmail ?? null,
+      },
+    })
+
+    result.movements.push({
+      componentId: row.componentId,
+      componentName: row.component.name,
+      quantity: consumption,
+      balanceAfter,
+      reverted: isReversal,
+    })
+
+    const threshold = toNumOrNull(row.component.lowStockThreshold)
+    if (!isReversal && threshold !== null && balanceAfter <= threshold) {
+      result.triggeredLowStock.push({
+        componentId: row.componentId,
+        componentName: row.component.name,
+        balanceAfter,
+        threshold,
+      })
+    }
+    if (balanceAfter < 0) result.wentNegative.push(row.component.name)
+  }
+
+  return result
+}
