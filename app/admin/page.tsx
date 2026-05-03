@@ -34,6 +34,13 @@ const cards: DashboardCard[] = [
     accent: '#0EA5E9',
   },
   {
+    href: '/admin/clientes',
+    title: 'Clientes',
+    description: 'Lista de compradores e cadastros.',
+    cta: 'Ver clientes →',
+    accent: '#A36A1F',
+  },
+  {
     href: '/admin/produtos',
     title: 'Produtos',
     description: 'Gerencie catálogo, fotos e personalizações.',
@@ -41,11 +48,18 @@ const cards: DashboardCard[] = [
     accent: '#1D7A72',
   },
   {
-    href: '/admin/clientes',
-    title: 'Clientes',
-    description: 'Lista de compradores e cadastros.',
-    cta: 'Ver clientes →',
-    accent: '#A36A1F',
+    href: '/admin/componentes',
+    title: 'Componentes',
+    description: 'Gerencie insumos, estoque e alertas de baixa.',
+    cta: 'Ver componentes →',
+    accent: '#B42318',
+  },
+  {
+    href: '/admin/filamentos',
+    title: 'Filamentos',
+    description: 'Cadastre filamentos, cores e consumo por impressora.',
+    cta: 'Ver filamentos →',
+    accent: '#4A7AB5',
   },
   {
     href: '/admin/categorias',
@@ -69,18 +83,25 @@ const cards: DashboardCard[] = [
     accent: '#1D7A72',
   },
   {
-    href: '/admin/auditoria',
-    title: 'Auditoria',
-    description: 'Log de ações sensíveis (estornos, exclusões, alterações).',
-    cta: 'Ver auditoria →',
-    accent: '#6B7494',
-  },
-  {
     href: '/admin/avaliacoes',
     title: 'Avaliações',
     description: 'Modere as avaliações dos clientes antes de publicar.',
     cta: 'Ver avaliações →',
     accent: '#F59E0B',
+  },
+  {
+    href: '/admin/emails',
+    title: 'E-mails',
+    description: 'Campanhas, templates e descadastros.',
+    cta: 'Ver e-mails →',
+    accent: '#6B7494',
+  },
+  {
+    href: '/admin/auditoria',
+    title: 'Auditoria',
+    description: 'Log de ações sensíveis (estornos, exclusões, alterações).',
+    cta: 'Ver auditoria →',
+    accent: '#6B7494',
   },
 ]
 
