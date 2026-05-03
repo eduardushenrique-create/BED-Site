@@ -23,15 +23,15 @@ test.describe('Forma 3D E-commerce', () => {
     await page.goto(`${BASE_URL}/produtos`)
     const productLink = page.locator('article').first()
     await productLink.click()
-    await expect(page.locator('button', { name: /Adicionar ao carrinho/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Adicionar ao carrinho/i })).toBeVisible()
   })
 
   test('4. Add to cart works', async ({ page }) => {
     await page.goto(`${BASE_URL}/produtos/porta-retratos-geometrico`)
-    
+
     // Add personalization if required
     const personalizationInput = page.locator('input[placeholder*="Família"]').first()
-    if (personalizationInput.isVisible()) {
+    if (await personalizationInput.isVisible()) {
       await personalizationInput.fill('Teste Silva')
     }
     
