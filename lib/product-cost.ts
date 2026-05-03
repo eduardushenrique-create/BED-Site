@@ -36,6 +36,7 @@ export interface ProductFilamentEntry {
   filamentName: string
   filamentBrand: string | null
   filamentType: string
+  filamentColorHex: string | null
   pricePerKg: number
   pricePerGram: number
   grams: number
@@ -144,6 +145,7 @@ export async function listProductFilaments(productId: string): Promise<ProductFi
         filamentName: row.filament.name,
         filamentBrand: row.filament.brand,
         filamentType: row.filament.type,
+        filamentColorHex: row.filament.colorHex ?? null,
         pricePerKg,
         pricePerGram: round2(pricePerGram * 10) / 10, // 4 casas via *10/10
         grams,

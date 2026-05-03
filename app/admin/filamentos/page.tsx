@@ -19,6 +19,7 @@ type Filament = {
   type: string
   pricePerKg: number
   pricePerGram: number
+  colorHex: string | null
   notes: string | null
   isActive: boolean
   createdAt: string
@@ -31,6 +32,7 @@ type FormState = {
   brand: string
   type: string
   pricePerKg: string
+  colorHex: string
   notes: string
   isActive: boolean
 }
@@ -41,6 +43,7 @@ const EMPTY: FormState = {
   brand: '',
   type: 'PLA',
   pricePerKg: '',
+  colorHex: '',
   notes: '',
   isActive: true,
 }
@@ -101,6 +104,7 @@ export default function FilamentosPage() {
       brand: f.brand || '',
       type: f.type,
       pricePerKg: String(f.pricePerKg),
+      colorHex: f.colorHex || '',
       notes: f.notes || '',
       isActive: f.isActive,
     })
@@ -124,6 +128,7 @@ export default function FilamentosPage() {
         brand: form.brand.trim() || null,
         type: form.type,
         pricePerKg: form.pricePerKg === '' ? 0 : Number(form.pricePerKg),
+        colorHex: form.colorHex || null,
         notes: form.notes.trim() || null,
         isActive: form.isActive,
       }
@@ -217,6 +222,43 @@ export default function FilamentosPage() {
                 placeholder="Ex.: 95.00"
               />
             </Field>
+            <Field label="Cor">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={form.colorHex || '#FFFFFF'}
+                  onChange={e => setForm({ ...form, colorHex: e.target.value.toUpperCase() })}
+                  style={{
+                    width: '44px',
+                    height: '38px',
+                    padding: '2px',
+                    border: '1px solid #D8DCE8',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: 'white',
+                    flexShrink: 0,
+                  }}
+                  aria-label="Selecionar cor do filamento"
+                />
+                <input
+                  value={form.colorHex}
+                  onChange={e => setForm({ ...form, colorHex: e.target.value.toUpperCase() })}
+                  style={{ ...input, flex: 1, fontFamily: 'var(--font-mono)' }}
+                  placeholder="#RRGGBB"
+                  maxLength={7}
+                />
+                {form.colorHex && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, colorHex: '' })}
+                    style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #D8DCE8', background: 'white', cursor: 'pointer', fontSize: '12px' }}
+                    title="Limpar cor"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+            </Field>
           </div>
           <Field label="Observações internas">
             <textarea
@@ -287,8 +329,27 @@ export default function FilamentosPage() {
               {filtered.map(f => (
                 <tr key={f.id} style={{ borderTop: '1px solid #E3E9F4' }}>
                   <td style={td}>
-                    <strong style={{ color: '#1D2235' }}>{f.name}</strong>
-                    {f.notes && <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7494' }}>{f.notes}</p>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {f.colorHex ? (
+                        <span
+                          aria-label={`Cor ${f.colorHex}`}
+                          title={f.colorHex}
+                          style={{
+                            display: 'inline-block',
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            background: f.colorHex,
+                            border: '1px solid #D8DCE8',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ display: 'inline-block', width: '18px', height: '18px', flexShrink: 0 }} aria-hidden />
+                      )}
+                      <strong style={{ color: '#1D2235' }}>{f.name}</strong>
+                    </div>
+                    {f.notes && <p style={{ margin: '4px 0 0 26px', fontSize: '12px', color: '#6B7494' }}>{f.notes}</p>}
                   </td>
                   <td style={{ ...td, color: '#6B7494' }}>{f.brand || '—'}</td>
                   <td style={td}>

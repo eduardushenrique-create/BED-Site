@@ -35,6 +35,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
     brand: body.brand as string | null | undefined,
     type: body.type as string | undefined,
     pricePerKg: body.pricePerKg !== undefined ? Number(body.pricePerKg) : undefined,
+    colorHex: body.colorHex as string | null | undefined,
     notes: body.notes as string | null | undefined,
     isActive: body.isActive as boolean | undefined,
   })

@@ -30,10 +30,22 @@ export interface SerializedFilament {
   pricePerKg: number
   /** Calculado em runtime: pricePerKg / 1000. Quando a UI mostra "custo/g". */
   pricePerGram: number
+  /** Hex string formato #RRGGBB. Null = sem cor cadastrada. */
+  colorHex: string | null
   notes: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
+}
+
+/** Aceita "#RRGGBB" ou "RRGGBB" (case-insensitive). Retorna null pra qualquer outra coisa. */
+function normalizeColorHex(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  if (!/^#[0-9a-f]{6}$/i.test(withHash)) return null
+  return withHash.toUpperCase()
 }
 
 function toNum(value: Prisma.Decimal | null | undefined): number {
@@ -47,6 +59,7 @@ function serialize(row: {
   brand: string | null
   type: string
   pricePerKg: Prisma.Decimal
+  colorHex: string | null
   notes: string | null
   isActive: boolean
   createdAt: Date
@@ -61,6 +74,7 @@ function serialize(row: {
     pricePerKg,
     // Cálculo em runtime — evita reescrever quando o admin reajusta o preço.
     pricePerGram: Math.round((pricePerKg / 1000) * 10000) / 10000,
+    colorHex: row.colorHex,
     notes: row.notes,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
@@ -73,6 +87,7 @@ export interface FilamentInput {
   brand?: string | null
   type: string
   pricePerKg: number
+  colorHex?: string | null
   notes?: string | null
   isActive?: boolean
 }
@@ -115,6 +130,7 @@ export async function createFilament(input: FilamentInput): Promise<{ filament?:
         brand: input.brand?.trim() || null,
         type: input.type,
         pricePerKg: input.pricePerKg,
+        colorHex: normalizeColorHex(input.colorHex),
         notes: input.notes?.trim() || null,
         isActive: input.isActive ?? true,
       },
@@ -146,6 +162,7 @@ export async function updateFilament(
     if (input.brand !== undefined) data.brand = input.brand?.trim() || null
     if (input.type !== undefined) data.type = input.type
     if (input.pricePerKg !== undefined) data.pricePerKg = input.pricePerKg
+    if (input.colorHex !== undefined) data.colorHex = normalizeColorHex(input.colorHex)
     if (input.notes !== undefined) data.notes = input.notes?.trim() || null
     if (input.isActive !== undefined) data.isActive = input.isActive
 
