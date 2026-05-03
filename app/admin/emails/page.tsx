@@ -50,12 +50,20 @@ export default function AdminEmailsPage() {
 
   return (
     <div>
-      <header style={{ marginBottom: '24px' }}>
-        <p style={{ fontSize: '12px', color: '#4A7AB5', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', margin: 0 }}>Comunicação</p>
-        <h1 style={{ fontSize: 'clamp(26px, 3vw, 34px)', color: '#1D2235', margin: '6px 0 4px' }}>Templates de e-mail</h1>
-        <p style={{ color: '#6B7494', margin: 0 }}>
-          Edite o texto dos e-mails enviados aos clientes. Templates não customizados continuam usando o padrão do sistema.
-        </p>
+      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ fontSize: '12px', color: '#4A7AB5', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', margin: 0 }}>Comunicação</p>
+          <h1 style={{ fontSize: 'clamp(26px, 3vw, 34px)', color: '#1D2235', margin: '6px 0 4px' }}>Templates de e-mail</h1>
+          <p style={{ color: '#6B7494', margin: 0 }}>
+            Edite o texto dos e-mails enviados aos clientes. Templates não customizados continuam usando o padrão do sistema.
+          </p>
+        </div>
+        <Link
+          href="/admin/emails/campanhas"
+          style={{ padding: '10px 18px', borderRadius: '10px', background: 'white', color: '#1D2235', textDecoration: 'none', fontWeight: 600, border: '1px solid #D8DCE8' }}
+        >
+          Campanhas →
+        </Link>
       </header>
 
       {error && (
