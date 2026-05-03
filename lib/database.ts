@@ -45,6 +45,11 @@ import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
 import { applyProductionConsumption } from '@/lib/components-stock'
+import {
+  checkOrderShortages,
+  fireLowStockAlertInBackground,
+  fireOrderShortageAlertInBackground,
+} from '@/lib/stock-alerts'
 
 const log = createLogger({ component: 'database' })
 
@@ -1610,6 +1615,20 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
       include: { address: true, payment: true, items: true },
     })
 
+    // Fase 4 SPEC-001: alerta proativo de componentes em falta.
+    // Roda em background — não bloqueia checkout (regra do stakeholder:
+    // pedido nunca é bloqueado, só avisamos pra repor).
+    void checkOrderShortages(order.id).then(shortages => {
+      if (shortages.length > 0) {
+        fireOrderShortageAlertInBackground({
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          orderId: order.id,
+          shortages,
+        })
+      }
+    }).catch(() => {})
+
     return serializeOrder(order)
   } catch (error) {
     reportDbError('createOrder Prisma failed, using fallback', error)
@@ -2624,6 +2643,14 @@ export async function updateProductionTask(
 
     if (orderIdForRefresh) {
       await refreshOrderFulfillmentFromProduction(orderIdForRefresh)
+    }
+
+    // Fase 4 SPEC-001: dispara alertas de estoque baixo APÓS o commit.
+    // Throttle de 6h por componente é tratado dentro do helper.
+    if (result.consumption) {
+      for (const trigger of result.consumption.triggeredLowStock) {
+        fireLowStockAlertInBackground(trigger.componentId)
+      }
     }
 
     const refreshed = await getProductionTask(id)
