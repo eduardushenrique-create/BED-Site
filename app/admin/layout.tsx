@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { href: '/admin/impressoras', label: 'Impressoras' },
   { href: '/admin/clientes', label: 'Clientes' },
   { href: '/admin/produtos', label: 'Produtos' },
+  { href: '/admin/componentes', label: 'Componentes' },
   { href: '/admin/categorias', label: 'Categorias' },
   { href: '/admin/banners', label: 'Banners' },
   { href: '/admin/cupons', label: 'Cupons' },
