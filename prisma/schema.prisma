@@ -186,6 +186,7 @@ model Order {
   shippingMethod     String?
   trackingCode       String?
   productionDeadline DateTime?
+  expectedDeliveryAt DateTime?
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)

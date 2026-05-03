@@ -17,6 +17,7 @@ type OrderDetail = {
   customerName: string
   customerEmail: string
   trackingCode: string | null
+  expectedDeliveryAt?: string | null
   createdAt: string
   shippingAddress: {
     street: string
@@ -177,6 +178,12 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
             {order.trackingCode && (
               <p style={{ marginTop: '16px', padding: '12px', background: '#F0F5FB', borderRadius: '8px', fontSize: '14px' }}>
                 <strong>Código de rastreio:</strong> {order.trackingCode}
+              </p>
+            )}
+            {order.expectedDeliveryAt && order.fulfillmentStatus !== 'delivered' && order.fulfillmentStatus !== 'cancelled' && (
+              <p style={{ marginTop: '12px', padding: '12px', background: '#FEF3C7', borderRadius: '8px', fontSize: '14px', color: '#92400E' }}>
+                <strong>Previsão de entrega:</strong>{' '}
+                {new Date(order.expectedDeliveryAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
               </p>
             )}
           </Section>

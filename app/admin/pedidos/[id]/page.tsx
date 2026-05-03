@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 
 type Order = {
@@ -31,6 +32,7 @@ type Order = {
   createdAt: string
   items: { productId: string; productName: string; quantity: number; unitPrice: number }[]
   trackingCode: string | null
+  expectedDeliveryAt?: string | null
 }
 
 type Product = {
@@ -78,8 +80,21 @@ function StatusBadge({ status, options }: { status: string, options: { value: st
   )
 }
 
+function toLocalDateTimeInput(iso: string | null | undefined): string {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (!Number.isFinite(d.getTime())) return ''
+    const offsetMs = d.getTimezoneOffset() * 60 * 1000
+    return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16)
+  } catch {
+    return ''
+  }
+}
+
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
+  const router = useRouter()
   const [order, setOrder] = useState<Order | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,16 +103,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showEditItemsModal, setShowEditItemsModal] = useState(false)
   const [showCloneModal, setShowCloneModal] = useState(false)
   const [showRefundModal, setShowRefundModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const [refunding, setRefunding] = useState(false)
   const [refundError, setRefundError] = useState('')
   const [saving, setSaving] = useState(false)
-  
+
   const [editingItems, setEditingItems] = useState<{productId: string; productName: string; quantity: number; unitPrice: number}[]>([])
-    
+
   const [formData, setFormData] = useState({
     fulfillmentStatus: '',
     paymentStatus: '',
     trackingCode: '',
+    expectedDeliveryAt: '',
   })
 
   async function loadOrder() {
@@ -114,6 +133,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         fulfillmentStatus: found.fulfillmentStatus,
         paymentStatus: found.paymentStatus,
         trackingCode: found.trackingCode || '',
+        expectedDeliveryAt: toLocalDateTimeInput(found.expectedDeliveryAt),
       })
       setEditingItems(found.items)
     } catch (e) {
@@ -142,6 +162,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             fulfillmentStatus: found.fulfillmentStatus,
             paymentStatus: found.paymentStatus,
             trackingCode: found.trackingCode || '',
+            expectedDeliveryAt: toLocalDateTimeInput(found.expectedDeliveryAt),
           })
           setEditingItems(found.items)
         }
@@ -167,16 +188,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const isCancelled = order?.status === 'cancelled' || order?.fulfillmentStatus === 'cancelled'
     
-  const hasChanges = 
+  const hasChanges =
     formData.fulfillmentStatus !== (order?.fulfillmentStatus || '') ||
     formData.paymentStatus !== (order?.paymentStatus || '') ||
-    formData.trackingCode !== (order?.trackingCode || '')
+    formData.trackingCode !== (order?.trackingCode || '') ||
+    formData.expectedDeliveryAt !== toLocalDateTimeInput(order?.expectedDeliveryAt)
 
   const handleSave = async () => {
     if (!order) return
     setSaving(true)
-    
+
     try {
+      const expectedIso = formData.expectedDeliveryAt
+        ? new Date(formData.expectedDeliveryAt).toISOString()
+        : null
+
       await fetch('/api/pedidos', {
         method: 'PUT',
         body: JSON.stringify({
@@ -184,6 +210,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           fulfillmentStatus: formData.fulfillmentStatus,
           paymentStatus: formData.paymentStatus,
           trackingCode: formData.trackingCode || null,
+          expectedDeliveryAt: expectedIso,
         }),
       })
       alert('Pedido atualizado!')
@@ -192,6 +219,28 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       console.error('Error saving order:', e)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteOrder = async () => {
+    if (!order) return
+    if (deleteConfirmInput.trim() !== order.orderNumber) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/pedidos?id=${encodeURIComponent(order.id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        alert(data?.error || 'Erro ao excluir pedido.')
+        return
+      }
+      router.push('/admin/pedidos')
+    } catch (e) {
+      console.error('Error deleting order:', e)
+      alert('Erro de conexão ao excluir.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -472,6 +521,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </select>
               </div>
               <div>
+                <label style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
+                  Data prevista de entrega
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <input
+                    type="datetime-local"
+                    value={formData.expectedDeliveryAt}
+                    onChange={(e) => setFormData({ ...formData, expectedDeliveryAt: e.target.value })}
+                    disabled={isCancelled}
+                    style={{ flex: 1, minWidth: '200px', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px', backgroundColor: isCancelled ? '#F0F5FB' : 'white' }}
+                  />
+                  {formData.expectedDeliveryAt && !isCancelled && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, expectedDeliveryAt: '' })}
+                      style={{ padding: '10px 14px', borderRadius: '6px', border: '1px solid #D8DCE8', background: 'white', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '6px' }}>
+                  Útil para pedidos sob encomenda. Aparece pro cliente em &quot;Meus pedidos&quot;.
+                </p>
+              </div>
+              <div>
                 <p style={{ fontSize: '14px', color: '#6B7494', marginBottom: '8px' }}>Código de rastreamento</p>
                 {order.trackingCode || formData.trackingCode ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -523,6 +598,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           )}
+
+          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #E3E9F4' }}>
+            <p style={{ fontSize: '12px', color: '#6B7494', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Zona de perigo
+            </p>
+            <button
+              onClick={() => { setDeleteConfirmInput(''); setShowDeleteModal(true) }}
+              style={{ padding: '10px 18px', backgroundColor: 'white', border: '1px solid #B42318', borderRadius: '8px', cursor: 'pointer', color: '#B42318', fontWeight: 600, fontSize: '13px' }}
+            >
+              🗑️ Excluir pedido permanentemente
+            </button>
+            <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '8px' }}>
+              Diferente de cancelar — apaga o registro do banco. Use para pedidos de teste ou criados por engano. Pedidos pagos devem ser estornados antes.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -605,6 +695,54 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button onClick={() => setShowCancelModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer' }}>Manter pedido</button>
               <button onClick={handleCancelOrder} style={{ padding: '10px 20px', backgroundColor: '#EF4444', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', fontWeight: 500 }}>Sim, cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '12px', maxWidth: '460px', width: '90%' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: '#B42318' }}>
+              Excluir pedido permanentemente?
+            </h2>
+            <p style={{ color: '#6B7494', marginBottom: '8px' }}>
+              Isso apaga o pedido <strong>{order.orderNumber}</strong> e todos os dados relacionados (itens, endereço, pagamento, tarefas de produção, logs).
+            </p>
+            <p style={{ color: '#6B7494', marginBottom: '20px', fontSize: '13px' }}>
+              <strong>Não pode ser desfeito.</strong> Para confirmar, digite o número do pedido abaixo.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              placeholder={order.orderNumber}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', fontSize: '14px', marginBottom: '20px', fontFamily: 'var(--font-mono)' }}
+            />
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                disabled={deleting}
+                onClick={() => setShowDeleteModal(false)}
+                style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: deleting ? 'not-allowed' : 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={deleting || deleteConfirmInput.trim() !== order.orderNumber}
+                onClick={handleDeleteOrder}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#B42318',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: deleting || deleteConfirmInput.trim() !== order.orderNumber ? 'not-allowed' : 'pointer',
+                  color: 'white',
+                  fontWeight: 600,
+                  opacity: deleting || deleteConfirmInput.trim() !== order.orderNumber ? 0.5 : 1,
+                }}
+              >
+                {deleting ? 'Excluindo...' : 'Sim, excluir definitivamente'}
+              </button>
             </div>
           </div>
         </div>
