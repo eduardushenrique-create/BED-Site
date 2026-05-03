@@ -554,6 +554,21 @@ model LowStockAlertLog {
   lastBalance Decimal  @db.Decimal(12, 4)
 }
 
+model Filament {
+  id         String   @id @default(cuid())
+  name       String
+  brand      String?
+  type       String   // PLA | PETG | TPU | ABS | PETG-HF | PLA-Speed+ | Other
+  pricePerKg Decimal  @db.Decimal(10, 2)
+  notes      String?  @db.Text
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([type])
+}
+
 model AlertSettings {
   id               String   @id @default("default")
   lowStockEmails   Json     @default("[]")

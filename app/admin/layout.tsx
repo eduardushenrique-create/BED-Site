@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { href: '/admin/clientes', label: 'Clientes' },
   { href: '/admin/produtos', label: 'Produtos' },
   { href: '/admin/componentes', label: 'Componentes', badgeKey: 'lowStock' },
+  { href: '/admin/filamentos', label: 'Filamentos' },
   { href: '/admin/categorias', label: 'Categorias' },
   { href: '/admin/banners', label: 'Banners' },
   { href: '/admin/cupons', label: 'Cupons' },
