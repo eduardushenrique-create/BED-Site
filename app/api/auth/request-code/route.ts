@@ -38,7 +38,17 @@ export async function POST(request: NextRequest) {
 
     const code = generateAccessCode()
     await storeAccessCode(normalizedEmail, code, ip)
-    await sendAccessCodeEmail(normalizedEmail, code)
+    const sent = await sendAccessCodeEmail(normalizedEmail, code)
+
+    // Antes retornava 200 mesmo se o Resend falhou — usuário via
+    // "código enviado" e nunca recebia nada. Agora propagamos o erro.
+    // `sent` retorna true em dev sem RESEND_API_KEY (loga no console).
+    if (!sent) {
+      return NextResponse.json(
+        { error: 'Não foi possível enviar o código no momento. Tente novamente em alguns instantes.' },
+        { status: 502 },
+      )
+    }
 
     return NextResponse.json({
       success: true,

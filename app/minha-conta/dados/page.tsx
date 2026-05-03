@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import Input from '@/components/Input'
 import Button from '@/components/Button'
-import { formatCPF, formatPhone } from '@/lib/validation'
+import { formatCPF, formatPhone, validateCPF } from '@/lib/validation'
 
 export default function MeusDadosPage() {
   const router = useRouter()
@@ -42,9 +42,17 @@ export default function MeusDadosPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    setSaving(true)
     setSuccess('')
     setError('')
+
+    // CPF é opcional, mas se preenchido precisa ser válido (módulo 11).
+    const cpfDigits = form.cpf.replace(/\D/g, '')
+    if (cpfDigits && !validateCPF(cpfDigits)) {
+      setError('CPF inválido. Verifique os números informados.')
+      return
+    }
+
+    setSaving(true)
 
     const res = await fetch('/api/me', {
       method: 'PATCH',
@@ -52,7 +60,7 @@ export default function MeusDadosPage() {
       body: JSON.stringify({
         name: form.name,
         phone: form.phone.replace(/\D/g, '') || null,
-        cpf: form.cpf.replace(/\D/g, '') || null,
+        cpf: cpfDigits || null,
       }),
     })
     const data = await res.json()

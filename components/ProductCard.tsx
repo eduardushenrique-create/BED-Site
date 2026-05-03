@@ -51,12 +51,15 @@ export default function ProductCard({ product }: ProductCardProps) {
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : 0
   const favorited = isFavorite(product.id)
-  const isCustomer = user && user.role === 'customer'
+  // Antes era restrito a `role === 'customer'`, mas isso bloqueava admin
+  // (que tem conta válida e expectativa razoável de favoritar). Agora
+  // qualquer usuário logado pode favoritar.
+  const isLoggedIn = Boolean(user)
 
   async function handleFavoriteClick(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (!isCustomer) {
+    if (!isLoggedIn) {
       const next = pathname && pathname !== '/login' ? pathname : '/produtos'
       router.push(`/login?redirect=${encodeURIComponent(next)}`)
       return

@@ -37,7 +37,7 @@ export default function MinhaContaPage() {
   }
 
   return (
-    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '960px' }}>
+    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '1240px', width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <p style={{ fontSize: '13px', color: '#4A7AB5', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', margin: 0 }}>Minha conta</p>

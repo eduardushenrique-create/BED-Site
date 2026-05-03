@@ -21,7 +21,9 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
-    if (!user || user.role !== 'customer') {
+    // Aceita qualquer usuário logado (incluindo admin) — bloquear por
+    // role causava redirect ao clicar no coração.
+    if (!user) {
       setProductIds(new Set())
       return
     }
@@ -108,7 +110,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const toggle = useCallback(async (productId: string): Promise<boolean | null> => {
-    if (!user || user.role !== 'customer') return null
+    if (!user) return null
     if (productIds.has(productId)) {
       const ok = await remove(productId)
       return ok ? false : null
