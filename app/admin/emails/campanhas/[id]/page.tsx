@@ -29,6 +29,8 @@ export default function EditarCampanhaPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [dispatching, setDispatching] = useState(false)
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,6 +51,42 @@ export default function EditarCampanhaPage() {
   useEffect(() => {
     if (id) load()
   }, [id, load])
+
+  // Poll a cada 3s enquanto a campanha está em envio — UI vê o progresso.
+  useEffect(() => {
+    if (!campaign || campaign.status !== 'sending') return
+    const handle = window.setInterval(() => {
+      fetch(`/api/admin/email-campaigns/${id}`, { cache: 'no-store' })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (data) setCampaign(data)
+        })
+        .catch(() => {})
+    }, 3000)
+    return () => window.clearInterval(handle)
+  }, [campaign, id])
+
+  async function handleDispatch() {
+    if (!campaign) return
+    const recipientsHint = campaign.recipientCount > 0 ? ` para ${campaign.recipientCount} pessoas` : ''
+    if (!window.confirm(`Disparar a campanha "${campaign.name}"${recipientsHint} agora? Esta ação não pode ser desfeita.`)) return
+    setDispatching(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/admin/email-campaigns/${id}/dispatch`, { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (res.status === 202) {
+        setFeedback({ kind: 'ok', text: 'Disparo iniciado. Acompanhe o progresso abaixo.' })
+        load()
+      } else {
+        setFeedback({ kind: 'err', text: data?.error || 'Erro ao disparar.' })
+      }
+    } catch {
+      setFeedback({ kind: 'err', text: 'Erro de conexão.' })
+    } finally {
+      setDispatching(false)
+    }
+  }
 
   async function handleDelete() {
     if (!campaign) return
@@ -87,10 +125,17 @@ export default function EditarCampanhaPage() {
     )
   }
 
-  const isLocked = campaign.status === 'sending' || campaign.status === 'sent'
+  const isLocked = campaign.status === 'sending' || campaign.status === 'sent' || campaign.status === 'failed'
+  const canDispatch = campaign.status === 'draft' || campaign.status === 'scheduled'
 
   return (
     <div>
+      {feedback && (
+        <div style={{ padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', background: feedback.kind === 'ok' ? '#DCFCE7' : '#FEE2E2', color: feedback.kind === 'ok' ? '#166534' : '#B42318' }}>
+          {feedback.text}
+        </div>
+      )}
+
       {isLocked ? (
         <ReadOnlyView campaign={campaign} />
       ) : (
@@ -107,22 +152,37 @@ export default function EditarCampanhaPage() {
           onSaved={() => load()}
         />
       )}
-      {!isLocked && (
-        <div style={{ marginTop: '24px' }}>
+
+      <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        {canDispatch && (
+          <button
+            onClick={handleDispatch}
+            disabled={dispatching}
+            style={{ padding: '10px 18px', borderRadius: '8px', border: 'none', background: '#1D7A72', color: 'white', fontWeight: 600, cursor: dispatching ? 'not-allowed' : 'pointer', opacity: dispatching ? 0.7 : 1 }}
+          >
+            {dispatching ? 'Iniciando...' : 'Disparar agora'}
+          </button>
+        )}
+        {!isLocked && (
           <button
             onClick={handleDelete}
             disabled={deleting}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #FCA5A5', background: 'white', color: '#B42318', fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer' }}
+            style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #FCA5A5', background: 'white', color: '#B42318', fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer' }}
           >
             {deleting ? 'Excluindo...' : 'Excluir campanha'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
 function ReadOnlyView({ campaign }: { campaign: Campaign }) {
+  const progress = campaign.recipientCount > 0
+    ? Math.min(100, Math.round(((campaign.sentCount + campaign.failedCount) / campaign.recipientCount) * 100))
+    : 0
+  const isSending = campaign.status === 'sending'
+
   return (
     <div>
       <div style={{ marginBottom: '12px' }}>
@@ -131,8 +191,33 @@ function ReadOnlyView({ campaign }: { campaign: Campaign }) {
       <header style={{ marginBottom: '20px' }}>
         <p style={{ fontSize: '12px', color: '#4A7AB5', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', margin: 0 }}>Comunicação</p>
         <h1 style={{ fontSize: 'clamp(24px, 3vw, 32px)', color: '#1D2235', margin: '6px 0 4px' }}>{campaign.name}</h1>
-        <p style={{ color: '#6B7494', margin: 0 }}>Esta campanha está em envio ou já foi enviada — visualização somente leitura.</p>
+        <p style={{ color: '#6B7494', margin: 0 }}>
+          {isSending ? 'Em envio — esta página atualiza sozinha enquanto a campanha roda.' : 'Visualização somente leitura.'}
+        </p>
       </header>
+
+      {campaign.recipientCount > 0 && (
+        <div style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '10px' }}>
+            <strong style={{ color: '#1D2235' }}>Progresso</strong>
+            <span style={{ color: '#6B7494', fontSize: '14px' }}>{progress}% concluído</span>
+          </div>
+          <div style={{ height: '10px', borderRadius: '999px', background: '#E4EDF8', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${progress}%`,
+                height: '100%',
+                background: campaign.status === 'failed' ? '#B42318' : '#1D7A72',
+                transition: 'width 0.4s ease',
+              }}
+            />
+          </div>
+          <p style={{ margin: '10px 0 0', color: '#6B7494', fontSize: '14px' }}>
+            {campaign.sentCount} enviados · {campaign.failedCount} falhas · {campaign.recipientCount} destinatários
+          </p>
+        </div>
+      )}
+
       <div style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <dl style={{ display: 'grid', gap: '12px', margin: 0 }}>
           <div>
