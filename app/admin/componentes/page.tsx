@@ -52,6 +52,7 @@ function formatNumber(n: number, unit: string): string {
 
 export default function ComponentesPage() {
   const [components, setComponents] = useState<Component[]>([])
+  const [kpis, setKpis] = useState<{ total: number; inLow: number; zeroed: number; estimatedValue: number | null; componentsWithCost: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'low' | 'inactive'>('all')
@@ -63,13 +64,19 @@ export default function ComponentesPage() {
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch('/api/componentes', { cache: 'no-store' })
-      if (!res.ok) {
+      const [listRes, kpisRes] = await Promise.all([
+        fetch('/api/componentes', { cache: 'no-store' }),
+        fetch('/api/componentes/kpis', { cache: 'no-store' }),
+      ])
+      if (!listRes.ok) {
         setError('Erro ao carregar.')
         return
       }
-      const data = await res.json()
+      const data = await listRes.json()
       setComponents(Array.isArray(data.components) ? data.components : [])
+      if (kpisRes.ok) {
+        setKpis(await kpisRes.json())
+      }
     } catch {
       setError('Erro de conexão.')
     } finally {
@@ -164,6 +171,23 @@ export default function ComponentesPage() {
           </button>
         </div>
       </header>
+
+      {kpis && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+          <KpiCard label="Componentes ativos" value={String(kpis.total)} />
+          <KpiCard label="Em baixa" value={String(kpis.inLow)} tone={kpis.inLow > 0 ? 'warn' : 'neutral'} />
+          <KpiCard label="Zerados" value={String(kpis.zeroed)} tone={kpis.zeroed > 0 ? 'danger' : 'neutral'} />
+          {kpis.estimatedValue !== null ? (
+            <KpiCard
+              label="Valor estimado em estoque"
+              value={`R$ ${kpis.estimatedValue.toFixed(2).replace('.', ',')}`}
+              hint={`baseado em ${kpis.componentsWithCost} ${kpis.componentsWithCost === 1 ? 'componente' : 'componentes'} com custo cadastrado`}
+            />
+          ) : (
+            <KpiCard label="Valor em estoque" value="—" hint="cadastre 'custo unitário' nos componentes pra ver" />
+          )}
+        </div>
+      )}
 
       {error && (
         <div style={{ background: '#FEE2E2', color: '#B42318', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px' }}>{error}</div>
@@ -293,6 +317,27 @@ export default function ComponentesPage() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  hint?: string
+  tone?: 'neutral' | 'warn' | 'danger'
+}) {
+  const accent = tone === 'danger' ? '#B42318' : tone === 'warn' ? '#92400E' : '#1D2235'
+  return (
+    <div style={{ background: 'white', borderRadius: '12px', padding: '14px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <p style={{ margin: 0, fontSize: '12px', color: '#6B7494', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
+      <p style={{ margin: '4px 0 0', fontSize: '22px', fontWeight: 700, color: accent }}>{value}</p>
+      {hint && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#6B7494' }}>{hint}</p>}
     </div>
   )
 }

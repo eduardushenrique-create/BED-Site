@@ -154,14 +154,22 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 
 Outros futuros:
 
-### 🧹 Dívidas técnicas conhecidas
-- 2 erros pré-existentes em `tests/e2e.spec.ts` (Playwright, linhas 26 e 34)
-- 1 erro pré-existente em `app/api/orders/[orderNumber]/route.ts:8` (`RouteContext` não tipado)
-- `console.error` em `lib/database.ts` ainda não migrados para `captureException` (escopo grande, fazer aos poucos)
-- `lib/auth-codes.ts:assertRateLimit` está marcado `@deprecated` mas ainda no arquivo
-- `lib/supabase.ts` é legado — pode ser removido
-- Modelos `Cart`/`CartItem` no schema não são usados (carrinho vive em React Context)
-- Lint debt: alguns `react-hooks/set-state-in-effect` em `useEffect` síncronos
+### 📦 Controle de estoque de componentes (SPEC-001) — ENTREGUE em 5 fases
+- **Spec completa:** [`docs/implementation/spec/SPEC-001-components-stock-control.md`](spec/SPEC-001-components-stock-control.md)
+- **Fase 1** (PR #72) — CRUD `Component` + `StockMovement` + `AlertSettings` + tela `/admin/componentes` + tela `/admin/configuracoes/alertas`
+- **Fase 2** (PR #74) — modelo `ProductComponent` (BOM) + tela "Componentes deste produto" no editor de produto
+- **Fase 3** (PR #76) — hook em `updateProductionTask` que debita estoque atomicamente conforme `quantityDelta`; card "Materiais necessários" no detalhe do pedido
+- **Fase 4** (PR #77) — alertas reais: e-mail `low_stock_alert` (com throttle de 6h via `LowStockAlertLog`) + e-mail `order_component_shortage` na criação de pedido + badge vermelho no menu lateral
+- **Fase 5** — KPIs no `/admin/componentes` (total/em baixa/zerados/valor estimado) + export CSV de movimentações + esta seção
+- **Pendência operacional do stakeholder:** cadastrar e-mails em `/admin/configuracoes/alertas` após o deploy pra alertas dispararem (sem cadastro, fallback é `RESEND_REPLY_TO_EMAIL`)
+
+### 🧹 Dívidas técnicas — TODAS LIMPAS
+- ✅ `lib/supabase.ts` + `lib/db.ts` (PR #63 + dependência npm desinstalada)
+- ✅ `assertRateLimitLegacy` deprecated (PR #57)
+- ✅ Modelos `Cart`/`CartItem` + `DROP TABLE` em prod (PR #65)
+- ✅ `console.error` → `captureException` + `pino` em `lib/database.ts` (PRs #67 + #69, 71 ocorrências migradas via helper `reportDbError`)
+- ✅ Erros pré-existentes em `tests/e2e.spec.ts` (PR #66)
+- ✅ Erro `RouteContext` em `app/api/orders/[orderNumber]/route.ts` (resolvido em PR antigo)
 
 ## 6. Subagents disponíveis (já criados)
 
