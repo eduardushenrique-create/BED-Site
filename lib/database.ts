@@ -44,6 +44,7 @@ import { getStorage } from '@/lib/storage'
 import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
+import { applyProductionConsumption } from '@/lib/components-stock'
 
 const log = createLogger({ component: 'database' })
 
@@ -2606,8 +2607,17 @@ export async function updateProductionTask(
         },
       })
 
+      // Fase 3 SPEC-001: debita componentes do estoque proporcional ao
+      // delta produzido. Roda DENTRO da transação pra ser atômico com
+      // o ProductionLog — se rollback, estoque também volta.
+      const consumption = await applyProductionConsumption(tx, {
+        taskId: id,
+        delta: computed.delta,
+        actorEmail: actor.email || null,
+      })
+
       orderIdForRefresh = updated.orderId
-      return { ok: true as const }
+      return { ok: true as const, consumption }
     })
 
     if (!result.ok) return { ok: false, error: result.error }
