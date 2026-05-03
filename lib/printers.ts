@@ -17,11 +17,24 @@ export type PrinterDto = {
   status: PrinterStatus
   color: string | null
   notes: string | null
+  /** Consumo em watts. Usado pra calcular custo de energia. */
+  powerConsumptionWatts: number | null
+  /** Preço pago na impressora (R$). Usado pra calcular depreciação. */
+  acquisitionCostBRL: number | null
+  /** Vida útil em horas (ex.: 5000). Depreciação por hora = aquisição / horas. */
+  lifetimeHours: number | null
   createdAt: string
   updatedAt: string
 }
 
 const printerClient = (): any => (prisma as any)?.printer
+
+function decimalToNumber(value: any): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') return value
+  // Prisma Decimal tem toString
+  return Number(value.toString())
+}
 
 function serialize(p: any): PrinterDto {
   return {
@@ -34,6 +47,9 @@ function serialize(p: any): PrinterDto {
     status: (p.status as PrinterStatus) || 'active',
     color: p.color || null,
     notes: p.notes || null,
+    powerConsumptionWatts: typeof p.powerConsumptionWatts === 'number' ? p.powerConsumptionWatts : null,
+    acquisitionCostBRL: decimalToNumber(p.acquisitionCostBRL),
+    lifetimeHours: typeof p.lifetimeHours === 'number' ? p.lifetimeHours : null,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt,
   }
@@ -48,6 +64,23 @@ export type PrinterInput = {
   status?: PrinterStatus
   color?: string | null
   notes?: string | null
+  powerConsumptionWatts?: number | null
+  acquisitionCostBRL?: number | null
+  lifetimeHours?: number | null
+}
+
+function nonNegIntOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isFinite(num) || num < 0) return null
+  return Math.floor(num)
+}
+
+function nonNegDecimalOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isFinite(num) || num < 0) return null
+  return Math.round(num * 100) / 100
 }
 
 function sanitize(input: PrinterInput) {
@@ -63,6 +96,9 @@ function sanitize(input: PrinterInput) {
     status,
     color: input.color?.trim() || null,
     notes: input.notes?.trim() || null,
+    powerConsumptionWatts: nonNegIntOrNull(input.powerConsumptionWatts),
+    acquisitionCostBRL: nonNegDecimalOrNull(input.acquisitionCostBRL),
+    lifetimeHours: nonNegIntOrNull(input.lifetimeHours),
   }
 }
 
@@ -137,6 +173,15 @@ export async function updatePrinter(id: string, input: Partial<PrinterInput>): P
     const cap = Number(input.dailyCapacityMinutes)
     if (!Number.isFinite(cap) || cap < 0) return { ok: false, error: 'Capacidade inválida.' }
     partial.dailyCapacityMinutes = Math.round(Math.min(60 * 24 * 30, cap))
+  }
+  if (input.powerConsumptionWatts !== undefined) {
+    partial.powerConsumptionWatts = nonNegIntOrNull(input.powerConsumptionWatts)
+  }
+  if (input.acquisitionCostBRL !== undefined) {
+    partial.acquisitionCostBRL = nonNegDecimalOrNull(input.acquisitionCostBRL)
+  }
+  if (input.lifetimeHours !== undefined) {
+    partial.lifetimeHours = nonNegIntOrNull(input.lifetimeHours)
   }
 
   if (!hasDatabase || !printerClient()) {
