@@ -145,7 +145,7 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
   const timeline = buildTimeline(order, production)
 
   return (
-    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '960px' }}>
+    <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '1100px', width: '100%' }}>
       <Link href="/meus-pedidos" style={{ color: '#1D2235', fontWeight: 600, fontSize: '14px' }}>← Voltar para meus pedidos</Link>
 
       <header style={{ marginTop: '16px', marginBottom: '32px' }}>

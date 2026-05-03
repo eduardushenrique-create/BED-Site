@@ -27,8 +27,14 @@ export async function GET(request: NextRequest) {
   const state = readState(request.nextUrl.searchParams.get('state'))
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
 
+  // CRÍTICO: usar `appUrl` como base do redirect, não `request.url`. Em
+  // produção atrás do proxy do Railway, request.url pode vir com host
+  // interno (localhost:8080) por X-Forwarded-Host não propagado, e o
+  // browser segue redirect literal — usuário ia parar em localhost.
+  const baseUrl = appUrl
+
   if (!code || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return NextResponse.redirect(new URL('/login?error=google', request.url))
+    return NextResponse.redirect(new URL('/login?error=google', baseUrl))
   }
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -45,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   const token = await tokenRes.json() as GoogleTokenResponse
   if (!tokenRes.ok || !token.access_token) {
-    return NextResponse.redirect(new URL('/login?error=google', request.url))
+    return NextResponse.redirect(new URL('/login?error=google', baseUrl))
   }
 
   const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
@@ -54,11 +60,11 @@ export async function GET(request: NextRequest) {
   const profile = await userRes.json() as GoogleUserInfo
 
   if (!userRes.ok || !profile.email) {
-    return NextResponse.redirect(new URL('/login?error=google', request.url))
+    return NextResponse.redirect(new URL('/login?error=google', baseUrl))
   }
 
   const user = await findOrCreateSessionUser(profile.email, profile.name)
   await createSession(user)
 
-  return NextResponse.redirect(new URL(state.redirect || '/checkout', request.url))
+  return NextResponse.redirect(new URL(state.redirect || '/minha-conta', baseUrl))
 }
