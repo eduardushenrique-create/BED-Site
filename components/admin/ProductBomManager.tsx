@@ -88,8 +88,7 @@ export default function ProductBomManager({ productId, variants = [] }: Props) {
     load()
   }, [load])
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleAdd() {
     if (!newCompId || !newQty) return
     setSaving(true)
     setError('')
@@ -225,14 +224,15 @@ export default function ProductBomManager({ productId, variants = [] }: Props) {
         </div>
       )}
 
-      <form
-        onSubmit={handleAdd}
-        style={{ borderTop: '1px solid #E3E9F4', paddingTop: '14px', display: 'grid', gap: '10px' }}
-      >
+      {/* Não pode ser <form> aqui — este componente é embarcado dentro do
+          form do editor de produto e HTML não permite forms aninhados. Usar
+          div + button type="button" evita que clicar em "Adicionar componente"
+          submeta o form externo (que salva o produto e redireciona). */}
+      <div style={{ borderTop: '1px solid #E3E9F4', paddingTop: '14px', display: 'grid', gap: '10px' }}>
         <h3 style={{ margin: 0, fontSize: '14px', color: '#1D2235' }}>+ Vincular novo componente</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
           <Field label="Componente">
-            <select required value={newCompId} onChange={e => setNewCompId(e.target.value)} style={input}>
+            <select value={newCompId} onChange={e => setNewCompId(e.target.value)} style={input}>
               <option value="">Selecione...</option>
               {availableComponents.map(c => (
                 <option key={c.id} value={c.id}>
@@ -246,7 +246,6 @@ export default function ProductBomManager({ productId, variants = [] }: Props) {
               type="number"
               min="0"
               step="any"
-              required
               value={newQty}
               onChange={e => setNewQty(e.target.value)}
               placeholder="Ex.: 1, 0.045"
@@ -269,14 +268,15 @@ export default function ProductBomManager({ productId, variants = [] }: Props) {
         </div>
         <div>
           <button
-            type="submit"
+            type="button"
+            onClick={handleAdd}
             disabled={saving || !newCompId || !newQty}
             style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#1D2235', color: 'white', fontWeight: 600, cursor: saving || !newCompId || !newQty ? 'not-allowed' : 'pointer', fontSize: '13px' }}
           >
             {saving ? 'Salvando...' : '+ Adicionar componente'}
           </button>
         </div>
-      </form>
+      </div>
     </section>
   )
 }
