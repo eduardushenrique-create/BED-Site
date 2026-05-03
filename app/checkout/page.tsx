@@ -76,10 +76,14 @@ export default function CheckoutPage() {
   const [couponLoading, setCouponLoading] = useState(false)
   const [couponError, setCouponError] = useState('')
   const [couponData, setCouponData] = useState<{ code: string; discount: number; type: 'fixed' | 'percentage'; value: number } | null>(null)
+  const [orderSubmitted, setOrderSubmitted] = useState(false)
 
   useEffect(() => {
-    if (items.length === 0) router.push('/produtos')
-  }, [items.length, router])
+    // Race condition fix: clearCart() após criar pedido esvazia o carrinho
+    // e dispararia esse redirect, atropelando o router.push pra
+    // /pedido-confirmado. Gate via orderSubmitted impede.
+    if (items.length === 0 && !orderSubmitted) router.push('/produtos')
+  }, [items.length, router, orderSubmitted])
 
   useEffect(() => {
     let cancelled = false
@@ -363,12 +367,13 @@ export default function CheckoutPage() {
         return
       }
 
+      setOrderSubmitted(true)
       clearCart()
       if (data.payment?.checkoutUrl) {
         window.location.href = data.payment.checkoutUrl
         return
       }
-      router.push(`/pedido-confirmado?pedido=${data.orderNumber}`)
+      router.push(`/pedido-confirmado?pedido=${encodeURIComponent(data.orderNumber)}`)
     } catch {
       setErrors(prev => ({ ...prev, submit: 'Erro ao processar pedido. Tente novamente.' }))
     } finally {

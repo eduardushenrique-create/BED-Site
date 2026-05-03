@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiUser } from '@/lib/api-auth'
-import { addToWishlist, getCustomerByEmail, listWishlistForCustomer } from '@/lib/database'
+import { addToWishlist, createCustomer, getCustomerByEmail, listWishlistForCustomer } from '@/lib/database'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Garante que o usuário logado tenha um Customer associado (admin não
+ * tem Customer row por padrão — ele vive em AdminUser). Sem isso, admin
+ * clica em favoritar e bate em 404.
+ */
+async function ensureCustomer(email: string, name: string) {
+  const existing = await getCustomerByEmail(email)
+  if (existing) return existing
+  return await createCustomer({ name, email, phone: undefined })
+}
 
 export async function GET() {
   const auth = await requireApiUser()
   if (auth.response) return auth.response
 
-  const customer = await getCustomerByEmail(auth.user!.email)
+  const customer = await ensureCustomer(auth.user!.email, auth.user!.name)
   if (!customer) return NextResponse.json([])
 
   const items = await listWishlistForCustomer(customer.id)
@@ -19,7 +30,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireApiUser()
   if (auth.response) return auth.response
 
-  const customer = await getCustomerByEmail(auth.user!.email)
+  const customer = await ensureCustomer(auth.user!.email, auth.user!.name)
   if (!customer) return NextResponse.json({ error: 'Cliente não encontrado.' }, { status: 404 })
 
   const body = await request.json().catch(() => null)

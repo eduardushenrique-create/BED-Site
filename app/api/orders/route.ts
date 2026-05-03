@@ -47,7 +47,11 @@ interface OrderRequest {
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
   const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  return `B&D-${timestamp}-${random}`
+  // ATENÇÃO: NÃO usar `&` — é caractere reservado em URLs e o
+  // proxy/edge (Cloudflare/Railway) trata como início de query string,
+  // truncando `params.orderNumber` em rotas dinâmicas. Use só
+  // letras/números/hífen.
+  return `BD-${timestamp}-${random}`
 }
 
 export async function POST(request: Request) {
