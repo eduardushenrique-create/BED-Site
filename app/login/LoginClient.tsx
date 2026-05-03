@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import { useAuth } from '@/context/AuthContext'
 
 type Tab = 'login' | 'signup'
 type Mode = 'code' | 'password'
@@ -13,6 +14,7 @@ type Mode = 'code' | 'password'
 export default function LoginClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { refresh: refreshAuth } = useAuth()
   const redirectTo = useMemo(() => searchParams.get('redirect') || '/minha-conta', [searchParams])
   const initialTab = (searchParams.get('tab') as Tab) || 'login'
 
@@ -140,6 +142,12 @@ export default function LoginClient() {
       }
     }
 
+    // Atualiza o AuthContext client-side antes de navegar. Sem isso, o
+    // /minha-conta carrega com user=null cacheado do mount inicial e
+    // redireciona pro /login (loop). router.refresh() invalida o RSC,
+    // mas o estado client do AuthProvider só re-busca via refresh().
+    await refreshAuth()
+
     setLoading(false)
     router.push(redirectTo)
     router.refresh()
@@ -168,6 +176,7 @@ export default function LoginClient() {
       return
     }
 
+    await refreshAuth()
     router.push(redirectTo)
     router.refresh()
   }
