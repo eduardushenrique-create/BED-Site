@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 
 type Props = {
@@ -7,9 +8,15 @@ type Props = {
   alt: string
   className?: string
   style?: React.CSSProperties
+  /** sizes hint para o `next/image` em modo `fill`. Default cobre os layouts atuais (cards/galeria). */
+  sizes?: string
+  /** marca como prioritária — usar só na imagem hero acima da dobra. */
+  priority?: boolean
 }
 
-export default function SafeImage({ src, alt, className, style }: Props) {
+const DEFAULT_SIZES = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
+
+export default function SafeImage({ src, alt, className, style, sizes, priority }: Props) {
   const [broken, setBroken] = useState(false)
   const hasSrc = Boolean(src && src.length > 0)
 
@@ -39,16 +46,49 @@ export default function SafeImage({ src, alt, className, style }: Props) {
     )
   }
 
+  // Data URLs (legado do storage inline) não passam pelo otimizador do
+  // next/image — caem no <img> direto pra não quebrar produtos antigos. Novos
+  // uploads vão pro Vercel Blob como https e ganham o otimizador.
+  if (src!.startsWith('data:')) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={src!}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        onError={() => setBroken(true)}
+        className={className}
+        style={style}
+      />
+    )
+  }
+
+  // URLs remotas: wrapper relative + Image fill. Todos os call sites já
+  // encapsulam num container com aspect-ratio ou width/height fixos, então
+  // herdar 100%/100% mantém o comportamento atual.
+  const objectFit = (style?.objectFit as React.CSSProperties['objectFit']) || 'cover'
   return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src={src!}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      onError={() => setBroken(true)}
+    <span
       className={className}
-      style={style}
-    />
+      style={{
+        ...style,
+        position: 'relative',
+        display: 'block',
+        overflow: 'hidden',
+        width: style?.width ?? '100%',
+        height: style?.height ?? '100%',
+      }}
+    >
+      <Image
+        src={src!}
+        alt={alt}
+        fill
+        sizes={sizes || DEFAULT_SIZES}
+        priority={priority}
+        onError={() => setBroken(true)}
+        style={{ objectFit }}
+      />
+    </span>
   )
 }

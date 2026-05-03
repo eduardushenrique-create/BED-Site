@@ -1,22 +1,33 @@
 import type { NextConfig } from "next";
 
-// Configura `next/image` para liberar o host do Cloudflare R2 quando
-// `R2_PUBLIC_URL` está setada. Sem a env, mantém o array vazio (não regride o
-// comportamento atual onde imagens são data URLs inline e SafeImage usa <img>).
-function buildRemotePatterns(): NonNullable<NonNullable<NextConfig['images']>['remotePatterns']> {
-  const publicUrl = process.env.R2_PUBLIC_URL
-  if (!publicUrl) return []
-  try {
-    const parsed = new URL(publicUrl)
-    return [
-      {
+type RemotePattern = NonNullable<NonNullable<NextConfig['images']>['remotePatterns']>[number]
+
+// Hosts liberados para `next/image`. Mantemos R2 (legado, opt-in via env) e
+// liberamos o wildcard do Vercel Blob — qualquer store dele cai em
+// `*.public.blob.vercel-storage.com`. Sem env extra: o subdomínio muda por
+// store, e mesmo trocando de store o pattern continua valendo.
+function buildRemotePatterns(): RemotePattern[] {
+  const patterns: RemotePattern[] = [
+    {
+      protocol: 'https',
+      hostname: '*.public.blob.vercel-storage.com',
+    },
+  ]
+
+  const r2Url = process.env.R2_PUBLIC_URL
+  if (r2Url) {
+    try {
+      const parsed = new URL(r2Url)
+      patterns.push({
         protocol: parsed.protocol.replace(':', '') as 'http' | 'https',
         hostname: parsed.hostname,
-      },
-    ]
-  } catch {
-    return []
+      })
+    } catch {
+      // env mal formada — ignora silenciosamente, app não regride.
+    }
   }
+
+  return patterns
 }
 
 const nextConfig: NextConfig = {
