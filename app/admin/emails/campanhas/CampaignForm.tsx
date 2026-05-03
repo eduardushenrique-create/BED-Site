@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import HtmlEditor from '@/components/HtmlEditor'
 
 type Segment =
   | { type: 'all' }
@@ -172,18 +173,18 @@ export default function CampaignForm({ initial, onSaved }: Props) {
             />
           </Field>
 
-          <Field label="HTML do e-mail">
-            <textarea
+          <div style={{ display: 'grid', gap: '6px' }}>
+            <label style={{ fontSize: '14px', color: '#1D2235', fontWeight: 600 }}>HTML do e-mail</label>
+            <HtmlEditor
               value={values.htmlBody}
-              onChange={e => setValues({ ...values, htmlBody: e.target.value })}
-              required
-              rows={14}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)', fontSize: '13px' }}
+              onChange={html => setValues({ ...values, htmlBody: html })}
+              minHeight={340}
+              placeholder="Use Visual para escrever, ou HTML para colar um e-mail marketing pronto."
             />
             <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6B7494' }}>
               O link de descadastro é adicionado automaticamente no rodapé.
             </p>
-          </Field>
+          </div>
 
           <Field label="Texto puro (opcional)">
             <textarea
