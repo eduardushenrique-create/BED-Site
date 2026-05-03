@@ -43,6 +43,13 @@ model Product {
   underOrder               Boolean  @default(false)
   productionMinutesPerUnit Int?
 
+  // Calculadora de custo (Fase 3 SPEC calculadora produto):
+  printerForCostId String?
+  printerForCost   Printer? @relation("PrinterCostProducts", fields: [printerForCostId], references: [id], onDelete: SetNull)
+  printingMinutes  Int?
+  markupPercent    Decimal? @db.Decimal(6, 2)
+  errorRatePercent Decimal? @default(30.00) @db.Decimal(6, 2)
+
   categoryId            String?
   category              Category?              @relation(fields: [categoryId], references: [id])
   images                ProductImage[]
@@ -51,6 +58,7 @@ model Product {
   orderItems            OrderItem[]
   reviews               Review[]
   components            ProductComponent[]
+  filaments             ProductFilament[]
 
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -152,6 +160,7 @@ model ProductVariant {
   orderItems OrderItem[]
   images     ProductImage[]
   components ProductComponent[]
+  filaments  ProductFilament[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -304,6 +313,7 @@ model Printer {
   acquisitionCostBRL     Decimal?         @db.Decimal(10, 2)
   lifetimeHours          Int?
   productionTasks        ProductionTask[]
+  costProducts           Product[]        @relation("PrinterCostProducts")
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -559,18 +569,37 @@ model LowStockAlertLog {
 }
 
 model Filament {
-  id         String   @id @default(cuid())
+  id         String            @id @default(cuid())
   name       String
   brand      String?
-  type       String   // PLA | PETG | TPU | ABS | PETG-HF | PLA-Speed+ | Other
-  pricePerKg Decimal  @db.Decimal(10, 2)
-  notes      String?  @db.Text
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  type       String             // PLA | PETG | TPU | ABS | PETG-HF | PLA-Speed+ | Other
+  pricePerKg Decimal             @db.Decimal(10, 2)
+  notes      String?             @db.Text
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  productLinks ProductFilament[]
 
   @@index([isActive])
   @@index([type])
+}
+
+model ProductFilament {
+  id         String          @id @default(cuid())
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  filamentId String
+  filament   Filament        @relation(fields: [filamentId], references: [id], onDelete: Restrict)
+  grams      Decimal         @db.Decimal(10, 3)
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([productId])
+  @@index([filamentId])
 }
 
 model AlertSettings {

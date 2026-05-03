@@ -6,6 +6,7 @@ import Input from '@/components/Input'
 import ProductGalleryEditor from '@/components/admin/ProductGalleryEditor'
 import ProductVariantsEditor from '@/components/admin/ProductVariantsEditor'
 import ProductBomManager from '@/components/admin/ProductBomManager'
+import ProductCostCalculator from '@/components/admin/ProductCostCalculator'
 
 interface Product {
   id: string
@@ -343,6 +344,9 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #EEF1F8' }}>
                   <ProductBomManager productId={editingId} />
+                </div>
+                <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #EEF1F8' }}>
+                  <ProductCostCalculator productId={editingId} />
                 </div>
               </>
             ) : (
