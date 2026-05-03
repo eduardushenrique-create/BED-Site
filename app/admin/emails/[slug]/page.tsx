@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import HtmlEditor from '@/components/HtmlEditor'
 
 type Variable = { name: string; description: string; example: string }
 
@@ -187,16 +188,15 @@ export default function AdminEmailTemplatePage() {
             />
           </label>
 
-          <label style={{ display: 'grid', gap: '6px', fontSize: '14px', color: '#1D2235', fontWeight: 600 }}>
-            HTML
-            <textarea
+          <div style={{ display: 'grid', gap: '6px' }}>
+            <label style={{ fontSize: '14px', color: '#1D2235', fontWeight: 600 }}>HTML</label>
+            <HtmlEditor
               value={htmlBody}
-              onChange={e => setHtmlBody(e.target.value)}
-              required
-              rows={18}
-              style={{ padding: '12px', borderRadius: '8px', border: '1px solid #D8DCE8', fontSize: '13px', fontFamily: 'var(--font-mono)' }}
+              onChange={setHtmlBody}
+              minHeight={360}
+              placeholder="Edite visualmente ou troque para HTML para colar o código completo."
             />
-          </label>
+          </div>
 
           <label style={{ display: 'grid', gap: '6px', fontSize: '14px', color: '#1D2235', fontWeight: 600 }}>
             Texto puro (opcional)
