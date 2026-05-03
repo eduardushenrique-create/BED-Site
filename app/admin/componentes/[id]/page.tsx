@@ -310,7 +310,18 @@ export default function ComponentDetailPage() {
           </section>
 
           <section style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: '15px' }}>Histórico</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '15px' }}>Histórico</h2>
+              {movements.length > 0 && (
+                <a
+                  href={`/api/componentes/${id}/historico`}
+                  download
+                  style={{ fontSize: '12px', color: '#4A7AB5', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  ⬇ Exportar CSV
+                </a>
+              )}
+            </div>
             {movements.length === 0 ? (
               <p style={{ margin: 0, fontSize: '13px', color: '#6B7494' }}>Nenhuma movimentação registrada.</p>
             ) : (
