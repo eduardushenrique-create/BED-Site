@@ -329,15 +329,48 @@ Bloco novo "Materiais necessários" listando o consumo planejado de componentes 
 - **Reservar estoque ao receber pedido** (vs debitar na produção) — escolhemos o caminho mais simples; reserva pode ser adicionada depois sem quebrar dados
 - **Lotes / FIFO / validade** — não há necessidade no negócio atual (componentes são duráveis)
 
-## 10. Perguntas em aberto pro stakeholder
+## 10. Perguntas em aberto — RESPONDIDAS pelo stakeholder em 2026-05-03
 
-1. **Unidade padrão** — você prefere "un, m, kg, g, L, ml" como combo fixo ou texto livre? (recomendo combo + opção "Outro" texto livre)
-2. **lowStockThreshold padrão** — default = 20% do estoque inicial? Ou sempre exigir do admin no cadastro?
-3. **Custo unitário** — você quer ver agora? (recomendo começar sem; adicionar como opcional)
-4. **E-mail de baixa** — vai pro mesmo `eduardus.henrique@gmail.com` configurado em `RESEND_REPLY_TO_EMAIL` ou tem outro destinatário operacional?
-5. **Frequência do alerta proativo no checkout** — só dispara o e-mail (1 por evento) ou também notifica em tempo real no painel? (recomendo só e-mail + badge no card)
-6. **Bloqueio total** — ainda mantemos "nunca bloquear, só avisar"? Ou em algum cenário o pedido deve ser recusado se faltar componente? (sob encomenda foi explicitamente liberado por você)
+| # | Pergunta | Resposta |
+|---|---|---|
+| 1 | Unidade padrão | **Combo fixo** `un, m, kg, g, L, ml` (sem texto livre) |
+| 2 | `lowStockThreshold` default | **Sem sugestão automática** — admin digita manualmente |
+| 3 | Custo unitário (`costPerUnit`) | **Sim, mostrar agora** no formulário (opcional, só admin) |
+| 4 | E-mail de alerta — destinatário | **Configurável** — adicionar tela de configuração com lista de e-mails que recebem alertas |
+| 5 | Frequência do alerta proativo | **Ambos** — e-mail (pros configurados) + badge no card do pedido |
+| 6 | Bloqueio | **Não bloquear** em hipótese alguma. Pedidos que **não são** sob encomenda não bloqueiam mesmo se faltar estoque — só geram alerta. Pedidos sob encomenda também passam, com alerta. |
+
+### Mudanças na spec após as respostas
+
+- **Nova entidade `AlertSettings`** (singleton): lista de e-mails que recebem alertas de baixa + alertas proativos. Substitui o destinatário hardcoded.
+  ```
+  AlertSettings {
+    id              String  @id @default("default")
+    lowStockEmails  Json    // string[] — e-mails que recebem alerta de baixa
+    orderAlertEmails Json   // string[] — e-mails que recebem alerta proativo (pedido com falta)
+    updatedAt       DateTime
+  }
+  ```
+  Tela: `/admin/configuracoes/alertas` (ou aba dentro de uma página geral de configurações). Endpoints: `GET/PUT /api/configuracoes/alertas`.
+  Fallback: se nenhum e-mail cadastrado, cai pro `RESEND_REPLY_TO_EMAIL` (não fica em silêncio).
+- **Combo fixo de unidades**: `UNIT_OPTIONS = ['un', 'm', 'kg', 'g', 'L', 'ml']` exposto como const compartilhada `lib/units.ts`. UI usa `<select>`. Validação no backend rejeita valor fora da lista.
+- **Sem sugestão de threshold**: campo só com placeholder vazio. Sem threshold preenchido, o alerta de baixa não dispara pra esse componente (já era o plano original).
+- **Custo unitário**: campo opcional no formulário desde a Fase 1, mas o relatório "valor em estoque" fica pra Fase 5.
+
+### Consequência no plano de fases
+
+Fase 1 ganha o **CRUD de `AlertSettings`** (escopo +0.3 dia). Plano final:
+
+| Fase | Escopo | Estimativa |
+|---|---|---|
+| 1 | Modelo + CRUD componentes + tela `/admin/configuracoes/alertas` | ~1.3 dia |
+| 2 | BOM (ProductComponent) | ~1 dia |
+| 3 | Decremento automático + reversão | ~1 dia |
+| 4 | Alertas (e-mail pros configurados + badge) | ~0.5 dia |
+| 5 | Polimento + relatórios + valor em estoque | ~0.5 dia |
+
+**Total revisado: ~4.3 dias** (5 PRs).
 
 ---
 
-**Após aprovar esta spec**, abro o PR da Fase 1 (modelo + CRUD básico) e seguimos.
+**Spec aprovada.** Após merge, abro o PR da Fase 1.
