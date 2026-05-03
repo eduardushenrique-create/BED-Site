@@ -58,12 +58,20 @@ export default function AdminEmailsPage() {
             Edite o texto dos e-mails enviados aos clientes. Templates não customizados continuam usando o padrão do sistema.
           </p>
         </div>
-        <Link
-          href="/admin/emails/campanhas"
-          style={{ padding: '10px 18px', borderRadius: '10px', background: 'white', color: '#1D2235', textDecoration: 'none', fontWeight: 600, border: '1px solid #D8DCE8' }}
-        >
-          Campanhas →
-        </Link>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <Link
+            href="/admin/emails/descadastros"
+            style={{ padding: '10px 18px', borderRadius: '10px', background: 'white', color: '#1D2235', textDecoration: 'none', fontWeight: 600, border: '1px solid #D8DCE8' }}
+          >
+            Descadastros
+          </Link>
+          <Link
+            href="/admin/emails/campanhas"
+            style={{ padding: '10px 18px', borderRadius: '10px', background: 'white', color: '#1D2235', textDecoration: 'none', fontWeight: 600, border: '1px solid #D8DCE8' }}
+          >
+            Campanhas →
+          </Link>
+        </div>
       </header>
 
       {error && (
