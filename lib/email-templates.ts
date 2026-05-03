@@ -26,6 +26,8 @@ export type EmailTemplateSlug =
   | 'password_reset'
   | 'access_code'
   | 'restock_alert'
+  | 'low_stock_alert'
+  | 'order_component_shortage'
 
 export interface EmailTemplateDefinition {
   slug: EmailTemplateSlug
@@ -329,6 +331,56 @@ export const TEMPLATE_CATALOG: Record<EmailTemplateSlug, EmailTemplateDefinition
     <a href="{{productUrl}}" style="display: inline-block; padding: 12px 22px; background: #1D2235; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Ver produto</a>
   </p>
   <p style="color: #6B7494; font-size: 13px;">Você recebeu este e-mail porque pediu para ser avisado quando este produto voltasse ao estoque.</p>
+</div>`,
+  },
+
+  low_stock_alert: {
+    slug: 'low_stock_alert',
+    label: 'Estoque baixo (componente)',
+    description: 'Aviso interno disparado quando um componente atinge o limite mínimo configurado.',
+    variables: [
+      { name: 'componentName', description: 'Nome do componente', example: 'TAG NFC 13.56MHz' },
+      { name: 'componentSku', description: 'SKU do componente', example: 'NFC-001' },
+      { name: 'currentStock', description: 'Saldo atual formatado', example: '8' },
+      { name: 'unit', description: 'Unidade de medida', example: 'un' },
+      { name: 'threshold', description: 'Limite mínimo configurado', example: '10' },
+      { name: 'restockUrl', description: 'Link pra tela do componente no admin', example: 'https://app.beddesigns.com.br/admin/componentes/abc' },
+      { name: 'supplierUrl', description: 'Link de recompra (se cadastrado)', example: 'https://fornecedor.com/produto' },
+    ],
+    defaultSubject: '⚠️ Estoque baixo: {{componentName}} ({{currentStock}} {{unit}}) — BED Design',
+    defaultHtml: `<div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+  <h2 style="color: #B42318;">Estoque baixo: {{componentName}}</h2>
+  <p>O componente <strong>{{componentName}}</strong>{{componentSku}} caiu para <strong>{{currentStock}} {{unit}}</strong>, abaixo do limite mínimo de {{threshold}} {{unit}}.</p>
+  <p style="margin: 24px 0;">
+    <a href="{{restockUrl}}" style="display: inline-block; padding: 12px 22px; background: #1D2235; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Abrir no painel</a>
+    <a href="{{supplierUrl}}" style="display: inline-block; padding: 12px 22px; background: white; color: #1D2235; border: 1px solid #D8DCE8; text-decoration: none; border-radius: 8px; font-weight: 600; margin-left: 8px;">Comprar com fornecedor</a>
+  </p>
+  <p style="color: #6B7494; font-size: 13px;">Você recebe este e-mail por estar cadastrado(a) na lista de alertas de estoque baixo. Gerencie em /admin/configuracoes/alertas.</p>
+</div>`,
+  },
+
+  order_component_shortage: {
+    slug: 'order_component_shortage',
+    label: 'Pedido sem componente em estoque',
+    description: 'Aviso interno disparado quando um pedido entra precisando de componente que falta. Pedido NÃO é bloqueado.',
+    variables: [
+      { name: 'orderNumber', description: 'Número do pedido', example: 'BED-000123' },
+      { name: 'customerName', description: 'Nome do cliente', example: 'Maria Silva' },
+      { name: 'orderUrl', description: 'Link pro pedido no admin', example: 'https://app.beddesigns.com.br/admin/pedidos/abc' },
+      { name: 'shortagesHtml', description: 'HTML cru da lista de componentes em falta (use {{raw.shortagesHtml}})', example: '<li><strong>TAG NFC</strong>: faltam 5 un</li>' },
+    ],
+    defaultSubject: '⚠️ Pedido {{orderNumber}} precisa de componente que falta — BED Design',
+    defaultHtml: `<div style="font-family: Arial, sans-serif; color: #1D2235; max-width: 560px; margin: 0 auto;">
+  <h2 style="color: #92400E;">Pedido entrou e precisa repor estoque</h2>
+  <p>O pedido <strong>{{orderNumber}}</strong> de <strong>{{customerName}}</strong> precisa de componentes que não estão totalmente disponíveis.</p>
+  <p>O pedido NÃO foi bloqueado — siga normalmente. Mas é hora de repor:</p>
+  <ul style="background: #FEF3C7; padding: 16px 16px 16px 32px; border-radius: 8px; line-height: 1.6;">
+    {{raw.shortagesHtml}}
+  </ul>
+  <p style="margin: 24px 0;">
+    <a href="{{orderUrl}}" style="display: inline-block; padding: 12px 22px; background: #1D2235; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Abrir pedido</a>
+  </p>
+  <p style="color: #6B7494; font-size: 13px;">Você recebe este e-mail por estar cadastrado(a) na lista de alertas proativos. Gerencie em /admin/configuracoes/alertas.</p>
 </div>`,
   },
 }
