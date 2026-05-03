@@ -754,7 +754,7 @@ export async function listCategories() {
     const categories = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] })
     return categories.map(serializeCategory)
   } catch (error) {
-    console.error('[database] listCategories Prisma failed, using fallback:', error)
+    reportDbError('listCategories Prisma failed, using fallback', error)
     return readDB().categories
   }
 }
@@ -771,7 +771,7 @@ export async function createCategory(data: Category) {
   try {
     return serializeCategory(await prisma.category.create({ data }))
   } catch (error) {
-    console.error('[database] createCategory Prisma failed, using fallback:', error)
+    reportDbError('createCategory Prisma failed, using fallback', error)
     const db = readDB()
     const newCategory: Category = { ...data, id: `cat_${Date.now()}` }
     db.categories.push(newCategory)
@@ -793,7 +793,7 @@ export async function updateCategory(id: string, data: Partial<Category>) {
   try {
     return serializeCategory(await prisma.category.update({ where: { id }, data }))
   } catch (error) {
-    console.error('[database] updateCategory Prisma failed, using fallback:', error)
+    reportDbError('updateCategory Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.categories.findIndex(category => category.id === id)
     if (index === -1) return null
@@ -817,7 +817,7 @@ export async function deleteCategory(id: string) {
     await prisma.category.delete({ where: { id } })
     return true
   } catch (error) {
-    console.error('[database] deleteCategory Prisma failed:', error)
+    reportDbError('deleteCategory Prisma failed', error)
     return false
   }
 }
@@ -850,7 +850,7 @@ export async function listCustomers(q = '') {
 
     return customers.map(serializeCustomer)
   } catch (error) {
-    console.error('[database] listCustomers Prisma failed, using fallback:', error)
+    reportDbError('listCustomers Prisma failed, using fallback', error)
     return readDB().users
   }
 }
@@ -875,7 +875,7 @@ export async function createCustomer(data: Pick<User, 'name' | 'email' | 'phone'
   try {
     return serializeCustomer(await prisma.customer.create({ data }))
   } catch (error) {
-    console.error('[database] createCustomer Prisma failed, using fallback:', error)
+    reportDbError('createCustomer Prisma failed, using fallback', error)
     const db = readDB()
     const existing = db.users.find(user => user.email === data.email)
     if (existing) return null
@@ -908,7 +908,7 @@ export async function updateCustomer(id: string, data: Partial<User>) {
       data: { name: data.name, email: data.email, phone: data.phone, cpf: data.cpf },
     }))
   } catch (error) {
-    console.error('[database] updateCustomer Prisma failed, using fallback:', error)
+    reportDbError('updateCustomer Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.users.findIndex(user => user.id === id)
     if (index === -1) return null
@@ -926,7 +926,7 @@ export async function getCustomerById(id: string): Promise<User | null> {
     const customer = await prisma.customer.findUnique({ where: { id } })
     return customer ? serializeCustomer(customer) : null
   } catch (error) {
-    console.error('[database] getCustomerById Prisma failed, using fallback:', error)
+    reportDbError('getCustomerById Prisma failed, using fallback', error)
     return readDB().users.find(user => user.id === id) || null
   }
 }
@@ -940,7 +940,7 @@ export async function getCustomerByEmail(email: string): Promise<User | null> {
     const customer = await prisma.customer.findUnique({ where: { email: normalized } })
     return customer ? serializeCustomer(customer) : null
   } catch (error) {
-    console.error('[database] getCustomerByEmail Prisma failed, using fallback:', error)
+    reportDbError('getCustomerByEmail Prisma failed, using fallback', error)
     return readDB().users.find(user => user.email.toLowerCase() === normalized) || null
   }
 }
@@ -990,7 +990,7 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
       offset,
     }
   } catch (error) {
-    console.error('[database] listOrdersByCustomerEmail Prisma failed, using fallback:', error)
+    reportDbError('listOrdersByCustomerEmail Prisma failed, using fallback', error)
     const db = readDB()
     let filtered = db.orders.filter(o => o.customerEmail.toLowerCase() === normalized)
     if (opts.status) filtered = filtered.filter(o => o.status === opts.status)
@@ -1017,7 +1017,7 @@ export async function listAddressesByCustomerId(customerId: string): Promise<Cus
     })
     return addresses.map(serializeAddress)
   } catch (error) {
-    console.error('[database] listAddressesByCustomerId Prisma failed, using fallback:', error)
+    reportDbError('listAddressesByCustomerId Prisma failed, using fallback', error)
     const db = readDB()
     return db.customerAddresses
       .filter(addr => addr.customerId === customerId)
@@ -1106,7 +1106,7 @@ export async function createAddress(customerId: string, data: AddressInput): Pro
     })
     return { address: serializeAddress(created) }
   } catch (error) {
-    console.error('[database] createAddress Prisma failed:', error)
+    reportDbError('createAddress Prisma failed', error)
     return { address: null, error: 'Não foi possível salvar o endereço.' }
   }
 }
@@ -1162,7 +1162,7 @@ export async function updateAddress(customerId: string, id: string, data: Partia
     })
     return serializeAddress(updated)
   } catch (error) {
-    console.error('[database] updateAddress Prisma failed:', error)
+    reportDbError('updateAddress Prisma failed', error)
     return null
   }
 }
@@ -1202,7 +1202,7 @@ export async function deleteAddress(customerId: string, id: string): Promise<boo
     })
     return true
   } catch (error) {
-    console.error('[database] deleteAddress Prisma failed:', error)
+    reportDbError('deleteAddress Prisma failed', error)
     return false
   }
 }
@@ -1213,7 +1213,7 @@ export async function listBanners() {
     const banners = await prisma.banner.findMany({ orderBy: { createdAt: 'desc' } })
     return banners.map(serializeBanner)
   } catch (error) {
-    console.error('[database] listBanners Prisma failed, using fallback:', error)
+    reportDbError('listBanners Prisma failed, using fallback', error)
     return readDB().banners
   }
 }
@@ -1237,7 +1237,7 @@ export async function createBanner(data: Banner) {
     })
     return serializeBanner(created)
   } catch (error) {
-    console.error('[database] createBanner Prisma failed, using fallback:', error)
+    reportDbError('createBanner Prisma failed, using fallback', error)
     const db = readDB()
     const newBanner: Banner = { ...data, id: `banner_${Date.now()}` }
     db.banners.push(newBanner)
@@ -1280,7 +1280,7 @@ export async function updateBanner(id: string, data: Partial<Banner>) {
 
     return serializeBanner(await prisma.banner.update({ where: { id }, data: payload }))
   } catch (error) {
-    console.error('[database] updateBanner Prisma failed, using fallback:', error)
+    reportDbError('updateBanner Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.banners.findIndex(banner => banner.id === id)
     if (index === -1) return null
@@ -1312,7 +1312,7 @@ export async function deleteBanner(id: string) {
     }
     return true
   } catch (error) {
-    console.error('[database] deleteBanner Prisma failed:', error)
+    reportDbError('deleteBanner Prisma failed', error)
     return false
   }
 }
@@ -1326,7 +1326,7 @@ export async function listOrders() {
     })
     return orders.map(serializeOrder)
   } catch (error) {
-    console.error('[database] listOrders Prisma failed, using fallback:', error)
+    reportDbError('listOrders Prisma failed, using fallback', error)
     return readDB().orders
   }
 }
@@ -1343,7 +1343,7 @@ export async function getOrderByNumber(orderNumber: string) {
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
-    console.error('[database] getOrderByNumber Prisma failed, using fallback:', error)
+    reportDbError('getOrderByNumber Prisma failed, using fallback', error)
     return readDB().orders.find(order => order.orderNumber === orderNumber) || null
   }
 }
@@ -1363,7 +1363,7 @@ export async function getOrderByTrackingCode(trackingCode: string) {
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
-    console.error('[database] getOrderByTrackingCode Prisma failed, using fallback:', error)
+    reportDbError('getOrderByTrackingCode Prisma failed, using fallback', error)
     return readDB().orders.find(order => order.trackingCode === code) || null
   }
 }
@@ -1424,7 +1424,7 @@ export async function anonymizeCustomer(customerId: string, email: string): Prom
     })
     return { ok: true }
   } catch (error) {
-    console.error('[database] anonymizeCustomer Prisma failed:', error)
+    reportDbError('anonymizeCustomer Prisma failed', error)
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -1477,7 +1477,7 @@ export async function cancelOrderByOwner(
     ])
     return { ok: true, orderStatus: 'cancelled' }
   } catch (error) {
-    console.error('[database] cancelOrderByOwner Prisma failed:', error)
+    reportDbError('cancelOrderByOwner Prisma failed', error)
     return { ok: false, error: 'not_cancellable' }
   }
 }
@@ -1514,7 +1514,7 @@ export async function setOrderFulfillmentByTracking(
     })
     return { ok: true, orderNumber: order.orderNumber, previousStatus: order.fulfillmentStatus }
   } catch (error) {
-    console.error('[database] setOrderFulfillmentByTracking Prisma failed:', error)
+    reportDbError('setOrderFulfillmentByTracking Prisma failed', error)
     return { ok: false }
   }
 }
@@ -1536,7 +1536,7 @@ export async function getOrderByIdOrNumber(idOrNumber: string) {
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
-    console.error('[database] getOrderByIdOrNumber Prisma failed, using fallback:', error)
+    reportDbError('getOrderByIdOrNumber Prisma failed, using fallback', error)
     const orders = readDB().orders
     return (
       orders.find(order => order.id === idOrNumber) ||
@@ -1607,7 +1607,7 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
 
     return serializeOrder(order)
   } catch (error) {
-    console.error('[database] createOrder Prisma failed, using fallback:', error)
+    reportDbError('createOrder Prisma failed, using fallback', error)
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
     db.orders.unshift(newOrder)
@@ -1662,7 +1662,7 @@ export async function updateOrder(id: string, data: Partial<Order>) {
 
     return serializeOrder(order)
   } catch (error) {
-    console.error('[database] updateOrder Prisma failed, using fallback:', error)
+    reportDbError('updateOrder Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
     if (index === -1) return null
@@ -1755,7 +1755,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       include: { address: true, payment: true, items: true },
     }))
   } catch (error) {
-    console.error('[database] updateOrderPaymentByNumber Prisma failed:', error)
+    reportDbError('updateOrderPaymentByNumber Prisma failed', error)
     return null
   }
 }
@@ -1864,7 +1864,7 @@ export async function deleteOrder(id: string) {
     await prisma.order.delete({ where: { id } })
     return true
   } catch (error) {
-    console.error('[database] deleteOrder Prisma failed:', error)
+    reportDbError('deleteOrder Prisma failed', error)
     return false
   }
 }
@@ -1985,7 +1985,7 @@ async function readSettingsRecord(): Promise<ProductionSettingsRecord> {
     }
     return serializeSettings(row)
   } catch (error) {
-    console.error('[database] readSettingsRecord Prisma failed, using fallback:', error)
+    reportDbError('readSettingsRecord Prisma failed, using fallback', error)
     const db = readDB()
     return db.productionSettings[0] || {
       id: 'default',
@@ -2079,7 +2079,7 @@ export async function updateProductionSettings(
     })
     return { ok: true, settings: serializeSettings(row) }
   } catch (error) {
-    console.error('[database] updateProductionSettings Prisma failed:', error)
+    reportDbError('updateProductionSettings Prisma failed', error)
     return { ok: false, error: 'Erro ao salvar configurações de produção.' }
   }
 }
@@ -2272,7 +2272,7 @@ export async function listProductionTasks(
     const summary = await computeSummary(now)
     return { items, summary, pagination: { limit, offset, total } }
   } catch (error) {
-    console.error('[database] listProductionTasks Prisma failed, using fallback:', error)
+    reportDbError('listProductionTasks Prisma failed, using fallback', error)
     return {
       items: [],
       summary: emptySummary(),
@@ -2330,7 +2330,7 @@ async function computeSummary(now: Date): Promise<ProductionTaskSummary> {
 
     return summary
   } catch (error) {
-    console.error('[database] computeSummary Prisma failed:', error)
+    reportDbError('computeSummary Prisma failed', error)
     return summary
   }
 }
@@ -2428,7 +2428,7 @@ export async function getProductionTask(
     }))
     return { ...serialized, logs }
   } catch (error) {
-    console.error('[database] getProductionTask Prisma failed:', error)
+    reportDbError('getProductionTask Prisma failed', error)
     return null
   }
 }
@@ -2601,7 +2601,7 @@ export async function updateProductionTask(
     if (!refreshed) return { ok: false, error: 'Tarefa não encontrada após atualização.' }
     return { ok: true, task: refreshed }
   } catch (error) {
-    console.error('[database] updateProductionTask Prisma failed:', error)
+    reportDbError('updateProductionTask Prisma failed', error)
     return { ok: false, error: 'Erro ao atualizar tarefa de produção.' }
   }
 }
@@ -2797,14 +2797,14 @@ export async function ensureProductionTasksForOrder(
       } catch (err: any) {
         // Idempotent: ignore unique violation on orderItemId
         if (err?.code !== 'P2002') {
-          console.error('[database] ensureProductionTasksForOrder create failed:', err)
+          reportDbError('ensureProductionTasksForOrder create failed', err)
         }
       }
     }
 
     return { created }
   } catch (error) {
-    console.error('[database] ensureProductionTasksForOrder Prisma failed:', error)
+    reportDbError('ensureProductionTasksForOrder Prisma failed', error)
     return { created: 0, skipped: 'error' }
   }
 }
@@ -2889,7 +2889,7 @@ export async function syncProductionTasksForPaidOrders(input?: {
 
     return { created, skipped, ordersScanned: candidates.length }
   } catch (error) {
-    console.error('[database] syncProductionTasksForPaidOrders Prisma failed:', error)
+    reportDbError('syncProductionTasksForPaidOrders Prisma failed', error)
     return { created: 0, skipped: 0, ordersScanned: 0 }
   }
 }
@@ -2954,7 +2954,7 @@ export async function getCustomerOrderProduction(
     }))
     return serializeCustomerProduction(inputs, orderNumber)
   } catch (error) {
-    console.error('[database] getCustomerOrderProduction Prisma failed:', error)
+    reportDbError('getCustomerOrderProduction Prisma failed', error)
     return null
   }
 }
@@ -3007,7 +3007,7 @@ export async function refreshOrderFulfillmentFromProduction(
       })
     }
   } catch (error) {
-    console.error('[database] refreshOrderFulfillmentFromProduction Prisma failed:', error)
+    reportDbError('refreshOrderFulfillmentFromProduction Prisma failed', error)
   }
 }
 
@@ -3080,7 +3080,7 @@ export async function listCoupons(): Promise<CouponRecord[]> {
     const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } })
     return coupons.map(serializeCoupon)
   } catch (error) {
-    console.error('[database] listCoupons Prisma failed, using fallback:', error)
+    reportDbError('listCoupons Prisma failed, using fallback', error)
     const db = readDB()
     return [...db.coupons].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   }
@@ -3097,7 +3097,7 @@ export async function getCouponByCode(code: string): Promise<CouponRecord | null
     const coupon = await prisma.coupon.findUnique({ where: { code: upper } })
     return coupon ? serializeCoupon(coupon) : null
   } catch (error) {
-    console.error('[database] getCouponByCode Prisma failed, using fallback:', error)
+    reportDbError('getCouponByCode Prisma failed, using fallback', error)
     const db = readDB()
     return db.coupons.find(c => c.code.toUpperCase() === upper) || null
   }
@@ -3173,7 +3173,7 @@ export async function createCoupon(data: CouponInput): Promise<{ coupon: CouponR
     })
     return { coupon: serializeCoupon(created) }
   } catch (error) {
-    console.error('[database] createCoupon Prisma failed:', error)
+    reportDbError('createCoupon Prisma failed', error)
     return { coupon: null, error: 'Erro ao criar cupom.' }
   }
 }
@@ -3281,7 +3281,7 @@ export async function updateCoupon(id: string, data: Partial<CouponInput>): Prom
     const updated = await prisma.coupon.update({ where: { id }, data: updateData })
     return { coupon: serializeCoupon(updated) }
   } catch (error) {
-    console.error('[database] updateCoupon Prisma failed:', error)
+    reportDbError('updateCoupon Prisma failed', error)
     return { coupon: null, error: 'Erro ao atualizar cupom.' }
   }
 }
@@ -3300,7 +3300,7 @@ export async function deleteCoupon(id: string): Promise<boolean> {
     await prisma.coupon.delete({ where: { id } })
     return true
   } catch (error) {
-    console.error('[database] deleteCoupon Prisma failed:', error)
+    reportDbError('deleteCoupon Prisma failed', error)
     return false
   }
 }
@@ -3364,7 +3364,7 @@ export async function incrementCouponUsage(code: string): Promise<void> {
       data: { usedCount: { increment: 1 } },
     })
   } catch (error) {
-    console.error('[database] incrementCouponUsage Prisma failed:', error)
+    reportDbError('incrementCouponUsage Prisma failed', error)
   }
 }
 
@@ -3476,7 +3476,7 @@ export async function listProductVariants(productId: string): Promise<ProductVar
     })
     return variants.map(serializeVariant)
   } catch (error) {
-    console.error('[database] listProductVariants Prisma failed:', error)
+    reportDbError('listProductVariants Prisma failed', error)
     return []
   }
 }
@@ -3557,7 +3557,7 @@ export async function createProductVariant(
     })
     return { ok: true, variant: serializeVariant(variant) }
   } catch (error) {
-    console.error('[database] createProductVariant Prisma failed:', error)
+    reportDbError('createProductVariant Prisma failed', error)
     return { ok: false, error: 'Erro ao criar variação.' }
   }
 }
@@ -3653,7 +3653,7 @@ export async function updateProductVariant(
     dispatchRestockNotificationsIfNeeded(productId, variantId).catch(() => {})
     return { ok: true, variant: serializeVariant(updated) }
   } catch (error) {
-    console.error('[database] updateProductVariant Prisma failed:', error)
+    reportDbError('updateProductVariant Prisma failed', error)
     return { ok: false, error: 'Erro ao atualizar variação.' }
   }
 }
@@ -3681,7 +3681,7 @@ export async function deleteProductVariant(
     await prisma.productVariant.delete({ where: { id: variantId } })
     return { ok: true }
   } catch (error) {
-    console.error('[database] deleteProductVariant Prisma failed:', error)
+    reportDbError('deleteProductVariant Prisma failed', error)
     return { ok: false, error: 'Erro ao remover variação.' }
   }
 }
@@ -3792,7 +3792,7 @@ export async function listWishlistForCustomer(customerId: string): Promise<Wishl
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     }))
   } catch (error) {
-    console.error('[database] listWishlistForCustomer Prisma failed, using fallback:', error)
+    reportDbError('listWishlistForCustomer Prisma failed, using fallback', error)
     return readWishlistFromLocalDb(customerId)
   }
 }
@@ -3812,7 +3812,7 @@ export async function listWishlistProductIds(customerId: string): Promise<string
     })
     return records.map((r: any) => r.productId)
   } catch (error) {
-    console.error('[database] listWishlistProductIds Prisma failed:', error)
+    reportDbError('listWishlistProductIds Prisma failed', error)
     return []
   }
 }
@@ -3854,7 +3854,7 @@ export async function addToWishlist(
     })
     return { ok: true }
   } catch (error) {
-    console.error('[database] addToWishlist Prisma failed:', error)
+    reportDbError('addToWishlist Prisma failed', error)
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -3909,7 +3909,7 @@ export async function subscribeToRestock(input: RestockAlertSubscription): Promi
     })
     return { ok: true }
   } catch (error) {
-    console.error('[database] subscribeToRestock Prisma failed:', error)
+    reportDbError('subscribeToRestock Prisma failed', error)
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -3941,7 +3941,7 @@ export async function listPendingRestockAlertsForProduct(
     })
     return records as PendingRestockAlert[]
   } catch (error) {
-    console.error('[database] listPendingRestockAlertsForProduct Prisma failed:', error)
+    reportDbError('listPendingRestockAlertsForProduct Prisma failed', error)
     return []
   }
 }
@@ -3998,7 +3998,7 @@ export async function dispatchRestockNotificationsIfNeeded(
     const alerts = await listPendingRestockAlertsForProduct(productId, null)
     await dispatchRestockEmails(alerts, product.name, product.slug)
   } catch (error) {
-    console.error('[database] dispatchRestockNotificationsIfNeeded failed:', error)
+    reportDbError('dispatchRestockNotificationsIfNeeded failed', error)
   }
 }
 
@@ -4021,7 +4021,7 @@ export async function markRestockAlertsNotified(ids: string[]): Promise<void> {
       data: { notifiedAt: new Date() },
     })
   } catch (error) {
-    console.error('[database] markRestockAlertsNotified Prisma failed:', error)
+    reportDbError('markRestockAlertsNotified Prisma failed', error)
   }
 }
 
@@ -4153,7 +4153,7 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardMetrics>
       topProductThisMonth: top,
     }
   } catch (error) {
-    console.error('[database] getAdminDashboardMetrics Prisma failed:', error)
+    reportDbError('getAdminDashboardMetrics Prisma failed', error)
     return {
       todayPaidCount: 0,
       todayPaidRevenue: 0,
@@ -4187,7 +4187,7 @@ export async function removeFromWishlist(
     await wishlistClient().deleteMany({ where: { customerId, productId } })
     return { ok: true }
   } catch (error) {
-    console.error('[database] removeFromWishlist Prisma failed:', error)
+    reportDbError('removeFromWishlist Prisma failed', error)
     return { ok: false }
   }
 }
