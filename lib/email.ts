@@ -49,10 +49,17 @@ async function sendTemplate(args: {
   devFallback?: () => void
 }): Promise<boolean> {
   if (!resend) {
-    if (process.env.NODE_ENV !== 'production' && args.devFallback) {
-      args.devFallback()
+    // Dev: loga código no console e finge sucesso pro fluxo continuar.
+    // Prod: retorna FALSE — caller tem que mostrar erro pro usuário,
+    // senão a UI mente "código enviado" e nunca chega nada (problema
+    // real do dashboard Resend mostrando "No sent emails yet" porque
+    // RESEND_API_KEY estava ausente em prod).
+    if (process.env.NODE_ENV !== 'production') {
+      if (args.devFallback) args.devFallback()
+      return true
     }
-    return true
+    console.error(`[email] RESEND_API_KEY ausente em produção — não é possível enviar template ${args.slug}`)
+    return false
   }
 
   try {
