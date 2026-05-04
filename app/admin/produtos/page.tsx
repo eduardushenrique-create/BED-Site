@@ -25,7 +25,7 @@ interface Product {
   underOrder: boolean
   sku?: string
   productionMinutesPerUnit?: number | null
-  coverImage?: string | null
+  imageUrl?: string | null
 }
 
 interface Category {
@@ -181,8 +181,8 @@ function ProductCard({
     >
       {/* Thumb 4:3 */}
       <div style={{ position: 'relative', aspectRatio: '4/3', background: '#F0F5FB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {product.coverImage
-          ? <img src={product.coverImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {product.imageUrl
+          ? <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ fontSize: '40px', color: '#D8DCE8' }}>□</span>
         }
         <div style={{ position: 'absolute', top: '8px', left: '8px' }}>
@@ -866,8 +866,8 @@ export default function AdminProductsPage() {
                     <td style={{ padding: '14px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#F0F5FB', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {product.coverImage
-                            ? <img src={product.coverImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          {product.imageUrl
+                            ? <img src={product.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : <span style={{ fontSize: '16px', color: '#D8DCE8' }}>□</span>
                           }
                         </div>
