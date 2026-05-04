@@ -409,8 +409,11 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
           </div>
 
           <h3 style={subtitleStyle}>Tempo & equipamento</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-            <Field label="Tempo de impressão (minutos)">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px', alignItems: 'start' }}>
+            <Field
+              label="Tempo de impressão (minutos)"
+              helper="Tempo total de fatiamento por unidade."
+            >
               <input
                 type="number"
                 min="0"
@@ -421,7 +424,16 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
                 style={inputStyle}
               />
             </Field>
-            <Field label="Impressora usada">
+            <Field
+              label="Impressora usada"
+              helper={
+                selectedPrinter && (!selectedPrinter.powerConsumptionWatts || !selectedPrinter.acquisitionCostBRL || !selectedPrinter.lifetimeHours) ? (
+                  <span style={{ color: '#92400E' }}>
+                    ⚠️ Faltam dados de consumo/aquisição/vida útil. Energia/depreciação zerados.
+                  </span>
+                ) : 'Usada para calcular energia e depreciação.'
+              }
+            >
               <select value={printerForCostId} onChange={e => setPrinterForCostId(e.target.value)} style={inputStyle}>
                 <option value="">Selecione...</option>
                 {printerOptions.map(p => (
@@ -431,13 +443,11 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
                   </option>
                 ))}
               </select>
-              {selectedPrinter && (!selectedPrinter.powerConsumptionWatts || !selectedPrinter.acquisitionCostBRL || !selectedPrinter.lifetimeHours) && (
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#92400E' }}>
-                  ⚠️ Esta impressora está sem alguns campos de custo (consumo/aquisição/vida útil). Energia/depreciação ficam zerados até você completar em /admin/impressoras.
-                </p>
-              )}
             </Field>
-            <Field label="Taxa de erro (%)">
+            <Field
+              label="Taxa de erro (%)"
+              helper="Aplicada sobre custo de filamento (default 30%)."
+            >
               <input
                 type="number"
                 min="0"
@@ -446,11 +456,11 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
                 onChange={e => setErrorRatePercent(e.target.value)}
                 style={inputStyle}
               />
-              <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#6B7494' }}>
-                Aplicada sobre custo de filamento (default 30%).
-              </p>
             </Field>
-            <Field label="Markup (%)">
+            <Field
+              label="Markup (%)"
+              helper="Sobre o custo total. Editar o preço final ao lado recalcula este valor."
+            >
               <input
                 type="number"
                 min="0"
@@ -460,9 +470,6 @@ export default function ProductCostCalculator({ productId, variants = [] }: Prop
                 placeholder="Ex.: 200"
                 style={inputStyle}
               />
-              <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#6B7494' }}>
-                Sobre o custo total. Editar o preço final ao lado recalcula este valor.
-              </p>
             </Field>
           </div>
 
@@ -640,11 +647,16 @@ function Row({ label, value, hint, bold }: { label: string; value: number; hint?
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, helper }: { label: string; children: React.ReactNode; helper?: React.ReactNode }) {
   return (
-    <label style={{ display: 'grid', gap: '4px', fontSize: '12px', color: '#1D2235', fontWeight: 600 }}>
-      {label}
+    <label style={{ display: 'grid', gap: '4px', fontSize: '12px', color: '#1D2235', fontWeight: 600, gridTemplateRows: 'auto auto 1fr', alignContent: 'start' }}>
+      <span>{label}</span>
       {children}
+      {helper !== undefined && (
+        <span style={{ marginTop: '2px', fontSize: '11px', color: '#6B7494', fontWeight: 500, lineHeight: 1.4, minHeight: '28px' }}>
+          {helper}
+        </span>
+      )}
     </label>
   )
 }
