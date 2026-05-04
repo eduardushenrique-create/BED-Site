@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import SiteShell from '@/components/SiteShell'
+import GoogleAnalytics from '@/components/GoogleAnalytics'
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL
 const siteTitle = 'B&D Artes & Impressões — Presentes personalizados em 3D'
@@ -37,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <GoogleAnalytics />
         <SiteShell>{children}</SiteShell>
       </body>
     </html>
