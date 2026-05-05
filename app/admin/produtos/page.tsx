@@ -26,6 +26,7 @@ interface Product {
   sku?: string
   productionMinutesPerUnit?: number | null
   imageUrl?: string | null
+  visibility?: 'public' | 'internal'
 }
 
 interface Category {
@@ -35,7 +36,7 @@ interface Category {
   isActive: boolean
 }
 
-type FilterKey = 'all' | 'published' | 'draft' | 'archived' | 'featured'
+type FilterKey = 'all' | 'published' | 'draft' | 'archived' | 'featured' | 'internal'
 type ViewMode = 'cards' | 'list'
 
 const LS_VIEW_KEY = 'admin.products.view'
@@ -51,6 +52,7 @@ const emptyForm = {
   isPersonalizable: false,
   isFeatured: false,
   productionMinutesPerUnit: '',
+  visibility: 'public' as 'public' | 'internal',
 }
 
 // ─── StatusPill ─────────────────────────────────────────────────────────────────
@@ -188,11 +190,18 @@ function ProductCard({
         <div style={{ position: 'absolute', top: '8px', left: '8px' }}>
           <StatusPill status={status} />
         </div>
-        {product.isFeatured && (
-          <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#D4849A', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px' }}>
-            Destaque
-          </div>
-        )}
+        <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+          {product.isFeatured && (
+            <div style={{ background: '#D4849A', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px' }}>
+              Destaque
+            </div>
+          )}
+          {product.visibility === 'internal' && (
+            <div style={{ background: '#6B7494', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px' }}>
+              Interno
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Body */}
@@ -329,6 +338,7 @@ export default function AdminProductsPage() {
     draft: products.filter(p => p.status === 'draft' || (!p.isActive && p.status !== 'archived')).length,
     archived: products.filter(p => p.status === 'archived').length,
     featured: products.filter(p => p.isFeatured).length,
+    internal: products.filter(p => p.visibility === 'internal').length,
   }
 
   const filteredProducts = products.filter(p => {
@@ -341,6 +351,7 @@ export default function AdminProductsPage() {
     if (activeFilter === 'draft') return p.status === 'draft' || (!p.isActive && p.status !== 'archived')
     if (activeFilter === 'archived') return p.status === 'archived'
     if (activeFilter === 'featured') return p.isFeatured
+    if (activeFilter === 'internal') return p.visibility === 'internal'
     return true
   })
 
@@ -373,6 +384,7 @@ export default function AdminProductsPage() {
         typeof product.productionMinutesPerUnit === 'number' && product.productionMinutesPerUnit > 0
           ? String(product.productionMinutesPerUnit)
           : '',
+      visibility: product.visibility ?? 'public',
     })
     setEditingId(product.id)
     setCurrentStep(0)
@@ -409,6 +421,7 @@ export default function AdminProductsPage() {
       stock: parseInt(formData.stock, 10) || 0,
       underOrder: formData.underOrder,
       sku: formData.sku,
+      visibility: formData.visibility,
       ...(typeof productionMinutes === 'number' && Number.isFinite(productionMinutes) && productionMinutes > 0
         ? { productionMinutesPerUnit: productionMinutes }
         : { productionMinutesPerUnit: null }),
@@ -649,6 +662,35 @@ export default function AdminProductsPage() {
                 </label>
               </div>
 
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#1D2235', marginBottom: '10px' }}>Visibilidade</div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#1D2235' }}>
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="public"
+                      checked={formData.visibility === 'public'}
+                      onChange={() => setFormData({ ...formData, visibility: 'public' })}
+                    />
+                    Público — aparece na loja
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#1D2235' }}>
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="internal"
+                      checked={formData.visibility === 'internal'}
+                      onChange={() => setFormData({ ...formData, visibility: 'internal' })}
+                    />
+                    Interno — só admin pode usar em pedidos
+                  </label>
+                </div>
+                <p style={{ marginTop: '8px', fontSize: '12px', color: '#6B7494', lineHeight: 1.5 }}>
+                  Produtos internos não aparecem na loja, busca, sitemap ou recomendações. Use para itens de revenda, brindes, kits sob encomenda ou ajustes manuais.
+                </p>
+              </div>
+
               <div style={{ marginTop: '28px', display: 'flex', gap: '12px' }}>
                 <Button type="submit" variant="blue" disabled={!categories.length}>
                   {editingId ? 'Salvar e continuar →' : 'Criar produto →'}
@@ -713,6 +755,7 @@ export default function AdminProductsPage() {
     { key: 'draft',     label: 'Rascunhos' },
     { key: 'archived',  label: 'Arquivados' },
     { key: 'featured',  label: 'Em destaque' },
+    { key: 'internal',  label: 'Internos' },
   ]
 
   const allSelected = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length
