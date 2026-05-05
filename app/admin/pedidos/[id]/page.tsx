@@ -173,15 +173,18 @@ function VariantPicker({
 
 /** Ensures all items from the API have the variantId/variantName shape. */
 function normalizeItems(items: unknown[]): OrderItem[] {
-  return (items || []).map((item: any) => ({
-    productId: item.productId,
-    productName: item.productName,
-    variantId: item.variantId ?? null,
-    variantName: item.variantName ?? null,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    observation: item.observation,
-  }))
+  return (items || []).map(raw => {
+    const item = raw as Record<string, unknown>
+    return ({
+    productId: String(item.productId),
+    productName: String(item.productName),
+    variantId: (item.variantId as string | null | undefined) ?? null,
+    variantName: (item.variantName as string | null | undefined) ?? null,
+    quantity: Number(item.quantity),
+    unitPrice: Number(item.unitPrice),
+    observation: item.observation as string | undefined,
+  })
+  })
 }
 
 const fulfillmentStatuses = [

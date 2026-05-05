@@ -356,7 +356,7 @@ export async function createProduct(data: Product) {
           ? { create: [{ url: persistedMain.url, storageKey: persistedMain.storageKey, alt: data.name, isMain: true }] }
           : undefined,
       },
-      include: { category: true, images: true },
+      include: { category: true, images: true, variants: { orderBy: { name: 'asc' } } },
     })
 
     return serializeProduct(product)
@@ -475,7 +475,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
       }
     }
 
-    const final = serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true } }))
+    const final = serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true, variants: { orderBy: { name: 'asc' } } } }))
     // Best-effort restock notifications when the product is now in stock /
     // under order. Won't email anyone if there are no pending subscribers.
     dispatchRestockNotificationsIfNeeded(id).catch(() => {})

@@ -295,6 +295,7 @@ export default function AdminProductsPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_VIEW_KEY)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved === 'cards' || saved === 'list') setView(saved)
     } catch {}
   }, [])

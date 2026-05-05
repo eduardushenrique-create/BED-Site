@@ -28,7 +28,15 @@ export async function PUT(request: NextRequest) {
   let before: { visibility: string; name: string } | null = null
   if (id && Object.prototype.hasOwnProperty.call(data, 'visibility')) {
     try {
-      before = await (prisma as any).product.findUnique({
+      // Cast: visibility é coluna nova do schema; lib/prisma já está com client gerado.
+      // Mantemos o select mínimo pra audit log. ESLint pede tipo explícito.
+      const prismaClient = prisma as unknown as {
+        product: {
+          findUnique: (args: { where: { id: string }; select: { visibility: true; name: true } }) =>
+            Promise<{ visibility: string; name: string } | null>
+        }
+      }
+      before = await prismaClient.product.findUnique({
         where: { id },
         select: { visibility: true, name: true },
       })
