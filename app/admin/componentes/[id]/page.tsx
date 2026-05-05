@@ -230,7 +230,7 @@ export default function ComponentDetailPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 360px)', gap: '20px', alignItems: 'start' }}>
+      <div className="admin-detail-grid" style={{ alignItems: 'start' }}>
         <form onSubmit={handleSave} style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'grid', gap: '14px' }}>
           <h2 style={{ margin: 0, fontSize: '16px' }}>Dados do componente</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>

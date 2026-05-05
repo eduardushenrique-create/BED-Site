@@ -185,7 +185,7 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
         )}
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(0, 1.6fr)', gap: '24px', alignItems: 'start' }}>
+      <div className="admin-detail-grid" style={{ alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <Card title="Dados do Cliente">
             {isEditing ? (
