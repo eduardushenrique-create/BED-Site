@@ -7,12 +7,12 @@ export const dynamic = 'force-dynamic'
 // POST /api/despesas/[id]/arquivar
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response
 
-  const { id } = params
+  const { id } = await params
   if (!id) {
     return NextResponse.json({ error: 'ID inválido.' }, { status: 400 })
   }

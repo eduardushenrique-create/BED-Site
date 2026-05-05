@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 // Restricted to roles 'owner' and 'global_admin'
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response
@@ -21,7 +21,7 @@ export async function PUT(
     )
   }
 
-  const { id } = params
+  const { id } = await params
   if (!id) {
     return NextResponse.json({ error: 'ID inválido.' }, { status: 400 })
   }
