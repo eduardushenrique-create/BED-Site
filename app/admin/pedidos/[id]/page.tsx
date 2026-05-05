@@ -627,7 +627,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px' }}>
+      <div className="admin-order-grid">
+        {/* Coluna esquerda: dados do cliente e pagamento */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <Card title="Cliente">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -667,7 +668,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           </Card>
+        </div>
 
+        {/* Coluna direita: itens, materiais, status e ações */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <Card title="Itens do Pedido">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {order.items.length === 0 ? (

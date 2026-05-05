@@ -152,7 +152,7 @@ export default function CampaignForm({ initial, onSaved }: Props) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 360px)', gap: '20px', alignItems: 'start' }}>
+      <div className="admin-detail-grid" style={{ gap: '20px', alignItems: 'start' }}>
         <form onSubmit={handleSubmit} style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'grid', gap: '14px' }}>
           <Field label="Nome interno (não vai no e-mail)">
             <input

@@ -113,7 +113,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+      <div className="admin-detail-grid" style={{ gap: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>Editar Banner</h1>
           <p style={{ color: '#6B7494', marginBottom: '32px' }}>Altere os dados do banner</p>

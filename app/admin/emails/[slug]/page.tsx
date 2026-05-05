@@ -176,7 +176,7 @@ export default function AdminEmailTemplatePage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 360px)', gap: '20px', alignItems: 'start' }}>
+      <div className="admin-detail-grid" style={{ gap: '20px', alignItems: 'start' }}>
         <form onSubmit={handleSave} style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'grid', gap: '14px' }}>
           <label style={{ display: 'grid', gap: '6px', fontSize: '14px', color: '#1D2235', fontWeight: 600 }}>
             Assunto
