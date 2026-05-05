@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { subscribeToRestock } from '@/lib/database'
+import { subscribeToRestock, hasDatabase } from '@/lib/database'
+import prisma from '@/lib/prisma'
 import { validateEmail } from '@/lib/validation'
 import {
   buildRateLimitKey,
@@ -40,6 +41,22 @@ export async function POST(request: NextRequest) {
   if (!emailLimit.ok) {
     const { body: rlBody, status, headers } = rateLimitResponseBody(emailLimit)
     return NextResponse.json(rlBody, { status, headers })
+  }
+
+  // Validate product exists, is active, and is publicly visible.
+  // Return 404 in all failure cases to avoid leaking the existence of internal SKUs.
+  if (hasDatabase && prisma?.product) {
+    try {
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true, isActive: true, visibility: true },
+      })
+      if (!product || !product.isActive || product.visibility === 'internal') {
+        return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 })
+      }
+    } catch {
+      // If DB check fails, let subscribeToRestock handle its own fallback path.
+    }
   }
 
   try {
