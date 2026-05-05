@@ -752,103 +752,301 @@ export default function AdminOrdersPage() {
       )}
 
       {showAddModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '12px', maxWidth: '700px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Novo Pedido</h2>
-
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Itens do Pedido</h3>
-              <div style={{ border: '1px solid #D8DCE8', borderRadius: '10px', padding: '12px', backgroundColor: '#FFFEFC' }}>
-                <Input
-                  placeholder="Filtrar produtos pelo nome..."
-                  value={searchProduct}
-                  onChange={(e) => setSearchProduct(e.target.value)}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', marginTop: '12px' }}>
-                  {availableProducts.length > 0 ? (
-                    availableProducts.map(product => {
-                      const hasVariants = product.variants && product.variants.length > 0
-                      const isSelected = newOrderItems.some(item => item.productId === product.id)
-                      const isPickerOpen = variantPickerFor === product.id
-                      return (
-                        <div key={product.id} style={{ position: 'relative' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleAddProduct(product)}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              borderRadius: '8px',
-                              border: isSelected ? '1px solid #D4849A' : isPickerOpen ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
-                              backgroundColor: isSelected ? '#D4849A12' : isPickerOpen ? '#F0F5FB' : 'white',
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                            }}
-                          >
-                            <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
-                            <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
-                              {hasVariants
-                                ? `${product.variants.length} variações`
-                                : `R$ ${product.price.toFixed(2).replace('.', ',')} ${product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}`}
-                            </span>
-                            <span style={{ display: 'block', color: hasVariants ? '#BBCFEB' : '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
-                              {hasVariants ? 'Escolher variação' : isSelected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
-                            </span>
-                          </button>
-                          {isPickerOpen && (
-                            <VariantPicker
-                              product={product}
-                              onSelect={(variant) => handleAddVariant(product, variant)}
-                              onClose={() => setVariantPickerFor(null)}
-                            />
-                          )}
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div style={{ padding: '16px', color: '#6B7494', textAlign: 'center', gridColumn: '1 / -1' }}>
-                      Nenhum produto disponivel para este filtro.
-                    </div>
-                  )}
-                </div>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(29,34,53,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '14px', maxWidth: '1100px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 60px rgba(29,34,53,0.25)' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 28px', borderBottom: '1px solid #E3E9F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Novo Pedido</h2>
+                <p style={{ fontSize: '13px', color: '#6B7494', marginTop: '2px' }}>
+                  Selecione produtos, informe o cliente e finalize o pedido
+                </p>
               </div>
-              {newOrderItems.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  {newOrderItems.map(item => {
-                    const key = itemKey(item.productId, item.variantId)
-                    const displayName = item.variantName
-                      ? `${item.productName} · ${item.variantName}`
-                      : item.productName
-                    return (
-                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ flex: 1, fontWeight: 500 }}>{displayName}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity - 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>−</button>
-                            <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
-                            <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity + 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>+</button>
-                          </div>
-                          <span style={{ fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</span>
-                          <button type="button" onClick={() => handleRemoveItem(key)} style={{ width: '32px', height: '32px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '4px', cursor: 'pointer', color: '#EF4444', fontSize: '16px' }}>×</button>
-                        </div>
-                        <input type="text" placeholder="Observações (ex:/cor gravado, cor verde, etc)" value={item.observation || ''} onChange={(e) => handleUpdateObservation(key, e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', fontSize: '14px' }} />
-                      </div>
-                    )
-                  })}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', fontWeight: 700, fontSize: '18px', borderTop: '2px solid #D8DCE8', marginTop: '12px' }}>
-                    <span>Total:</span>
-                    <span>R$ {orderSubtotal.toFixed(2).replace('.', ',')}</span>
-                  </div>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                aria-label="Fechar"
+                style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', cursor: 'pointer', fontSize: '18px', color: '#6B7494' }}
+              >
+                ×
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Cliente</h3>
-                <div style={{ position: 'relative' }}>
+            {/* Body — scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+
+              {/* Section: Itens do Pedido (split panel) */}
+              <section style={{ marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1D2235' }}>
+                      Itens do Pedido
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '2px' }}>
+                      Catálogo à esquerda · carrinho à direita
+                    </p>
+                  </div>
+                  {newOrderItems.length > 0 && (
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#D4849A', background: '#FDF2F5', padding: '4px 10px', borderRadius: '999px' }}>
+                      {newOrderItems.reduce((s, i) => s + i.quantity, 0)} {newOrderItems.reduce((s, i) => s + i.quantity, 0) === 1 ? 'unidade' : 'unidades'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="admin-order-split">
+                  {/* LEFT: Product catalog */}
+                  <div style={{ border: '1px solid #E3E9F4', borderRadius: '12px', backgroundColor: '#FAFCFE', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '440px' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #E3E9F4', backgroundColor: 'white' }}>
+                      <Input
+                        placeholder="🔍  Buscar produto pelo nome..."
+                        value={searchProduct}
+                        onChange={(e) => setSearchProduct(e.target.value)}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                        <span>Catálogo</span>
+                        <span>{availableProducts.length} {availableProducts.length === 1 ? 'item' : 'itens'}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '420px' }}>
+                      {availableProducts.length > 0 ? (
+                        availableProducts.map(product => {
+                          const hasVariants = product.variants && product.variants.length > 0
+                          const isSelected = newOrderItems.some(item => item.productId === product.id)
+                          const isPickerOpen = variantPickerFor === product.id
+                          const stockInfo = product.underOrder
+                            ? { label: 'Sob encomenda', color: '#6B7494', bg: '#F0F5FB' }
+                            : (product.stock ?? 0) > 0
+                              ? { label: `${product.stock} em estoque`, color: '#1D7A72', bg: '#E8F5F2' }
+                              : { label: 'Sem estoque', color: '#B42318', bg: '#FEE2E2' }
+
+                          return (
+                            <div key={product.id}>
+                              <button
+                                type="button"
+                                onClick={() => handleAddProduct(product)}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  borderRadius: '10px',
+                                  border: isSelected ? '1.5px solid #D4849A' : isPickerOpen ? '1.5px solid #BBCFEB' : '1px solid #E3E9F4',
+                                  backgroundColor: isSelected ? '#FDF2F5' : isPickerOpen ? '#EEF4FB' : 'white',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr auto',
+                                  gap: '12px',
+                                  alignItems: 'center',
+                                  transition: 'all 120ms ease-out',
+                                }}
+                              >
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#1D2235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {product.name}
+                                    </span>
+                                    {isSelected && (
+                                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#D4849A', background: 'white', border: '1px solid #D4849A', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                                        ✓ NO PEDIDO
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                                    {hasVariants ? (
+                                      <span style={{ color: '#4A7AB5', fontWeight: 600 }}>
+                                        {product.variants.length} variações
+                                      </span>
+                                    ) : (
+                                      <>
+                                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#1D2235' }}>
+                                          R$ {product.price.toFixed(2).replace('.', ',')}
+                                        </span>
+                                        <span style={{ background: stockInfo.bg, color: stockInfo.color, padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 600 }}>
+                                          {stockInfo.label}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div
+                                  style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '8px',
+                                    backgroundColor: hasVariants ? '#BBCFEB' : '#1D2235',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '18px',
+                                    fontWeight: 700,
+                                    flexShrink: 0,
+                                  }}
+                                  aria-hidden="true"
+                                >
+                                  {hasVariants ? '⌄' : '+'}
+                                </div>
+                              </button>
+
+                              {/* Inline variant picker (replaces absolute positioning that overlapped other rows) */}
+                              {isPickerOpen && hasVariants && (
+                                <div style={{ marginTop: '6px', padding: '12px', borderRadius: '10px', backgroundColor: 'white', border: '1.5px solid #BBCFEB', boxShadow: '0 4px 12px rgba(29,34,53,0.06)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                      Escolha a variação
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setVariantPickerFor(null)}
+                                      aria-label="Fechar"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#6B7494', lineHeight: 1 }}
+                                    >×</button>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {product.variants.map(variant => {
+                                      const label = describeVariant(variant)
+                                      const price = variantEffectivePrice(product.price, variant)
+                                      const stock = variant.stockQuantity ?? 0
+                                      const isSoldOut = !variant.isAvailable || stock <= 0
+                                      return (
+                                        <button
+                                          key={variant.id}
+                                          type="button"
+                                          onClick={() => handleAddVariant(product, variant)}
+                                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E3E9F4', backgroundColor: '#FAFCFE', cursor: 'pointer', textAlign: 'left', color: '#1D2235' }}
+                                        >
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontWeight: 600, fontSize: '13px' }}>{label}</span>
+                                            {variant.sku && (
+                                              <span style={{ fontSize: '11px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>SKU: {variant.sku}</span>
+                                            )}
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                            {isSoldOut ? (
+                                              <span style={{ fontSize: '10px', fontWeight: 700, color: '#B42318', backgroundColor: '#FEE2E2', padding: '2px 8px', borderRadius: '999px' }}>Esgotado</span>
+                                            ) : product.underOrder ? (
+                                              <span style={{ fontSize: '11px', color: '#6B7494' }}>Sob encomenda</span>
+                                            ) : (
+                                              <span style={{ fontSize: '11px', color: '#1D7A72', background: '#E8F5F2', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>{stock} estoque</span>
+                                            )}
+                                            <span style={{ fontWeight: 700, fontSize: '13px', color: '#1D2235', fontFamily: 'var(--font-mono)' }}>
+                                              R$ {price.toFixed(2).replace('.', ',')}
+                                            </span>
+                                          </div>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div style={{ padding: '32px 16px', color: '#6B7494', textAlign: 'center', fontSize: '13px' }}>
+                          {searchProduct ? 'Nenhum produto encontrado para este filtro.' : 'Nenhum produto disponível.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Cart */}
+                  <div style={{ border: '1px solid #E3E9F4', borderRadius: '12px', backgroundColor: 'white', display: 'flex', flexDirection: 'column', minHeight: '440px', maxHeight: '440px' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #E3E9F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        🛒 Carrinho
+                      </span>
+                      {newOrderItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setNewOrderItems([])}
+                          style={{ background: 'none', border: 'none', color: '#6B7494', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          limpar
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+                      {newOrderItems.length === 0 ? (
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#6B7494', padding: '24px' }}>
+                          <div style={{ fontSize: '40px', marginBottom: '8px', opacity: 0.4 }}>🛍️</div>
+                          <p style={{ fontSize: '13px', margin: 0 }}>
+                            Nenhum item adicionado.
+                          </p>
+                          <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: '#9AA1B8' }}>
+                            Clique em um produto à esquerda para começar.
+                          </p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {newOrderItems.map(item => {
+                            const key = itemKey(item.productId, item.variantId)
+                            const displayName = item.variantName
+                              ? `${item.productName} · ${item.variantName}`
+                              : item.productName
+                            return (
+                              <div key={key} style={{ padding: '12px', backgroundColor: '#FAFCFE', borderRadius: '10px', border: '1px solid #E3E9F4', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                  <span style={{ flex: 1, fontWeight: 600, fontSize: '13px', color: '#1D2235', lineHeight: 1.3 }}>{displayName}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItem(key)}
+                                    aria-label="Remover item"
+                                    style={{ width: '24px', height: '24px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#B42318', fontSize: '16px', flexShrink: 0, lineHeight: 1, padding: 0 }}
+                                  >×</button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', padding: '2px' }}>
+                                    <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity - 1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#1D2235' }}>−</button>
+                                    <span style={{ minWidth: '28px', textAlign: 'center', fontWeight: 700, fontSize: '13px' }}>{item.quantity}</span>
+                                    <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity + 1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#1D2235' }}>+</button>
+                                  </div>
+                                  <span style={{ fontWeight: 700, fontSize: '14px', fontFamily: 'var(--font-mono)', color: '#1D2235' }}>
+                                    R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}
+                                  </span>
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Observações (cor, gravado, etc)"
+                                  value={item.observation || ''}
+                                  onChange={(e) => handleUpdateObservation(key, e.target.value)}
+                                  style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #E3E9F4', fontSize: '12px', backgroundColor: 'white' }}
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {newOrderItems.length > 0 && (
+                      <div style={{ padding: '14px 16px', borderTop: '1.5px solid #1D2235', backgroundColor: '#FAFCFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Subtotal</span>
+                        <span style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1D2235' }}>
+                          R$ {orderSubtotal.toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+
+              {/* Section: Cliente & Endereço */}
+              <section>
+                <div style={{ marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1D2235' }}>
+                    Cliente & Entrega
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '2px' }}>
+                    Busque um cliente existente ou cadastre um novo
+                  </p>
+                </div>
+
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
                   <Input
-                    placeholder="Buscar cliente por nome, e-mail ou telefone..."
+                    placeholder="🔍  Buscar cliente por nome, e-mail ou telefone..."
                     value={searchCustomer}
                     onChange={(e) => {
                       setSearchCustomer(e.target.value)
@@ -857,42 +1055,65 @@ export default function AdminOrdersPage() {
                     }}
                   />
                   {showCustomerDropdown && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                    {foundCustomers.length > 0 ? (
-                      foundCustomers.map(customer => (
-                        <div key={customer.id} onClick={() => handleSelectCustomer(customer)} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #F0F5FB' }}>
-                          <div style={{ fontWeight: 500 }}>{customer.name}</div>
-                          <div style={{ fontSize: '12px', color: '#6B7494' }}>{customer.email}</div>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(29,34,53,0.12)', marginTop: '4px' }}>
+                      {foundCustomers.length > 0 ? (
+                        foundCustomers.map(customer => (
+                          <div key={customer.id} onClick={() => handleSelectCustomer(customer)} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #F0F5FB' }}>
+                            <div style={{ fontWeight: 500 }}>{customer.name}</div>
+                            <div style={{ fontSize: '12px', color: '#6B7494' }}>{customer.email}</div>
+                          </div>
+                        ))
+                      ) : searchCustomer.length >= 2 && (
+                        <div onClick={handleCreateNewCustomer} style={{ padding: '12px 16px', cursor: 'pointer', backgroundColor: '#F0F5FB', fontWeight: 500 }}>
+                          + Criar novo cliente: {searchCustomer}
                         </div>
-                      ))
-                    ) : searchCustomer.length >= 2 && (
-                      <div onClick={handleCreateNewCustomer} style={{ padding: '12px 16px', cursor: 'pointer', backgroundColor: '#F0F5FB', fontWeight: 500 }}>
-                        + Criar novo cliente: {searchCustomer}
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
                   )}
                 </div>
+
+                <div className="admin-order-form-grid">
+                  <Input label="Nome do cliente" value={newOrderForm.customerName} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })} required />
+                  <Input label="E-mail" type="email" value={newOrderForm.customerEmail} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerEmail: e.target.value })} required />
+                  <Input label="Telefone" value={newOrderForm.customerPhone} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })} required placeholder="(11) 99999-9999" />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                    <Input label="CEP" value={newOrderForm.zipCode} onChange={(e) => setNewOrderForm({ ...newOrderForm, zipCode: e.target.value })} required placeholder="00000-000" style={{ flex: 1 }} />
+                    <button onClick={handleViaCep} disabled={cepLoading} style={{ padding: '11px 14px', backgroundColor: '#1D2235', color: 'white', border: 'none', borderRadius: '6px', cursor: cepLoading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      {cepLoading ? '...' : 'Buscar'}
+                    </button>
+                  </div>
+                  <Input label="Rua" value={newOrderForm.street} onChange={(e) => setNewOrderForm({ ...newOrderForm, street: e.target.value })} required style={{ gridColumn: '1 / -1' }} />
+                  <Input label="Número" value={newOrderForm.number} onChange={(e) => setNewOrderForm({ ...newOrderForm, number: e.target.value })} required />
+                  <Input label="Complemento" value={newOrderForm.complement} onChange={(e) => setNewOrderForm({ ...newOrderForm, complement: e.target.value })} />
+                  <Input label="Bairro" value={newOrderForm.neighborhood} onChange={(e) => setNewOrderForm({ ...newOrderForm, neighborhood: e.target.value })} required />
+                  <Input label="Cidade" value={newOrderForm.city} onChange={(e) => setNewOrderForm({ ...newOrderForm, city: e.target.value })} required />
+                  <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
+                </div>
+              </section>
+            </div>
+
+            {/* Footer fixo */}
+            <div style={{ padding: '16px 28px', borderTop: '1px solid #E3E9F4', backgroundColor: '#FAFCFE', display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ fontSize: '13px', color: '#6B7494' }}>
+                {newOrderItems.length === 0
+                  ? 'Adicione ao menos um item para criar o pedido'
+                  : (
+                    <>
+                      <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)' }}>R$ {orderSubtotal.toFixed(2).replace('.', ',')}</strong>
+                      <span> · {newOrderItems.length} {newOrderItems.length === 1 ? 'produto' : 'produtos'}</span>
+                    </>
+                  )}
               </div>
-              <Input label="Nome do cliente" value={newOrderForm.customerName} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })} required />
-              <Input label="E-mail" type="email" value={newOrderForm.customerEmail} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerEmail: e.target.value })} required />
-              <Input label="Telefone" value={newOrderForm.customerPhone} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })} required placeholder="(11) 99999-9999" />
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                <Input label="CEP" value={newOrderForm.zipCode} onChange={(e) => setNewOrderForm({ ...newOrderForm, zipCode: e.target.value })} required placeholder="00000-000" style={{ flex: 1 }} />
-                <button onClick={handleViaCep} disabled={cepLoading} style={{ padding: '12px', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '6px', cursor: cepLoading ? 'not-allowed' : 'pointer' }}>
-                  {cepLoading ? '...' : 'Buscar'}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => setShowAddModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer', fontWeight: 500 }}>Cancelar</button>
+                <button
+                  onClick={handleCreateOrder}
+                  disabled={newOrderItems.length === 0}
+                  style={{ padding: '10px 24px', backgroundColor: newOrderItems.length === 0 ? '#9AA1B8' : '#1D2235', border: 'none', borderRadius: '8px', cursor: newOrderItems.length === 0 ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 600, opacity: newOrderItems.length === 0 ? 0.6 : 1 }}
+                >
+                  Criar Pedido
                 </button>
               </div>
-              <Input label="Rua" value={newOrderForm.street} onChange={(e) => setNewOrderForm({ ...newOrderForm, street: e.target.value })} required style={{ gridColumn: '1 / -1' }} />
-              <Input label="Número" value={newOrderForm.number} onChange={(e) => setNewOrderForm({ ...newOrderForm, number: e.target.value })} required />
-              <Input label="Complemento" value={newOrderForm.complement} onChange={(e) => setNewOrderForm({ ...newOrderForm, complement: e.target.value })} />
-              <Input label="Bairro" value={newOrderForm.neighborhood} onChange={(e) => setNewOrderForm({ ...newOrderForm, neighborhood: e.target.value })} required />
-              <Input label="Cidade" value={newOrderForm.city} onChange={(e) => setNewOrderForm({ ...newOrderForm, city: e.target.value })} required />
-              <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
-            </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowAddModal(false)} style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleCreateOrder} style={{ padding: '10px 20px', backgroundColor: '#1D2235', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'white', fontWeight: 500 }}>Criar Pedido</button>
             </div>
           </div>
         </div>
