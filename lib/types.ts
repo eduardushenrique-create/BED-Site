@@ -37,6 +37,8 @@ export interface ProductCategory {
   slug: string
 }
 
+export type ProductVisibility = 'public' | 'internal'
+
 export interface Product {
   id: string
   name: string
@@ -56,6 +58,7 @@ export interface Product {
   status?: string
   isActive?: boolean
   isFeatured?: boolean
+  visibility?: ProductVisibility
   stock?: number
   underOrder?: boolean
   weightGrams?: number

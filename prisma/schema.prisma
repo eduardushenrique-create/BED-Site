@@ -43,6 +43,11 @@ model Product {
   underOrder               Boolean  @default(false)
   productionMinutesPerUnit Int?
 
+  // SPEC-002 Parte B: visibilidade do produto.
+  // 'public'   → aparece no site, busca, sitemap, listagens públicas (default).
+  // 'internal' → só admin enxerga; pode ser usado em pedidos manuais.
+  visibility               String   @default("public")
+
   // Calculadora de custo (Fase 3 SPEC calculadora produto):
   printerForCostId String?
   printerForCost   Printer? @relation("PrinterCostProducts", fields: [printerForCostId], references: [id], onDelete: SetNull)
@@ -62,6 +67,8 @@ model Product {
 
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@index([visibility, isActive])
 }
 
 model Customer {

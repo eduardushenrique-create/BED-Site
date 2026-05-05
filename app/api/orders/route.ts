@@ -120,6 +120,11 @@ export async function POST(request: Request) {
       if (!product || !product.isActive || product.status === 'draft') {
         return NextResponse.json({ error: 'Um item do carrinho não está disponível.' }, { status: 400 })
       }
+      // Defense-in-depth: block internal products even if a tampered productId bypasses
+      // the catalog filter (getLocalCatalogProducts already excludes visibility='internal').
+      if (product.visibility === 'internal') {
+        return NextResponse.json({ error: 'Um item do carrinho não está disponível.' }, { status: 400 })
+      }
 
       const underOrder = product.underOrder || false
       const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1))

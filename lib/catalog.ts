@@ -86,6 +86,7 @@ function getPublicProductWhere(filters: CatalogFilters = {}) {
   return {
     isActive: true,
     status: { not: 'draft' },
+    visibility: 'public',
     category: filters.category ? { slug: filters.category, isActive: true } : undefined,
     isFeatured: filters.featured ? true : undefined,
     isPersonalizable: filters.personalizable ? true : undefined,
