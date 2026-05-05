@@ -4,6 +4,44 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import Input from '@/components/Input'
 import Button from '@/components/Button'
+import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-pricing'
+
+// --- Types ---
+
+type ProductVariant = {
+  id: string
+  name: string
+  sku: string | null
+  color: string | null
+  size: string | null
+  material: string | null
+  finish: string | null
+  priceDelta: number | null
+  priceOverride: number | null
+  stockQuantity: number
+  isAvailable: boolean
+}
+
+type Product = {
+  id: string
+  name: string
+  price: number
+  stock?: number
+  underOrder?: boolean
+  isActive: boolean
+  visibility?: 'public' | 'internal'
+  variants: ProductVariant[]
+}
+
+type NewOrderItem = {
+  productId: string
+  productName: string
+  variantId: string | null
+  variantName: string | null
+  quantity: number
+  unitPrice: number
+  observation?: string
+}
 
 type Order = {
   id: string
@@ -28,18 +66,18 @@ type Order = {
   fulfillmentStatus: string
   paymentMethod: string
   createdAt: string
-  items: { productId: string; productName: string; quantity: number; unitPrice: number; observation?: string }[]
+  items: NewOrderItem[]
   trackingCode: string | null
 }
 
-type Product = {
-  id: string
-  name: string
-  price: number
-  stock?: number
-  underOrder?: boolean
-  isActive: boolean
+// --- Helpers ---
+
+/** Composite key for identifying a cart line (product + optional variant). */
+function itemKey(productId: string, variantId: string | null): string {
+  return `${productId}::${variantId ?? ''}`
 }
+
+// --- Status options ---
 
 const fulfillmentStatuses = [
   { value: 'pending', label: 'Pendente', color: '#F59E0B' },
@@ -57,6 +95,8 @@ const paymentStatuses = [
   { value: 'refunded', label: 'Estornado', color: '#8B5CF6' },
 ]
 
+// --- Sub-components ---
+
 function StatusCard({ label, count, color }: { label: string; count: number; color: string }) {
   return (
     <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px' }}>
@@ -65,6 +105,99 @@ function StatusCard({ label, count, color }: { label: string; count: number; col
     </div>
   )
 }
+
+/**
+ * Shows a variant picker for a product when the user clicks the product card.
+ * Each variant row shows label, SKU, stock, price and a badge if out-of-stock.
+ * Admin can force-add even out-of-stock variants (badge shown, not blocked).
+ */
+function VariantPicker({
+  product,
+  onSelect,
+  onClose,
+}: {
+  product: Product
+  onSelect: (variant: ProductVariant) => void
+  onClose: () => void
+}) {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 50,
+      backgroundColor: 'white',
+      border: '2px solid #BBCFEB',
+      borderRadius: '10px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+      padding: '12px',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{ fontWeight: 700, fontSize: '13px', color: '#1D2235' }}>Escolha a variação — {product.name}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar seletor de variação"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6B7494', lineHeight: 1 }}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {product.variants.map(variant => {
+          const label = describeVariant(variant)
+          const price = variantEffectivePrice(product.price, variant)
+          const stock = variant.stockQuantity ?? 0
+          const isSoldOut = !variant.isAvailable || stock <= 0
+          return (
+            <button
+              key={variant.id}
+              type="button"
+              onClick={() => onSelect(variant)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #D8DCE8',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                textAlign: 'left',
+                color: '#1D2235',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                <span style={{ fontWeight: 600, fontSize: '13px' }}>{label}</span>
+                {variant.sku && (
+                  <span style={{ fontSize: '11px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>SKU: {variant.sku}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                {isSoldOut ? (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#D4849A', backgroundColor: '#FDF2F5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #D4849A' }}>
+                    Esgotado · admin pode forçar
+                  </span>
+                ) : product.underOrder ? (
+                  <span style={{ fontSize: '11px', color: '#6B7494' }}>Sob encomenda</span>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#6B7494' }}>{stock} em estoque</span>
+                )}
+                <span style={{ fontWeight: 700, fontSize: '13px', color: '#1D2235', fontFamily: 'var(--font-mono)' }}>
+                  R$ {price.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// --- Main page ---
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -80,10 +213,12 @@ export default function AdminOrdersPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [cepLoading, setCepLoading] = useState(false)
   const [searchProduct, setSearchProduct] = useState('')
-  const [newOrderItems, setNewOrderItems] = useState<{productId: string; productName: string; quantity: number; unitPrice: number; observation?: string}[]>([])
+  const [newOrderItems, setNewOrderItems] = useState<NewOrderItem[]>([])
   const [searchCustomer, setSearchCustomer] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [foundCustomers, setFoundCustomers] = useState<{id: string; name: string; email: string; phone: string}[]>([])
+  /** productId for which the variant picker is currently open */
+  const [variantPickerFor, setVariantPickerFor] = useState<string | null>(null)
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     customerEmail: '',
@@ -162,7 +297,7 @@ export default function AdminOrdersPage() {
     try {
       const res = await fetch('/api/produtos')
       const data = await res.json()
-      const available = data.filter((p: Product) => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder))
+      const available = (data as Product[]).filter(p => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder || (p.variants && p.variants.length > 0)))
       setProducts(available)
     } catch (e) {
       console.error('Error loading products:', e)
@@ -307,11 +442,22 @@ export default function AdminOrdersPage() {
     }
   }
 
+  /**
+   * Called when admin clicks a product card.
+   * - No variants → add directly (same behavior as before).
+   * - Has variants → open inline variant picker.
+   */
   const handleAddProduct = (product: Product) => {
-    const existing = newOrderItems.find(item => item.productId === product.id)
+    if (product.variants && product.variants.length > 0) {
+      setVariantPickerFor(product.id)
+      return
+    }
+    // No variants — add directly, incrementing if the same product is already in.
+    const key = itemKey(product.id, null)
+    const existing = newOrderItems.find(item => itemKey(item.productId, item.variantId) === key)
     if (existing) {
-      setNewOrderItems(newOrderItems.map(item => 
-        item.productId === product.id 
+      setNewOrderItems(newOrderItems.map(item =>
+        itemKey(item.productId, item.variantId) === key
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ))
@@ -319,6 +465,8 @@ export default function AdminOrdersPage() {
       setNewOrderItems([...newOrderItems, {
         productId: product.id,
         productName: product.name,
+        variantId: null,
+        variantName: null,
         quantity: 1,
         unitPrice: product.price,
       }])
@@ -326,24 +474,50 @@ export default function AdminOrdersPage() {
     setSearchProduct('')
   }
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setNewOrderItems(newOrderItems.filter(item => item.productId !== productId))
+  /** Called when admin picks a specific variant from the sub-picker. */
+  const handleAddVariant = (product: Product, variant: ProductVariant) => {
+    setVariantPickerFor(null)
+    const vLabel = describeVariant(variant)
+    const price = variantEffectivePrice(product.price, variant)
+    const key = itemKey(product.id, variant.id)
+    const existing = newOrderItems.find(item => itemKey(item.productId, item.variantId) === key)
+    if (existing) {
+      setNewOrderItems(newOrderItems.map(item =>
+        itemKey(item.productId, item.variantId) === key
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ))
     } else {
-      setNewOrderItems(newOrderItems.map(item => 
-        item.productId === productId ? { ...item, quantity } : item
+      setNewOrderItems([...newOrderItems, {
+        productId: product.id,
+        productName: product.name,
+        variantId: variant.id,
+        variantName: vLabel,
+        quantity: 1,
+        unitPrice: price,
+      }])
+    }
+    setSearchProduct('')
+  }
+
+  const handleUpdateQuantity = (key: string, quantity: number) => {
+    if (quantity <= 0) {
+      setNewOrderItems(newOrderItems.filter(item => itemKey(item.productId, item.variantId) !== key))
+    } else {
+      setNewOrderItems(newOrderItems.map(item =>
+        itemKey(item.productId, item.variantId) === key ? { ...item, quantity } : item
       ))
     }
   }
 
-  const handleUpdateObservation = (productId: string, observation: string) => {
-    setNewOrderItems(newOrderItems.map(item => 
-      item.productId === productId ? { ...item, observation } : item
+  const handleUpdateObservation = (key: string, observation: string) => {
+    setNewOrderItems(newOrderItems.map(item =>
+      itemKey(item.productId, item.variantId) === key ? { ...item, observation } : item
     ))
   }
 
-  const handleRemoveItem = (productId: string) => {
-    setNewOrderItems(newOrderItems.filter(item => item.productId !== productId))
+  const handleRemoveItem = (key: string) => {
+    setNewOrderItems(newOrderItems.filter(item => itemKey(item.productId, item.variantId) !== key))
   }
 
   async function handleCreateOrder() {
@@ -351,7 +525,7 @@ export default function AdminOrdersPage() {
       alert('Preencha: Nome, E-mail e adicione pelo menos um produto')
       return
     }
-    
+
     const orderData = {
       orderNumber: `BD-${Date.now().toString(36).toUpperCase()}`,
       customerName: newOrderForm.customerName,
@@ -379,11 +553,17 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      await fetch('/api/pedidos', {
+      const res = await fetch('/api/pedidos', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData),
       })
-      
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        alert(err?.error || 'Erro ao criar pedido')
+        return
+      }
+
       try {
         await fetch('/api/clientes', {
           method: 'POST',
@@ -396,7 +576,7 @@ export default function AdminOrdersPage() {
       } catch (e) {
         console.log('Cliente pode já existir')
       }
-      
+
       setShowAddModal(false)
       setSearchCustomer('')
       setNewOrderForm({ customerName: '', customerEmail: '', customerPhone: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '' })
@@ -410,6 +590,7 @@ export default function AdminOrdersPage() {
   const openCreateModal = () => {
     setNewOrderItems([])
     setSearchProduct('')
+    setVariantPickerFor(null)
     setShowAddModal(true)
   }
 
@@ -503,7 +684,7 @@ export default function AdminOrdersPage() {
             fontWeight: 600,
           }}
         >
-          ⬇ Exportar CSV ({filteredOrders.length})
+          Exportar CSV ({filteredOrders.length})
         </button>
       </div>
 
@@ -551,7 +732,7 @@ export default function AdminOrdersPage() {
                       <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
                       {order.paymentStatus === 'paid' && order.fulfillmentStatus === 'ready_to_ship' ? (
                         <span style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#DFF4EC', color: '#1D7A72' }}>
-                          ✅ Pronto para envio
+                          Pronto para envio
                         </span>
                       ) : order.paymentStatus === 'paid' && (order.fulfillmentStatus === 'pending' || order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'production') ? (
                         <Link
@@ -574,7 +755,7 @@ export default function AdminOrdersPage() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '12px', maxWidth: '700px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Novo Pedido</h2>
-            
+
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Itens do Pedido</h3>
               <div style={{ border: '1px solid #D8DCE8', borderRadius: '10px', padding: '12px', backgroundColor: '#FFFEFC' }}>
@@ -586,29 +767,42 @@ export default function AdminOrdersPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', marginTop: '12px' }}>
                   {availableProducts.length > 0 ? (
                     availableProducts.map(product => {
-                      const selected = newOrderItems.some(item => item.productId === product.id)
+                      const hasVariants = product.variants && product.variants.length > 0
+                      const isSelected = newOrderItems.some(item => item.productId === product.id)
+                      const isPickerOpen = variantPickerFor === product.id
                       return (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => handleAddProduct(product)}
-                          style={{
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: selected ? '1px solid #D4849A' : '1px solid #D8DCE8',
-                            backgroundColor: selected ? '#D4849A12' : 'white',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                        >
-                          <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
-                          <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
-                            R$ {product.price.toFixed(2).replace('.', ',')} {product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}
-                          </span>
-                          <span style={{ display: 'block', color: '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
-                            {selected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
-                          </span>
-                        </button>
+                        <div key={product.id} style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleAddProduct(product)}
+                            style={{
+                              width: '100%',
+                              padding: '12px',
+                              borderRadius: '8px',
+                              border: isSelected ? '1px solid #D4849A' : isPickerOpen ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+                              backgroundColor: isSelected ? '#D4849A12' : isPickerOpen ? '#F0F5FB' : 'white',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
+                            <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
+                              {hasVariants
+                                ? `${product.variants.length} variações`
+                                : `R$ ${product.price.toFixed(2).replace('.', ',')} ${product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}`}
+                            </span>
+                            <span style={{ display: 'block', color: hasVariants ? '#BBCFEB' : '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
+                              {hasVariants ? 'Escolher variação' : isSelected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
+                            </span>
+                          </button>
+                          {isPickerOpen && (
+                            <VariantPicker
+                              product={product}
+                              onSelect={(variant) => handleAddVariant(product, variant)}
+                              onClose={() => setVariantPickerFor(null)}
+                            />
+                          )}
+                        </div>
                       )
                     })
                   ) : (
@@ -620,21 +814,27 @@ export default function AdminOrdersPage() {
               </div>
               {newOrderItems.length > 0 && (
                 <div style={{ marginTop: '12px' }}>
-                  {newOrderItems.map(item => (
-                    <div key={item.productId} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ flex: 1, fontWeight: 500 }}>{item.productName}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>−</button>
-                          <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
-                          <button type="button" onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>+</button>
+                  {newOrderItems.map(item => {
+                    const key = itemKey(item.productId, item.variantId)
+                    const displayName = item.variantName
+                      ? `${item.productName} · ${item.variantName}`
+                      : item.productName
+                    return (
+                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ flex: 1, fontWeight: 500 }}>{displayName}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity - 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>−</button>
+                            <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
+                            <button type="button" onClick={() => handleUpdateQuantity(key, item.quantity + 1)} style={{ width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '18px' }}>+</button>
+                          </div>
+                          <span style={{ fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</span>
+                          <button type="button" onClick={() => handleRemoveItem(key)} style={{ width: '32px', height: '32px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '4px', cursor: 'pointer', color: '#EF4444', fontSize: '16px' }}>×</button>
                         </div>
-                        <span style={{ fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</span>
-                        <button type="button" onClick={() => handleRemoveItem(item.productId)} style={{ width: '32px', height: '32px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '4px', cursor: 'pointer', color: '#EF4444', fontSize: '16px' }}>×</button>
+                        <input type="text" placeholder="Observações (ex:/cor gravado, cor verde, etc)" value={item.observation || ''} onChange={(e) => handleUpdateObservation(key, e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', fontSize: '14px' }} />
                       </div>
-                      <input type="text" placeholder="Observações (ex:/cor gravado, cor verde, etc)" value={item.observation || ''} onChange={(e) => handleUpdateObservation(item.productId, e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', fontSize: '14px' }} />
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', fontWeight: 700, fontSize: '18px', borderTop: '2px solid #D8DCE8', marginTop: '12px' }}>
                     <span>Total:</span>
                     <span>R$ {orderSubtotal.toFixed(2).replace('.', ',')}</span>
@@ -647,14 +847,14 @@ export default function AdminOrdersPage() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Cliente</h3>
                 <div style={{ position: 'relative' }}>
-                  <Input 
-                    placeholder="Buscar cliente por nome, e-mail ou telefone..." 
-                    value={searchCustomer} 
-                    onChange={(e) => { 
+                  <Input
+                    placeholder="Buscar cliente por nome, e-mail ou telefone..."
+                    value={searchCustomer}
+                    onChange={(e) => {
                       setSearchCustomer(e.target.value)
                       searchUsers(e.target.value)
                       setShowCustomerDropdown(true)
-                    }} 
+                    }}
                   />
                   {showCustomerDropdown && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
@@ -700,4 +900,3 @@ export default function AdminOrdersPage() {
     </div>
   )
 }
-

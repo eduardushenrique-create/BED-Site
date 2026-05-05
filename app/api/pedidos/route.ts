@@ -10,6 +10,38 @@ import { requireApiAdmin } from '@/lib/api-auth'
 import { notifyOrderStatusChange } from '@/lib/order-notifications'
 import { recordAuditEntry } from '@/lib/audit-log'
 import { getClientIp } from '@/lib/rate-limit'
+import prisma from '@/lib/prisma'
+
+async function validateOrderItems(
+  items: Array<{ productId: string; variantId?: string | null }> | undefined,
+): Promise<NextResponse | null> {
+  if (!items || items.length === 0) return null
+  // Skip validation when Prisma is not available (mock mode).
+  if (!prisma?.product) return null
+
+  for (const item of items) {
+    const product = await prisma.product.findUnique({
+      where: { id: item.productId },
+      include: { variants: true },
+    })
+    if (!product) {
+      return NextResponse.json({ error: 'Produto inexistente' }, { status: 400 })
+    }
+    if (product.variants.length > 0 && !item.variantId) {
+      return NextResponse.json(
+        { error: `Selecione uma variação para ${product.name}` },
+        { status: 400 },
+      )
+    }
+    if (item.variantId) {
+      const variant = product.variants.find(v => v.id === item.variantId)
+      if (!variant) {
+        return NextResponse.json({ error: 'Variação inválida' }, { status: 400 })
+      }
+    }
+  }
+  return null
+}
 
 export async function GET() {
   const auth = await requireApiAdmin()
@@ -21,6 +53,8 @@ export async function POST(request: NextRequest) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response
   const body = await request.json()
+  const itemsError = await validateOrderItems(body.items)
+  if (itemsError) return itemsError
   const newOrder = await createOrder(body)
   return NextResponse.json(newOrder, { status: 201 })
 }
@@ -29,6 +63,8 @@ export async function PUT(request: NextRequest) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response
   const { id, ...data } = await request.json()
+  const itemsError = await validateOrderItems(data.items)
+  if (itemsError) return itemsError
 
   const before = id ? await getOrderByIdOrNumber(id) : null
 

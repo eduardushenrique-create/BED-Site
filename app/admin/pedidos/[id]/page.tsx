@@ -5,6 +5,44 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import OrderMaterialsCard from '@/components/admin/OrderMaterialsCard'
+import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-pricing'
+
+// --- Types ---
+
+type ProductVariant = {
+  id: string
+  name: string
+  sku: string | null
+  color: string | null
+  size: string | null
+  material: string | null
+  finish: string | null
+  priceDelta: number | null
+  priceOverride: number | null
+  stockQuantity: number
+  isAvailable: boolean
+}
+
+type Product = {
+  id: string
+  name: string
+  price: number
+  stock?: number
+  underOrder?: boolean
+  isActive: boolean
+  visibility?: 'public' | 'internal'
+  variants: ProductVariant[]
+}
+
+type OrderItem = {
+  productId: string
+  productName: string
+  variantId: string | null
+  variantName: string | null
+  quantity: number
+  unitPrice: number
+  observation?: string
+}
 
 type Order = {
   id: string
@@ -31,18 +69,119 @@ type Order = {
   fulfillmentStatus: string
   paymentMethod: string
   createdAt: string
-  items: { productId: string; productName: string; quantity: number; unitPrice: number }[]
+  items: OrderItem[]
   trackingCode: string | null
   expectedDeliveryAt?: string | null
 }
 
-type Product = {
-  id: string
-  name: string
-  price: number
-  stock?: number
-  underOrder?: boolean
-  isActive: boolean
+// --- Helpers ---
+
+/** Composite key for identifying a cart line (product + optional variant). */
+function itemKey(productId: string, variantId: string | null): string {
+  return `${productId}::${variantId ?? ''}`
+}
+
+/**
+ * Variant picker sub-component — same visual as page.tsx counterpart.
+ * Admin can force-add even out-of-stock variants (badge shown, not blocked).
+ */
+function VariantPicker({
+  product,
+  onSelect,
+  onClose,
+}: {
+  product: Product
+  onSelect: (variant: ProductVariant) => void
+  onClose: () => void
+}) {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 50,
+      backgroundColor: 'white',
+      border: '2px solid #BBCFEB',
+      borderRadius: '10px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+      padding: '12px',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{ fontWeight: 700, fontSize: '13px', color: '#1D2235' }}>Escolha a variação — {product.name}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar seletor de variação"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6B7494', lineHeight: 1 }}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {product.variants.map(variant => {
+          const label = describeVariant(variant)
+          const price = variantEffectivePrice(product.price, variant)
+          const stock = variant.stockQuantity ?? 0
+          const isSoldOut = !variant.isAvailable || stock <= 0
+          return (
+            <button
+              key={variant.id}
+              type="button"
+              onClick={() => onSelect(variant)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #D8DCE8',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                textAlign: 'left',
+                color: '#1D2235',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                <span style={{ fontWeight: 600, fontSize: '13px' }}>{label}</span>
+                {variant.sku && (
+                  <span style={{ fontSize: '11px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>SKU: {variant.sku}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                {isSoldOut ? (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#D4849A', backgroundColor: '#FDF2F5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #D4849A' }}>
+                    Esgotado · admin pode forçar
+                  </span>
+                ) : product.underOrder ? (
+                  <span style={{ fontSize: '11px', color: '#6B7494' }}>Sob encomenda</span>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#6B7494' }}>{stock} em estoque</span>
+                )}
+                <span style={{ fontWeight: 700, fontSize: '13px', color: '#1D2235', fontFamily: 'var(--font-mono)' }}>
+                  R$ {price.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Ensures all items from the API have the variantId/variantName shape. */
+function normalizeItems(items: unknown[]): OrderItem[] {
+  return (items || []).map((item: any) => ({
+    productId: item.productId,
+    productName: item.productName,
+    variantId: item.variantId ?? null,
+    variantName: item.variantName ?? null,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    observation: item.observation,
+  }))
 }
 
 const fulfillmentStatuses = [
@@ -111,7 +250,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [refundError, setRefundError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const [editingItems, setEditingItems] = useState<{productId: string; productName: string; quantity: number; unitPrice: number}[]>([])
+  const [editingItems, setEditingItems] = useState<OrderItem[]>([])
+  const [variantPickerFor, setVariantPickerFor] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     fulfillmentStatus: '',
@@ -136,7 +276,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         trackingCode: found.trackingCode || '',
         expectedDeliveryAt: toLocalDateTimeInput(found.expectedDeliveryAt),
       })
-      setEditingItems(found.items)
+      setEditingItems(normalizeItems(found.items))
     } catch (e) {
       console.error('Error loading order:', e)
     } finally {
@@ -165,13 +305,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             trackingCode: found.trackingCode || '',
             expectedDeliveryAt: toLocalDateTimeInput(found.expectedDeliveryAt),
           })
-          setEditingItems(found.items)
+          setEditingItems(normalizeItems(found.items))
         }
 
         if (productsRes.ok) {
           const productsData = await productsRes.json()
           if (Array.isArray(productsData)) {
-            setProducts(productsData.filter((p: Product) => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder)))
+            setProducts(
+              (productsData as Product[]).filter(
+                p => p.isActive && ((p.stock ?? 1) > 0 || p.underOrder || (p.variants && p.variants.length > 0)),
+              ),
+            )
           }
         }
       } catch (e) {
@@ -326,25 +470,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const handleRemoveItem = (productId: string) => {
-    setEditingItems(editingItems.filter(item => item.productId !== productId))
+  const handleRemoveItem = (key: string) => {
+    setEditingItems(editingItems.filter(item => itemKey(item.productId, item.variantId) !== key))
   }
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = (key: string, quantity: number) => {
     if (quantity <= 0) {
-      setEditingItems(editingItems.filter(item => item.productId !== productId))
+      setEditingItems(editingItems.filter(item => itemKey(item.productId, item.variantId) !== key))
     } else {
-      setEditingItems(editingItems.map(item => 
-        item.productId === productId ? { ...item, quantity } : item
+      setEditingItems(editingItems.map(item =>
+        itemKey(item.productId, item.variantId) === key ? { ...item, quantity } : item
       ))
     }
   }
 
+  /**
+   * Called when admin clicks a product card inside the Edit Items modal.
+   * Products with variants open the inline picker; without variants add directly.
+   */
   const handleAddProduct = (product: Product) => {
-    const existing = editingItems.find(item => item.productId === product.id)
+    if (product.variants && product.variants.length > 0) {
+      setVariantPickerFor(product.id)
+      return
+    }
+    const key = itemKey(product.id, null)
+    const existing = editingItems.find(item => itemKey(item.productId, item.variantId) === key)
     if (existing) {
-      setEditingItems(editingItems.map(item => 
-        item.productId === product.id 
+      setEditingItems(editingItems.map(item =>
+        itemKey(item.productId, item.variantId) === key
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ))
@@ -352,8 +505,35 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       setEditingItems([...editingItems, {
         productId: product.id,
         productName: product.name,
+        variantId: null,
+        variantName: null,
         quantity: 1,
         unitPrice: product.price,
+      }])
+    }
+  }
+
+  /** Called when admin picks a specific variant from the sub-picker. */
+  const handleAddVariant = (product: Product, variant: ProductVariant) => {
+    setVariantPickerFor(null)
+    const vLabel = describeVariant(variant)
+    const price = variantEffectivePrice(product.price, variant)
+    const key = itemKey(product.id, variant.id)
+    const existing = editingItems.find(item => itemKey(item.productId, item.variantId) === key)
+    if (existing) {
+      setEditingItems(editingItems.map(item =>
+        itemKey(item.productId, item.variantId) === key
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ))
+    } else {
+      setEditingItems([...editingItems, {
+        productId: product.id,
+        productName: product.name,
+        variantId: variant.id,
+        variantName: vLabel,
+        quantity: 1,
+        unitPrice: price,
       }])
     }
   }
@@ -490,14 +670,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {order.items.length === 0 ? (
                 <p style={{ color: '#6B7494' }}>Nenhum item</p>
               ) : (
-                order.items.map((item, idx) => (
-                  <div key={idx} style={{ padding: '16px 0', borderBottom: idx < order.items.length - 1 ? '1px solid #D8DCE8' : 'none' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div><p style={{ fontWeight: 500 }}>{item.productName}</p><p style={{ fontSize: '14px', color: '#6B7494' }}>Qty: {item.quantity} × R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p></div>
-                      <p style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</p>
+                order.items.map((item, idx) => {
+                  const displayName = item.variantName
+                    ? `${item.productName} · ${item.variantName}`
+                    : item.productName
+                  return (
+                    <div key={idx} style={{ padding: '16px 0', borderBottom: idx < order.items.length - 1 ? '1px solid #D8DCE8' : 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <p style={{ fontWeight: 500 }}>{displayName}</p>
+                          <p style={{ fontSize: '14px', color: '#6B7494' }}>Qty: {item.quantity} × R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                        <p style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>R$ {(item.unitPrice * item.quantity).toFixed(2).replace('.', ',')}</p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
               <div style={{ padding: '16px 0', borderTop: '2px solid #D8DCE8', marginTop: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#6B7494' }}><span>Subtotal</span><span style={{ fontFamily: 'var(--font-mono)' }}>R$ {order.subtotal.toFixed(2).replace('.', ',')}</span></div>
@@ -589,7 +777,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
           {!isCancelled && (
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
-              <button onClick={() => { setEditingItems([...order.items]); setShowEditItemsModal(true) }} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#3B82F6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>✏️ Editar Itens</button>
+              <button onClick={() => { setEditingItems(normalizeItems(order.items)); setVariantPickerFor(null); setShowEditItemsModal(true) }} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#3B82F6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>Editar Itens</button>
               <button onClick={() => setShowCloneModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#8B5CF6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>📋 Clonar Pedido</button>
               {order.paymentStatus === 'paid' && (
                 <button
@@ -624,40 +812,62 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '12px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px' }}>Editar Itens do Pedido</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-              {editingItems.map((item) => (
-                <div key={item.productId} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
-                  <div style={{ flex: 1 }}><p style={{ fontWeight: 500 }}>{item.productName}</p><p style={{ fontSize: '14px', color: '#6B7494' }}>R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p></div>
-                  <input type="number" min="1" value={item.quantity} onChange={(e) => handleUpdateQuantity(item.productId, parseInt(e.target.value) || 1)} style={{ width: '60px', padding: '8px', borderRadius: '4px', border: '1px solid #D8DCE8' }} />
-                  <button onClick={() => handleRemoveItem(item.productId)} style={{ padding: '8px 12px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', color: '#EF4444' }}>✕</button>
-                </div>
-              ))}
+              {editingItems.map((item) => {
+                const key = itemKey(item.productId, item.variantId)
+                const displayName = item.variantName
+                  ? `${item.productName} · ${item.variantName}`
+                  : item.productName
+                return (
+                  <div key={key} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: 500 }}>{displayName}</p>
+                      <p style={{ fontSize: '14px', color: '#6B7494' }}>R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p>
+                    </div>
+                    <input type="number" min="1" value={item.quantity} onChange={(e) => handleUpdateQuantity(key, parseInt(e.target.value) || 1)} style={{ width: '60px', padding: '8px', borderRadius: '4px', border: '1px solid #D8DCE8' }} />
+                    <button onClick={() => handleRemoveItem(key)} style={{ padding: '8px 12px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', color: '#EF4444' }}>✕</button>
+                  </div>
+                )
+              })}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '16px', border: '1px solid #D8DCE8', borderRadius: '10px', padding: '12px' }}>
               {products.length > 0 ? (
                 products.map(product => {
-                  const selected = editingItems.some(item => item.productId === product.id)
+                  const hasVariants = product.variants && product.variants.length > 0
+                  const isSelected = editingItems.some(item => item.productId === product.id)
+                  const isPickerOpen = variantPickerFor === product.id
                   return (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => handleAddProduct(product)}
-                      style={{
-                        padding: '12px',
-                        borderRadius: '8px',
-                        border: selected ? '1px solid #D4849A' : '1px solid #D8DCE8',
-                        backgroundColor: selected ? '#D4849A12' : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
-                      <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
-                        R$ {product.price.toFixed(2).replace('.', ',')} {product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}
-                      </span>
-                      <span style={{ display: 'block', color: '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
-                        {selected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
-                      </span>
-                    </button>
+                    <div key={product.id} style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddProduct(product)}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: isSelected ? '1px solid #D4849A' : isPickerOpen ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
+                          backgroundColor: isSelected ? '#D4849A12' : isPickerOpen ? '#F0F5FB' : 'white',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ display: 'block', fontWeight: 600 }}>{product.name}</span>
+                        <span style={{ display: 'block', color: '#6B7494', fontSize: '13px', marginTop: '2px' }}>
+                          {hasVariants
+                            ? `${product.variants.length} variações`
+                            : `R$ ${product.price.toFixed(2).replace('.', ',')} ${product.underOrder ? '· sob encomenda' : `· estoque ${product.stock ?? 'n/d'}`}`}
+                        </span>
+                        <span style={{ display: 'block', color: hasVariants ? '#BBCFEB' : '#D4849A', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
+                          {hasVariants ? 'Escolher variação' : isSelected ? 'Adicionar mais uma unidade' : '+ Adicionar ao pedido'}
+                        </span>
+                      </button>
+                      {isPickerOpen && (
+                        <VariantPicker
+                          product={product}
+                          onSelect={(variant) => handleAddVariant(product, variant)}
+                          onClose={() => setVariantPickerFor(null)}
+                        />
+                      )}
+                    </div>
                   )
                 })
               ) : (

@@ -1731,6 +1731,7 @@ export async function updateOrder(id: string, data: Partial<Order>) {
         data: data.items.map(item => ({
           orderId: id,
           productId: item.productId,
+          variantId: (item as any).variantId ?? null,
           productNameSnapshot: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
