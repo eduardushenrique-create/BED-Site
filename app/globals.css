@@ -276,3 +276,30 @@ button {
     min-width: 0;
   }
 }
+
+/* Novo pedido — split panel: catálogo (esquerda) + carrinho (direita) */
+.admin-order-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 880px) {
+  .admin-order-split {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+
+/* Novo pedido — formulário do cliente (2 colunas no desktop, 1 no mobile) */
+.admin-order-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .admin-order-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
