@@ -29,6 +29,29 @@ const PHONE_BR_RE = /\b\(?\d{2}\)?\s?9?\d{4}-?\d{4}\b/g
 // CEP: 00000-000 or 00000000
 const CEP_RE = /\b\d{5}-?\d{3}\b/g
 
+/**
+ * Sensitive field keys that must be masked in structured event data.
+ * This list covers both customer PII and financial fields (e.g. amount,
+ * paymentMethod) that should not appear in Sentry breadcrumb payloads.
+ */
+const SENSITIVE_KEYS = new Set([
+  'email',
+  'cpf',
+  'phone',
+  'password',
+  'passwordHash',
+  'token',
+  'secret',
+  'creditCard',
+  'cardNumber',
+  'cvv',
+  // Financial fields — expense module
+  'amount',
+  'paymentMethod',
+  'receiptUrl',
+  'invoiceNumber',
+])
+
 const REDACTED = '[REDACTED]'
 
 function redactString(input: string): string {
@@ -42,13 +65,15 @@ function redactString(input: string): string {
   return out
 }
 
-function redactValue(value: unknown): unknown {
+function redactValue(value: unknown, key?: string): unknown {
+  // Mask sensitive keys entirely regardless of value shape
+  if (key && SENSITIVE_KEYS.has(key)) return REDACTED
   if (typeof value === 'string') return redactString(value)
-  if (Array.isArray(value)) return value.map(redactValue)
+  if (Array.isArray(value)) return value.map(v => redactValue(v))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = redactValue(v)
+      out[k] = redactValue(v, k)
     }
     return out
   }

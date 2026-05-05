@@ -68,6 +68,7 @@ type Order = {
   createdAt: string
   items: NewOrderItem[]
   trackingCode: string | null
+  expectedDeliveryAt?: string | null
 }
 
 // --- Helpers ---
@@ -703,7 +704,8 @@ export default function AdminOrdersPage() {
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Total</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Pagamento</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Data</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Data do Pedido</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Prev. Entrega</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Ações</th>
               </tr>
             </thead>
@@ -727,6 +729,11 @@ export default function AdminOrdersPage() {
                     </span>
                   </td>
                   <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
+                  <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>
+                    {order.expectedDeliveryAt
+                      ? new Date(order.expectedDeliveryAt).toLocaleDateString('pt-BR')
+                      : '—'}
+                  </td>
                   <td style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>

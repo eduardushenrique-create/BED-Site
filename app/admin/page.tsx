@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getAdminDashboardMetrics } from '@/lib/database'
+import { generateExpenseReport, currentMonthRange } from '@/lib/expenseReports'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,6 +84,13 @@ const cards: DashboardCard[] = [
     accent: '#1D7A72',
   },
   {
+    href: '/admin/despesas',
+    title: 'Despesas',
+    description: 'Registre e acompanhe despesas operacionais, insumos e custos fixos.',
+    cta: 'Ver despesas →',
+    accent: '#B42318',
+  },
+  {
     href: '/admin/avaliacoes',
     title: 'Avaliações',
     description: 'Modere as avaliações dos clientes antes de publicar.',
@@ -131,8 +139,23 @@ function KpiCard({ label, value, hint, accent }: { label: string; value: string;
   )
 }
 
+function formatExpenseBRL(value: string): string {
+  const n = parseFloat(value)
+  if (isNaN(n)) return 'R$ 0,00'
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+}
+
 export default async function AdminIndexPage() {
   const metrics = await getAdminDashboardMetrics()
+
+  // Fetch expense report for the current month — silently suppressed on failure
+  let expenseReport: Awaited<ReturnType<typeof generateExpenseReport>> | null = null
+  try {
+    const { startDate, endDate } = currentMonthRange('America/Sao_Paulo')
+    expenseReport = await generateExpenseReport(startDate, endDate)
+  } catch {
+    // Non-critical — dashboard still renders without expense data
+  }
 
   const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long' })
 
@@ -177,6 +200,32 @@ export default async function AdminIndexPage() {
             hint={`${metrics.readyToShip} prontos para envio`}
             accent="#A3526A"
           />
+          {expenseReport && (
+            <KpiCard
+              label={`Despesas em ${monthName}`}
+              value={formatExpenseBRL(
+                String(
+                  parseFloat(expenseReport.totals.paid) +
+                    parseFloat(expenseReport.totals.pending),
+                ),
+              )}
+              hint="Pagas + pendentes"
+              accent="#B42318"
+            />
+          )}
+          {expenseReport && (
+            <KpiCard
+              label="Lucro estimado"
+              value={formatBRL(
+                Math.max(
+                  0,
+                  metrics.monthPaidRevenue - parseFloat(expenseReport.totals.paid),
+                ),
+              )}
+              hint="Receita paga − despesas pagas"
+              accent="#1D7A72"
+            />
+          )}
         </div>
 
         {metrics.topProductThisMonth && (

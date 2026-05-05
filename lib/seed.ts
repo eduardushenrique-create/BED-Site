@@ -118,6 +118,32 @@ async function seed() {
     }
   }
 
+  // SPEC-003: categorias iniciais de despesas. Upsert por slug — seguro de
+  // re-rodar e não sobrescreve nome/descrição que o admin tenha customizado.
+  const expenseCategories = [
+    { slug: 'filamentos', name: 'Filamentos', description: 'Compra de filamento para impressão', defaultType: 'variable', costCenter: 'production', color: '#A855F7' },
+    { slug: 'embalagens', name: 'Embalagens', description: 'Caixas, sacos e materiais de embalo', defaultType: 'variable', costCenter: 'production', color: '#F97316' },
+    { slug: 'softwares', name: 'Softwares', description: 'Assinaturas de softwares (slicer, design, etc.)', defaultType: 'recurring', costCenter: 'admin', color: '#0EA5E9' },
+    { slug: 'plataforma-hospedagem', name: 'Plataforma e hospedagem', description: 'Servidor, hospedagem do site, banco de dados', defaultType: 'recurring', costCenter: 'infra', color: '#2563EB' },
+    { slug: 'dominio-infraestrutura', name: 'Domínio e infraestrutura', description: 'Domínio, e-mail corporativo, ferramentas de infra', defaultType: 'recurring', costCenter: 'infra', color: '#1E40AF' },
+    { slug: 'marketing-anuncios', name: 'Marketing e anúncios', description: 'Anúncios pagos, mídia, conteúdo', defaultType: 'variable', costCenter: 'marketing', color: '#DB2777' },
+    { slug: 'manutencao-impressoras', name: 'Manutenção de impressoras', description: 'Peças de reposição, calibração, reparos', defaultType: 'variable', costCenter: 'production', color: '#EA580C' },
+    { slug: 'energia-eletrica', name: 'Energia elétrica', description: 'Conta de luz proporcional à produção', defaultType: 'recurring', costCenter: 'production', color: '#FACC15' },
+    { slug: 'taxas-pagamento', name: 'Taxas de pagamento', description: 'Mercado Pago, gateway, taxas bancárias', defaultType: 'variable', costCenter: 'admin', color: '#10B981' },
+    { slug: 'fretes-operacionais', name: 'Fretes operacionais', description: 'Frete de insumos recebidos (não inclui frete de venda)', defaultType: 'variable', costCenter: 'production', color: '#14B8A6' },
+    { slug: 'ferramentas-acessorios', name: 'Ferramentas e acessórios', description: 'Chaves, espátulas, peças auxiliares', defaultType: 'one_off', costCenter: 'production', color: '#6366F1' },
+    { slug: 'administrativo', name: 'Administrativo', description: 'Contador, jurídico, papelada', defaultType: 'recurring', costCenter: 'admin', color: '#64748B' },
+    { slug: 'outros', name: 'Outros', description: 'Despesas que não se encaixam nas demais categorias', defaultType: 'one_off', costCenter: 'other', color: '#94A3B8' },
+  ]
+
+  for (const cat of expenseCategories) {
+    await prisma.expenseCategory.upsert({
+      where: { slug: cat.slug },
+      update: {},
+      create: cat,
+    })
+  }
+
   console.log('Seed completed.')
 }
 

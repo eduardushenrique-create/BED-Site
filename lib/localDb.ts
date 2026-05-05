@@ -271,6 +271,61 @@ export type PasswordResetTokenRecord = {
   createdAt: string
 }
 
+export type ExpenseCategoryRecord = {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  defaultType?: string | null
+  costCenter?: string | null
+  color?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type ExpenseRecord = {
+  id: string
+  title: string
+  description?: string | null
+  /** Sempre armazenado como string para evitar perda de precisão (Decimal). */
+  amount: string
+  categoryId: string
+  type: string // fixed | variable | one_off | recurring
+  status: string // pending | paid | canceled
+  paymentMethod?: string | null
+  costCenter: string
+  competenceDate: string // ISO
+  dueDate?: string | null
+  paidAt?: string | null
+  receiptUrl?: string | null
+  invoiceNumber?: string | null
+  supplierName?: string | null
+  relatedFilamentId?: string | null
+  relatedComponentId?: string | null
+  relatedPrinterId?: string | null
+  notes?: string | null
+  createdByEmail?: string | null
+  updatedByEmail?: string | null
+  archivedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  isRecurring: boolean
+  recurrenceRule?: string | null
+  recurrenceParentId?: string | null
+}
+
+export type ExpenseBudgetRecord = {
+  id: string
+  categoryId: string
+  month: number // 1-12
+  year: number
+  plannedAmount: string // decimal serializado
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type Database = {
   products: Product[]
   categories: Category[]
@@ -290,6 +345,9 @@ export type Database = {
   restockAlerts: RestockAlertRecord[]
   auditLogs: AuditLogRecord[]
   reviews: ReviewRecord[]
+  expenseCategories: ExpenseCategoryRecord[]
+  expenses: ExpenseRecord[]
+  expenseBudgets: ExpenseBudgetRecord[]
 }
 
 const defaultData: Database = {
@@ -331,6 +389,9 @@ const defaultData: Database = {
   restockAlerts: [],
   auditLogs: [],
   reviews: [],
+  expenseCategories: [],
+  expenses: [],
+  expenseBudgets: [],
 }
 
 function ensureDir() {
@@ -373,6 +434,9 @@ export function readDB(): Database {
       restockAlerts: parsed.restockAlerts || [],
       auditLogs: parsed.auditLogs || [],
       reviews: parsed.reviews || [],
+      expenseCategories: parsed.expenseCategories || [],
+      expenses: parsed.expenses || [],
+      expenseBudgets: parsed.expenseBudgets || [],
     }
   } catch {
     return defaultData

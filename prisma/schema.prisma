@@ -321,6 +321,7 @@ model Printer {
   lifetimeHours          Int?
   productionTasks        ProductionTask[]
   costProducts           Product[]        @relation("PrinterCostProducts")
+  expenses               CompanyExpense[]
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -528,6 +529,7 @@ model Component {
   movements         StockMovement[]
   productLinks      ProductComponent[]
   lowStockAlertLog  LowStockAlertLog?
+  expenses          CompanyExpense[]
 
   @@index([isActive])
 }
@@ -588,6 +590,7 @@ model Filament {
   updatedAt  DateTime            @updatedAt
 
   productLinks ProductFilament[]
+  expenses     CompanyExpense[]
 
   @@index([isActive])
   @@index([type])
@@ -648,4 +651,84 @@ model ProductionLog {
   createdAt DateTime @default(now())
 
   @@index([taskId, createdAt])
+}
+
+// SPEC-003: controle de despesas empresariais.
+model ExpenseCategory {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String?
+  defaultType String?          // sugestão de tipo (fixed | variable | one_off | recurring)
+  costCenter  String?          // sugestão de centro de custo
+  color       String?          // hex tag para UI
+  isActive    Boolean          @default(true)
+  expenses    CompanyExpense[]
+  budgets     ExpenseBudget[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([isActive])
+}
+
+model CompanyExpense {
+  id              String          @id @default(cuid())
+  title           String
+  description     String?         @db.Text
+  amount          Decimal         @db.Decimal(10, 2)
+  categoryId      String
+  category        ExpenseCategory @relation(fields: [categoryId], references: [id])
+  type            String          // fixed | variable | one_off | recurring
+  status          String          @default("pending") // pending | paid | canceled (overdue é derivado em runtime)
+  paymentMethod   String?         // pix | boleto | credit_card | debit_card | cash | transfer | other
+  costCenter      String          @default("other")  // production | marketing | infra | admin | other
+  competenceDate  DateTime
+  dueDate         DateTime?
+  paidAt          DateTime?
+  receiptUrl      String?
+  invoiceNumber   String?
+  supplierName    String?
+
+  // Vínculo opcional com itens internos pra contabilidade analítica.
+  relatedFilamentId  String?
+  relatedFilament    Filament?  @relation(fields: [relatedFilamentId], references: [id], onDelete: SetNull)
+  relatedComponentId String?
+  relatedComponent   Component? @relation(fields: [relatedComponentId], references: [id], onDelete: SetNull)
+  relatedPrinterId   String?
+  relatedPrinter     Printer?   @relation(fields: [relatedPrinterId], references: [id], onDelete: SetNull)
+
+  notes           String?         @db.Text
+  createdByEmail  String?
+  updatedByEmail  String?
+  archivedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Recorrência: parent gera children. recurrenceRule é JSON serializado (frequência, dia, fim).
+  isRecurring        Boolean      @default(false)
+  recurrenceRule     String?
+  recurrenceParentId String?
+  recurrenceParent   CompanyExpense?  @relation("ExpenseRecurrence", fields: [recurrenceParentId], references: [id], onDelete: SetNull)
+  recurrenceChildren CompanyExpense[] @relation("ExpenseRecurrence")
+
+  @@index([status, competenceDate])
+  @@index([categoryId])
+  @@index([dueDate])
+  @@index([archivedAt])
+  @@index([costCenter])
+}
+
+model ExpenseBudget {
+  id            String           @id @default(cuid())
+  categoryId    String
+  category      ExpenseCategory  @relation(fields: [categoryId], references: [id])
+  month         Int              // 1-12
+  year          Int
+  plannedAmount Decimal          @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([categoryId, month, year])
+  @@index([year, month])
 }
