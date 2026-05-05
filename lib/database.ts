@@ -289,7 +289,11 @@ export async function listProducts() {
 
   try {
     const products = await prisma.product.findMany({
-      include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: { orderBy: { name: 'asc' } },
+      },
       orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
     })
 
@@ -347,6 +351,7 @@ export async function createProduct(data: Product) {
         stock: data.stock || 0,
         underOrder: data.underOrder || false,
         productionMinutesPerUnit: productionMinutes,
+        visibility: (data as any).visibility === 'internal' ? 'internal' : 'public',
         images: persistedMain
           ? { create: [{ url: persistedMain.url, storageKey: persistedMain.storageKey, alt: data.name, isMain: true }] }
           : undefined,
@@ -410,6 +415,9 @@ export async function updateProduct(id: string, data: Partial<Product>) {
         stock: data.stock,
         underOrder: data.underOrder,
         ...(hasProductionMinutesField ? { productionMinutesPerUnit: productionMinutes } : {}),
+        ...(Object.prototype.hasOwnProperty.call(data, 'visibility')
+          ? { visibility: (data as any).visibility === 'internal' ? 'internal' : 'public' }
+          : {}),
       },
       include: { category: true, images: true },
     })
