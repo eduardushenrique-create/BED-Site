@@ -83,6 +83,14 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
     })
 
     if (!pixPayment) {
+      // Sentry breadcrumb pra investigar quando Pix vem null. Não é
+      // exception — é fluxo controlado, mas precisa de visibilidade.
+      captureMessage('Mercado Pago Pix returned null', 'warning', {
+        context: 'payment.createPaymentForOrder',
+        orderNumber: input.orderNumber,
+        amount: input.amount,
+        hasCpf: Boolean(input.customer.cpf),
+      })
       return {
         provider: 'mercadopago',
         status: 'pending',
@@ -90,17 +98,33 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
       }
     }
 
+    const qrBase64 = pixPayment.point_of_interaction?.transaction_data?.qr_code_base64 || null
+    const qrCopyPaste = pixPayment.point_of_interaction?.transaction_data?.qr_code || null
+
+    // MP às vezes retorna 200 mas sem qr_code (estado intermediário ou
+    // restrição na conta). Loga warning pra investigar — UI mostra
+    // botão "Gerar QR Code agora" pra o cliente acionar regenerate-pix.
+    if (!qrCopyPaste) {
+      captureMessage('Mercado Pago Pix without qr_code', 'warning', {
+        context: 'payment.createPaymentForOrder',
+        orderNumber: input.orderNumber,
+        paymentId: pixPayment.id,
+        status: pixPayment.status,
+        statusDetail: pixPayment.status_detail,
+      })
+    }
+
     return {
       provider: 'mercadopago',
       status: pixPayment.status || 'pending',
       statusDetail: pixPayment.status_detail || undefined,
       providerPaymentId: String(pixPayment.id),
-      pixQrCodeBase64: pixPayment.point_of_interaction?.transaction_data?.qr_code_base64 || null,
-      pixCopyPaste: pixPayment.point_of_interaction?.transaction_data?.qr_code || null,
+      pixQrCodeBase64: qrBase64,
+      pixCopyPaste: qrCopyPaste,
       rawPayload: {
         ...pixPayment,
-        pixQrCodeBase64: pixPayment.point_of_interaction?.transaction_data?.qr_code_base64 || null,
-        pixCopyPaste: pixPayment.point_of_interaction?.transaction_data?.qr_code || null,
+        pixQrCodeBase64: qrBase64,
+        pixCopyPaste: qrCopyPaste,
       },
     }
   }

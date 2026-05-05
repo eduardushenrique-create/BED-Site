@@ -24,24 +24,52 @@ function OrderConfirmationContent() {
   const orderNumber = searchParams.get('pedido')
   const [order, setOrder] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(Boolean(orderNumber))
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
+
+  async function loadOrder() {
+    if (!orderNumber) return
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`)
+      if (!response.ok) return
+      const data = await response.json()
+      setOrder(data)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!orderNumber) return
-    const resolvedOrderNumber = orderNumber
-
-    async function loadOrder() {
-      try {
-        const response = await fetch(`/api/orders/${encodeURIComponent(resolvedOrderNumber)}`)
-        if (!response.ok) return
-        const data = await response.json()
-        setOrder(data)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadOrder()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderNumber])
+
+  async function handleGeneratePix() {
+    if (!orderNumber) return
+    setGenerating(true)
+    setGenerateError('')
+    try {
+      const res = await fetch(
+        `/api/me/orders/${encodeURIComponent(orderNumber)}/regenerate-pix`,
+        { method: 'POST' },
+      )
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGenerateError(data?.error || 'Não foi possível gerar o Pix agora. Tente novamente.')
+        return
+      }
+      // Recarrega o pedido pra pegar QR + copia-cola atualizados
+      await loadOrder()
+    } catch {
+      setGenerateError('Erro de conexão. Tente novamente.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const isPixPending =
+    order?.paymentMethod === 'pix' && order.paymentStatus !== 'paid'
+  const hasPixData = Boolean(order?.paymentDetails?.pixCopyPaste)
 
   const title =
     order?.paymentStatus === 'paid' ? 'Pedido confirmado!' :
@@ -84,6 +112,25 @@ function OrderConfirmationContent() {
         )}
 
         {loading && <p style={{ color: '#78716C' }}>Carregando status do pedido...</p>}
+
+        {!loading && isPixPending && !hasPixData && (
+          <div style={{ textAlign: 'left', backgroundColor: '#FEF3C7', padding: '20px 24px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #F5D58F' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', color: '#92400E' }}>
+              Pix ainda não foi gerado
+            </h2>
+            <p style={{ color: '#78716C', fontSize: '14px', marginBottom: '16px', lineHeight: 1.5 }}>
+              Houve uma falha ao gerar o código Pix automaticamente quando você finalizou o pedido. Clique abaixo para tentar de novo — o pedido continua válido.
+            </p>
+            <Button onClick={handleGeneratePix} disabled={generating}>
+              {generating ? 'Gerando...' : 'Gerar QR Code agora'}
+            </Button>
+            {generateError && (
+              <p role="alert" style={{ color: '#B42318', fontSize: '13px', marginTop: '12px' }}>
+                {generateError}
+              </p>
+            )}
+          </div>
+        )}
 
         {!loading && order?.paymentMethod === 'pix' && order.paymentDetails?.pixCopyPaste && (
           <div style={{ textAlign: 'left', backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
