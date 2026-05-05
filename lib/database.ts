@@ -113,7 +113,22 @@ function money(value: number) {
   return Number(value || 0)
 }
 
-function serializeProduct(product: any): Product {
+function serializeProduct(product: any): Product & {
+  visibility: 'public' | 'internal'
+  variants: Array<{
+    id: string
+    name: string
+    sku: string | null
+    color: string | null
+    size: string | null
+    material: string | null
+    finish: string | null
+    priceDelta: number | null
+    priceOverride: number | null
+    stockQuantity: number
+    isAvailable: boolean
+  }>
+} {
   const image = product.images?.find((img: any) => img.isMain) || product.images?.[0]
 
   return {
@@ -132,6 +147,22 @@ function serializeProduct(product: any): Product {
     underOrder: product.underOrder || false,
     sku: product.sku || '',
     productionMinutesPerUnit: product.productionMinutesPerUnit ?? null,
+    visibility: product.visibility === 'internal' ? 'internal' : 'public',
+    variants: Array.isArray(product.variants)
+      ? product.variants.map((variant: any) => ({
+          id: String(variant.id),
+          name: variant.name || 'Padrão',
+          sku: variant.sku || null,
+          color: variant.color || null,
+          size: variant.size || null,
+          material: variant.material || null,
+          finish: variant.finish || null,
+          priceDelta: variant.priceDelta != null ? Number(variant.priceDelta) : null,
+          priceOverride: variant.priceOverride != null ? Number(variant.priceOverride) : null,
+          stockQuantity: typeof variant.stockQuantity === 'number' ? variant.stockQuantity : 0,
+          isAvailable: variant.isAvailable !== false,
+        }))
+      : [],
   }
 }
 
@@ -237,6 +268,8 @@ function serializeOrder(order: any): Order {
     items: (order.items || []).map((item: any) => ({
       productId: item.productId,
       productName: item.productNameSnapshot || item.productName,
+      variantId: item.variantId ?? null,
+      variantName: item.variant?.name ?? item.variantName ?? null,
       quantity: item.quantity,
       unitPrice: money(item.unitPrice),
       observation: item.personalizationJson || item.observation || undefined,
@@ -985,7 +1018,7 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: { address: true, payment: true, items: true },
+        include: { address: true, payment: true, items: { include: { variant: true } } },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
@@ -1331,7 +1364,7 @@ export async function listOrders() {
   if (!hasDatabase || !prisma?.order) return readDB().orders
   try {
     const orders = await prisma.order.findMany({
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
       orderBy: { createdAt: 'desc' },
     })
     return orders.map(serializeOrder)
@@ -1349,7 +1382,7 @@ export async function getOrderByNumber(orderNumber: string) {
   try {
     const order = await prisma.order.findUnique({
       where: { orderNumber },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
@@ -1369,7 +1402,7 @@ export async function getOrderByTrackingCode(trackingCode: string) {
   try {
     const order = await prisma.order.findFirst({
       where: { trackingCode: code },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
@@ -1542,7 +1575,7 @@ export async function getOrderByIdOrNumber(idOrNumber: string) {
   try {
     const order = await prisma.order.findFirst({
       where: { OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }] },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
     return order ? serializeOrder(order) : null
   } catch (error) {
@@ -1612,7 +1645,7 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
           })),
         },
       },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
 
     // Fase 4 SPEC-001: alerta proativo de componentes em falta.
@@ -1677,7 +1710,7 @@ export async function updateOrder(id: string, data: Partial<Order>) {
         total: data.total,
         ...(expectedDelivery !== undefined ? { expectedDeliveryAt: expectedDelivery } : {}),
       },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
 
     if (data.paymentStatus) {
@@ -1779,7 +1812,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
           },
         },
       },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     })
 
     if (data.rawPayload?.paidAt && order.payment?.id) {
@@ -1791,7 +1824,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
 
     return serializeOrder(await prisma.order.findUniqueOrThrow({
       where: { orderNumber },
-      include: { address: true, payment: true, items: true },
+      include: { address: true, payment: true, items: { include: { variant: true } } },
     }))
   } catch (error) {
     reportDbError('updateOrderPaymentByNumber Prisma failed', error)

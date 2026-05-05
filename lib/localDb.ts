@@ -19,6 +19,7 @@ export type Product = {
   underOrder: boolean
   sku?: string
   productionMinutesPerUnit?: number | null
+  visibility?: 'public' | 'internal'
 }
 
 export type Category = {
