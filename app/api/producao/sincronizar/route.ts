@@ -4,6 +4,11 @@ import { syncProductionTasksForPaidOrders } from '@/lib/database'
 
 export const dynamic = 'force-dynamic'
 
+// Backfill manual: cria ProductionTask para pedidos pagos que estão em
+// 'pending' ou 'in_production' e ainda não têm tarefa criada. Útil para
+// pedidos antigos parados em 'in_production' antes da integração automática
+// (lib/order-production-bridge.ts) entrar em operação. Idempotente.
+
 export async function POST(request: NextRequest) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response

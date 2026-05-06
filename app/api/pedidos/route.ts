@@ -18,6 +18,29 @@ import {
   type ProductionTimeline,
   type FulfillmentStatus,
 } from '@/lib/order-statuses'
+import {
+  triggerProductionTasksOnStatusChange,
+  type TriggerProductionResult,
+} from '@/lib/order-production-bridge'
+
+/**
+ * Converte o resultado do bridge em um payload limpo para o response e em
+ * um snippet de metadata para o audit log. Mantém o handler enxuto.
+ */
+function summarizeProductionTrigger(result: TriggerProductionResult) {
+  if (!result.triggered) {
+    return { responsePayload: null, auditMetadata: null }
+  }
+  const responsePayload: Record<string, unknown> = { tasksCreated: result.created }
+  if (result.skipped) responsePayload.warning = result.skipped
+  if (result.error) responsePayload.error = true
+
+  const auditMetadata: Record<string, unknown> = { created: result.created }
+  if (result.skipped) auditMetadata.skipped = result.skipped
+  if (result.error) auditMetadata.error = true
+
+  return { responsePayload, auditMetadata }
+}
 
 async function validateOrderItems(
   items: Array<{ productId: string; variantId?: string | null }> | undefined,
@@ -98,6 +121,23 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
+  // Edição manual de fulfillmentStatus também precisa criar tasks de produção
+  // quando o pedido entra em "Em produção" (cobre admin que pula etapas via
+  // formulário de edição direta, sem usar o botão "avançar fase").
+  const productionTrigger = before
+    ? await triggerProductionTasksOnStatusChange(
+        {
+          id: order.id,
+          fulfillmentStatus: order.fulfillmentStatus,
+          status: order.status,
+          orderNumber: order.orderNumber,
+        },
+        before.fulfillmentStatus,
+      )
+    : ({ triggered: false } as TriggerProductionResult)
+  const { responsePayload: productionPayload, auditMetadata: productionAudit } =
+    summarizeProductionTrigger(productionTrigger)
+
   if (before) {
     const fields: string[] = []
     if (before.paymentStatus !== order.paymentStatus) fields.push(`pagamento ${before.paymentStatus}→${order.paymentStatus}`)
@@ -115,6 +155,7 @@ export async function PUT(request: NextRequest) {
           orderNumber: order.orderNumber,
           before: { paymentStatus: before.paymentStatus, fulfillmentStatus: before.fulfillmentStatus, trackingCode: before.trackingCode },
           after: { paymentStatus: order.paymentStatus, fulfillmentStatus: order.fulfillmentStatus, trackingCode: order.trackingCode },
+          ...(productionAudit ? { production: productionAudit } : {}),
         },
         ip: getClientIp(request),
       }).catch(() => {})
@@ -148,7 +189,9 @@ export async function PUT(request: NextRequest) {
     ).catch(() => {})
   }
 
-  return NextResponse.json(order)
+  return NextResponse.json(
+    productionPayload ? { ...order, production: productionPayload } : order,
+  )
 }
 
 async function handleStageTransition(input: {
@@ -200,6 +243,21 @@ async function handleStageTransition(input: {
     return NextResponse.json({ error: 'Falha ao atualizar pedido' }, { status: 500 })
   }
 
+  // Quando o pedido entra em "Em produção", garante que existam as
+  // ProductionTask correspondentes para os itens elegíveis. Idempotente,
+  // não bloqueia a transição em caso de falha.
+  const productionTrigger = await triggerProductionTasksOnStatusChange(
+    {
+      id: updated.id,
+      fulfillmentStatus: updated.fulfillmentStatus,
+      status: updated.status,
+      orderNumber: updated.orderNumber,
+    },
+    before.fulfillmentStatus,
+  )
+  const { responsePayload: productionPayload, auditMetadata: productionAudit } =
+    summarizeProductionTrigger(productionTrigger)
+
   recordAuditEntry({
     actorEmail: auth.user!.email,
     actorRole: auth.user!.role || null,
@@ -212,6 +270,7 @@ async function handleStageTransition(input: {
       from: before.fulfillmentStatus,
       to: target,
       note: currentStageNote || null,
+      ...(productionAudit ? { production: productionAudit } : {}),
     },
     ip: getClientIp(request),
   }).catch(() => {})
@@ -241,7 +300,9 @@ async function handleStageTransition(input: {
     },
   ).catch(() => {})
 
-  return NextResponse.json(updated)
+  return NextResponse.json(
+    productionPayload ? { ...updated, production: productionPayload } : updated,
+  )
 }
 
 export async function DELETE(request: NextRequest) {

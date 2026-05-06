@@ -137,6 +137,35 @@ button {
   }
 }
 
+/* Home benefits bar: 1 col mobile, 2 cols tablet, 4 cols desktop. */
+.home-benefits-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 600px) {
+  .home-benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .home-benefits-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Home "como funciona" steps: 1 col mobile, 3 cols desktop. */
+.home-personalization-steps-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+@media (min-width: 768px) {
+  .home-personalization-steps-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* ─── Admin responsive utilities ─────────────────────────────────────────── */
 
 /* Admin root layout: sidebar + main content */

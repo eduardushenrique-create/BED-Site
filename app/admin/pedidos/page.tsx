@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import Input from '@/components/Input'
 import Button from '@/components/Button'
@@ -198,6 +198,17 @@ export default function AdminOrdersPage() {
   const [foundCustomers, setFoundCustomers] = useState<{id: string; name: string; email: string; phone: string}[]>([])
   const [variantPickerFor, setVariantPickerFor] = useState<string | null>(null)
   const [pendingActionFor, setPendingActionFor] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkFulfillmentChoice, setBulkFulfillmentChoice] = useState('')
+  const [bulkPaymentChoice, setBulkPaymentChoice] = useState('')
+  const [bulkLastResult, setBulkLastResult] = useState<{
+    total: number
+    succeeded: number
+    failed: Array<{ id: string; error: string }>
+    action: 'update' | 'delete'
+  } | null>(null)
+  const headerCheckboxRef = useRef<HTMLInputElement>(null)
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     customerEmail: '',
@@ -354,6 +365,138 @@ export default function AdminOrdersPage() {
     setDateFrom('')
     setDateTo('')
     setMinTotal('')
+  }
+
+  const filteredOrderIds = useMemo(() => filteredOrders.map(o => o.id), [filteredOrders])
+
+  const allFilteredSelected = filteredOrderIds.length > 0 && filteredOrderIds.every(id => selectedIds.has(id))
+  const someFilteredSelected = filteredOrderIds.some(id => selectedIds.has(id))
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someFilteredSelected && !allFilteredSelected
+    }
+  }, [someFilteredSelected, allFilteredSelected])
+
+  function toggleSelectAllFiltered() {
+    if (allFilteredSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        filteredOrderIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        filteredOrderIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+    setBulkLastResult(null)
+    setBulkFulfillmentChoice('')
+    setBulkPaymentChoice('')
+  }
+
+  async function runBulkAction(
+    action: 'update' | 'delete',
+    payload?: { fulfillmentStatus?: string; paymentStatus?: string },
+  ) {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    setBulkLoading(true)
+    setBulkLastResult(null)
+    try {
+      const res = await fetch('/api/pedidos/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds: ids, action, payload }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        alert(data?.error || 'Falha na operação em massa.')
+        return
+      }
+      setBulkLastResult({
+        total: data.total,
+        succeeded: data.succeeded,
+        failed: data.failed || [],
+        action,
+      })
+      // Reset escolhas
+      setBulkFulfillmentChoice('')
+      setBulkPaymentChoice('')
+      // Limpa seleção de IDs que sumiram (delete) ou que foram atualizados com sucesso
+      if (action === 'delete') {
+        const failedIdSet = new Set((data.failed || []).map((f: { id: string }) => f.id))
+        setSelectedIds(prev => {
+          const next = new Set<string>()
+          prev.forEach(id => {
+            if (failedIdSet.has(id)) next.add(id)
+          })
+          return next
+        })
+      }
+      await loadOrders()
+    } catch (e) {
+      console.error('Error in bulk action:', e)
+      alert('Erro de conexão na operação em massa.')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  function handleBulkDelete() {
+    const count = selectedIds.size
+    if (count === 0) return
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir ${count} ${count === 1 ? 'pedido' : 'pedidos'}? Essa ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+    runBulkAction('delete')
+  }
+
+  function handleBulkChangeFulfillment(value: string) {
+    if (!value) return
+    const count = selectedIds.size
+    if (count === 0) return
+    const label = FULFILLMENT_STATUSES.find(s => s.value === value)?.label || value
+    const confirmed = window.confirm(
+      `Aplicar fase "${label}" em ${count} ${count === 1 ? 'pedido' : 'pedidos'}?`,
+    )
+    if (!confirmed) {
+      setBulkFulfillmentChoice('')
+      return
+    }
+    runBulkAction('update', { fulfillmentStatus: value })
+  }
+
+  function handleBulkChangePayment(value: string) {
+    if (!value) return
+    const count = selectedIds.size
+    if (count === 0) return
+    const label = PAYMENT_STATUSES.find(s => s.value === value)?.label || value
+    const confirmed = window.confirm(
+      `Aplicar pagamento "${label}" em ${count} ${count === 1 ? 'pedido' : 'pedidos'}?`,
+    )
+    if (!confirmed) {
+      setBulkPaymentChoice('')
+      return
+    }
+    runBulkAction('update', { paymentStatus: value })
   }
 
   function escapeCsvField(value: string | number | null | undefined): string {
@@ -705,6 +848,173 @@ export default function AdminOrdersPage() {
         </button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Ações em massa nos pedidos selecionados"
+          style={{
+            backgroundColor: '#1D2235',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            marginBottom: '12px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 4px 12px rgba(29,34,53,0.18)',
+          }}
+        >
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>
+            {selectedIds.size} {selectedIds.size === 1 ? 'pedido selecionado' : 'pedidos selecionados'}
+          </span>
+          {bulkLoading && (
+            <span aria-live="polite" style={{ fontSize: '13px', color: '#BBCFEB' }}>
+              Processando...
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={bulkLoading}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.25)',
+              backgroundColor: 'transparent',
+              color: 'white',
+              cursor: bulkLoading ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+              opacity: bulkLoading ? 0.6 : 1,
+            }}
+          >
+            Limpar seleção
+          </button>
+          <div style={{ flex: 1, minWidth: '12px' }} />
+          <select
+            value={bulkFulfillmentChoice}
+            onChange={e => {
+              const v = e.target.value
+              setBulkFulfillmentChoice(v)
+              handleBulkChangeFulfillment(v)
+            }}
+            disabled={bulkLoading}
+            aria-label="Mudar fase de produção dos pedidos selecionados"
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.25)',
+              backgroundColor: '#2A3149',
+              color: 'white',
+              fontSize: '13px',
+              cursor: bulkLoading ? 'not-allowed' : 'pointer',
+              opacity: bulkLoading ? 0.6 : 1,
+            }}
+          >
+            <option value="">Mudar fase de produção...</option>
+            {FULFILLMENT_STATUSES.map(s => (
+              <option key={s.value} value={s.value} style={{ color: '#1D2235' }}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={bulkPaymentChoice}
+            onChange={e => {
+              const v = e.target.value
+              setBulkPaymentChoice(v)
+              handleBulkChangePayment(v)
+            }}
+            disabled={bulkLoading}
+            aria-label="Mudar status de pagamento dos pedidos selecionados"
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.25)',
+              backgroundColor: '#2A3149',
+              color: 'white',
+              fontSize: '13px',
+              cursor: bulkLoading ? 'not-allowed' : 'pointer',
+              opacity: bulkLoading ? 0.6 : 1,
+            }}
+          >
+            <option value="">Mudar pagamento...</option>
+            {PAYMENT_STATUSES.map(s => (
+              <option key={s.value} value={s.value} style={{ color: '#1D2235' }}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkLoading}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#B42318',
+              color: 'white',
+              cursor: bulkLoading ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              opacity: bulkLoading ? 0.6 : 1,
+            }}
+          >
+            Excluir selecionados
+          </button>
+        </div>
+      )}
+
+      {bulkLastResult && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            backgroundColor: bulkLastResult.failed.length === 0 ? '#E8F5F2' : '#FEF6E6',
+            border: bulkLastResult.failed.length === 0 ? '1px solid #1D7A72' : '1px solid #F59E0B',
+            color: '#1D2235',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            marginBottom: '12px',
+            fontSize: '13px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>
+              <strong>
+                {bulkLastResult.action === 'delete' ? 'Exclusão em massa' : 'Atualização em massa'}:
+              </strong>{' '}
+              {bulkLastResult.succeeded} de {bulkLastResult.total}{' '}
+              {bulkLastResult.action === 'delete' ? 'excluídos' : 'atualizados'} com sucesso
+              {bulkLastResult.failed.length > 0 && ` · ${bulkLastResult.failed.length} falharam`}.
+            </span>
+            <button
+              type="button"
+              onClick={() => setBulkLastResult(null)}
+              aria-label="Fechar mensagem"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#6B7494', lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+          {bulkLastResult.failed.length > 0 && (
+            <details style={{ marginTop: '8px' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                Ver pedidos que falharam ({bulkLastResult.failed.length})
+              </summary>
+              <ul style={{ margin: '8px 0 0', paddingLeft: '20px', maxHeight: '160px', overflowY: 'auto' }}>
+                {bulkLastResult.failed.map(f => (
+                  <li key={f.id} style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                    {f.id.slice(0, 12)}… — {f.error}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
       {orders.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '48px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>Nenhum pedido encontrado</p>
@@ -715,6 +1025,17 @@ export default function AdminOrdersPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
+                <th style={{ padding: '16px 8px 16px 16px', textAlign: 'left', width: '36px' }}>
+                  <input
+                    ref={headerCheckboxRef}
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAllFiltered}
+                    disabled={bulkLoading || filteredOrderIds.length === 0}
+                    aria-label="Selecionar todos os pedidos visíveis"
+                    style={{ width: '16px', height: '16px', cursor: filteredOrderIds.length === 0 ? 'not-allowed' : 'pointer' }}
+                  />
+                </th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Pedido</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Cliente</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Total</th>
@@ -734,8 +1055,19 @@ export default function AdminOrdersPage() {
                 const advanceEnabled = canAdvance(order.fulfillmentStatus)
                 const regressEnabled = canRegress(order.fulfillmentStatus)
                 const isPending = pendingActionFor === order.id
+                const isSelected = selectedIds.has(order.id)
                 return (
-                  <tr key={order.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
+                  <tr key={order.id} style={{ borderBottom: '1px solid #D8DCE8', backgroundColor: isSelected ? '#F0F5FB' : 'transparent' }}>
+                    <td style={{ padding: '16px 8px 16px 16px', textAlign: 'left' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectOne(order.id)}
+                        disabled={bulkLoading}
+                        aria-label={`Selecionar pedido ${order.orderNumber}`}
+                        style={{ width: '16px', height: '16px', cursor: bulkLoading ? 'not-allowed' : 'pointer' }}
+                      />
+                    </td>
                     <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px' }}>{order.orderNumber}</td>
                     <td style={{ padding: '16px' }}>
                       <div style={{ fontWeight: 500 }}>{order.customerName}</div>
