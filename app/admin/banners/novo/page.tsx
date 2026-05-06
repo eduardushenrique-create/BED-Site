@@ -13,6 +13,7 @@ export default function NovoBannerPage() {
     htmlContent: '',
     isActive: true,
     displayDurationSeconds: 5,
+    displayOrder: 0,
   })
   const [saving, setSaving] = useState(false)
 
@@ -106,6 +107,20 @@ export default function NovoBannerPage() {
               onChange={(e) => setFormData({ ...formData, displayDurationSeconds: Math.max(2, parseInt(e.target.value, 10) || 5) })}
               placeholder="5"
             />
+
+            <div>
+              <Input
+                label="Ordem de exibição"
+                type="number"
+                min={0}
+                value={String(formData.displayOrder)}
+                onChange={(e) => setFormData({ ...formData, displayOrder: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                placeholder="0"
+              />
+              <span style={{ fontSize: '12px', color: '#6B7494', marginTop: '4px', display: 'block' }}>
+                Banners são exibidos do menor para o maior número (0 = primeiro)
+              </span>
+            </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: '#F0F5FB', borderRadius: '8px' }}>
               <input
