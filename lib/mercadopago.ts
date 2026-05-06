@@ -2,9 +2,7 @@ import crypto from 'crypto'
 import { captureException, captureMessage } from '@/lib/observability'
 
 const MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN!
-const MERCADOPAGO_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://api.mercadopago.com' 
-  : 'https://api.mercadopago.com'
+const MERCADOPAGO_BASE_URL = 'https://api.mercadopago.com'
 
 export interface PaymentPreference {
   items: Array<{
