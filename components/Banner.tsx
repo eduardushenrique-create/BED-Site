@@ -1,16 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import BrandLogo from '@/components/BrandLogo'
 
 export interface Banner {
   id: string
-  title: string
-  subtitle?: string
-  imageUrl: string
-  ctaText?: string
-  ctaLink?: string
+  title: string        // label administrativo, não é exibido
+  htmlContent: string  // HTML completo do banner
   isActive: boolean
   displayDurationSeconds?: number
 }
@@ -18,11 +13,8 @@ export interface Banner {
 const defaultBanners: Banner[] = [
   {
     id: '1',
-    title: 'Presentes feitos para durar.',
-    subtitle: 'Cada peça é impressa sob demanda com filamento premium. Personalize com nome, data ou mensagem especial.',
-    imageUrl: '',
-    ctaText: 'Explorar coleção',
-    ctaLink: '/produtos',
+    title: 'Banner de exemplo',
+    htmlContent: `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1D2235 0%,#2E3650 100%);color:#F0F5FB;font-family:sans-serif;font-size:22px;font-weight:600;">Configure seus banners no painel admin.</div>`,
     isActive: true,
     displayDurationSeconds: 5,
   },
@@ -55,8 +47,6 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
   if (!current) return null
 
-  const hasImage = Boolean(current.imageUrl)
-
   function goPrev() {
     setIndex(prev => (prev - 1 + activeBanners.length) % activeBanners.length)
   }
@@ -74,140 +64,13 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
         marginBottom: '64px',
         borderRadius: '18px',
         overflow: 'hidden',
-        background: 'linear-gradient(135deg, #1D2235 0%, #2E3650 64%, #1A2840 100%)',
       }}
     >
-      {hasImage && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={current.id}
-          src={current.imageUrl}
-          alt={current.title}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center',
-          }}
-        />
-      )}
-
       <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: hasImage
-            ? 'linear-gradient(90deg, rgba(15,18,32,0.78) 0%, rgba(15,18,32,0.55) 45%, rgba(15,18,32,0.18) 75%, rgba(15,18,32,0) 100%)'
-            : 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-          backgroundSize: hasImage ? undefined : '48px 48px',
-        }}
+        key={current.id}
+        dangerouslySetInnerHTML={{ __html: current.htmlContent }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       />
-
-      <div
-        style={{
-          position: 'relative',
-          minHeight: 'inherit',
-          display: 'flex',
-          alignItems: 'center',
-          padding: 'clamp(32px, 6vw, 96px) clamp(24px, 6vw, 96px)',
-          zIndex: 1,
-        }}
-      >
-        <div style={{ maxWidth: '640px', minWidth: 0 }}>
-          <div className="banner-brand-logo" style={{ marginBottom: '18px' }}>
-            <BrandLogo dark={false} size="md" />
-          </div>
-          <style>{`
-            @media (max-width: 480px) {
-              .banner-brand-logo { display: none; }
-            }
-          `}</style>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <div style={{ width: '28px', height: '1.5px', background: '#BBCFEB', borderRadius: '999px' }} />
-            <span
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: '#BBCFEB',
-              }}
-            >
-              Impressão 3D com alma
-            </span>
-          </div>
-          <h1
-            style={{
-              fontSize: 'clamp(28px, 6.5vw, 68px)',
-              fontWeight: 700,
-              color: '#F0F5FB',
-              marginBottom: '18px',
-              lineHeight: 1.08,
-              letterSpacing: 0,
-              textShadow: hasImage ? '0 2px 24px rgba(0,0,0,0.45)' : 'none',
-              wordBreak: 'break-word',
-              hyphens: 'auto',
-            }}
-          >
-            {current.title}
-          </h1>
-          {current.subtitle && (
-            <p
-              style={{
-                fontSize: '17px',
-                color: 'rgba(240,245,251,0.85)',
-                marginBottom: '28px',
-                maxWidth: '520px',
-                lineHeight: 1.7,
-                textShadow: hasImage ? '0 1px 12px rgba(0,0,0,0.35)' : 'none',
-              }}
-            >
-              {current.subtitle}
-            </p>
-          )}
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {current.ctaText && current.ctaLink && (
-              <Link href={current.ctaLink}>
-                <button
-                  style={{
-                    padding: '14px 28px',
-                    backgroundColor: '#BBCFEB',
-                    color: '#1D2235',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    width: 'fit-content',
-                  }}
-                >
-                  {current.ctaText}
-                </button>
-              </Link>
-            )}
-            <Link href="/personalizados">
-              <button
-                style={{
-                  padding: '14px 24px',
-                  backgroundColor: 'transparent',
-                  color: 'rgba(240,245,251,0.92)',
-                  border: '1px solid rgba(255,255,255,0.28)',
-                  borderRadius: '10px',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  width: 'fit-content',
-                }}
-              >
-                Personalizar
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
 
       {activeBanners.length > 1 && (
         <>

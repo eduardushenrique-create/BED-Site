@@ -217,10 +217,7 @@ function serializeBanner(banner: any): Banner {
   return {
     id: banner.id,
     title: banner.title,
-    subtitle: banner.subtitle || '',
-    imageUrl: banner.imageUrl,
-    ctaText: banner.ctaText || '',
-    ctaLink: banner.ctaLink || '',
+    htmlContent: banner.htmlContent || '',
     isActive: banner.isActive,
     displayDurationSeconds: typeof banner.displayDurationSeconds === 'number' ? banner.displayDurationSeconds : 5,
   }
@@ -1277,13 +1274,7 @@ export async function createBanner(data: Banner) {
   }
 
   try {
-    const persisted = data.imageUrl ? await persistImageIfDataUrl(data.imageUrl, 'banners') : null
-    const created = await prisma.banner.create({
-      data: {
-        ...data,
-        ...(persisted ? { imageUrl: persisted.url, storageKey: persisted.storageKey } : {}),
-      },
-    })
+    const created = await prisma.banner.create({ data })
     return serializeBanner(created)
   } catch (error) {
     reportDbError('createBanner Prisma failed, using fallback', error)
@@ -1306,28 +1297,7 @@ export async function updateBanner(id: string, data: Partial<Banner>) {
   }
 
   try {
-    let payload: Record<string, unknown> = { ...data }
-
-    // Se veio uma nova imagem (data URL), faz upload e captura storageKey.
-    if (typeof data.imageUrl === 'string' && data.imageUrl) {
-      if (isDataUrl(data.imageUrl)) {
-        const persisted = await persistImageIfDataUrl(data.imageUrl, 'banners')
-        payload = { ...payload, imageUrl: persisted.url, storageKey: persisted.storageKey }
-
-        // Limpa o objeto antigo no R2, se houver.
-        const existing = await prisma.banner.findUnique({ where: { id } })
-        if (existing?.storageKey && existing.storageKey !== persisted.storageKey) {
-          try {
-            await getStorage().delete(existing.storageKey)
-          } catch (deleteError) {
-            console.warn('[database] storage delete (updateBanner) falhou:', deleteError)
-          }
-        }
-      }
-      // Se já é URL pública, mantém como veio (sem mexer em storageKey).
-    }
-
-    return serializeBanner(await prisma.banner.update({ where: { id }, data: payload }))
+    return serializeBanner(await prisma.banner.update({ where: { id }, data }))
   } catch (error) {
     reportDbError('updateBanner Prisma failed, using fallback', error)
     const db = readDB()
@@ -1350,15 +1320,7 @@ export async function deleteBanner(id: string) {
   }
 
   try {
-    const existing = await prisma.banner.findUnique({ where: { id } })
     await prisma.banner.delete({ where: { id } })
-    if (existing?.storageKey) {
-      try {
-        await getStorage().delete(existing.storageKey)
-      } catch (deleteError) {
-        console.warn('[database] storage delete (deleteBanner) falhou:', deleteError)
-      }
-    }
     return true
   } catch (error) {
     reportDbError('deleteBanner Prisma failed', error)

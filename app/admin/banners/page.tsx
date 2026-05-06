@@ -7,10 +7,7 @@ import Button from '@/components/Button'
 type Banner = {
   id: string
   title: string
-  subtitle: string
-  imageUrl: string
-  ctaText: string
-  ctaLink: string
+  htmlContent: string
   isActive: boolean
   displayDurationSeconds: number
 }
@@ -106,17 +103,13 @@ export default function AdminBannersPage() {
                 opacity: banner.isActive ? 1 : 0.6,
               }}
             >
-              <div style={{ position: 'relative', height: '180px', backgroundColor: '#1D2235', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {banner.imageUrl ? (
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                ) : (
-                  <span style={{ color: '#BBCFEB', fontSize: '13px', opacity: 0.7 }}>Sem imagem — usa gradiente padrão</span>
-                )}
+              <div style={{ position: 'relative', height: '180px', backgroundColor: '#1D2235', overflow: 'hidden' }}>
+                <iframe
+                  srcDoc={banner.htmlContent || '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#1D2235;color:#BBCFEB;font-family:sans-serif;font-size:13px;opacity:0.7;">Sem conteúdo HTML</div>'}
+                  sandbox="allow-scripts"
+                  title={`Preview: ${banner.title}`}
+                  style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }}
+                />
                 <span style={{
                   position: 'absolute',
                   top: '12px',
@@ -133,16 +126,6 @@ export default function AdminBannersPage() {
               </div>
               <div style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>{banner.title}</h3>
-                {banner.subtitle && (
-                  <p style={{ fontSize: '14px', color: '#6B7494', marginBottom: '12px' }}>
-                    {banner.subtitle}
-                  </p>
-                )}
-                <div style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#6B7494', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  <span>CTA: {banner.ctaText || 'Nenhum'}</span>
-                  <span>|</span>
-                  <span>Link: {banner.ctaLink || 'Nenhum'}</span>
-                </div>
                 <div style={{ fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
                   Tempo no carrossel: {banner.displayDurationSeconds || 5}s
                 </div>

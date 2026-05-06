@@ -77,10 +77,7 @@ export type Order = {
 export type Banner = {
   id: string
   title: string
-  subtitle: string
-  imageUrl: string
-  ctaText: string
-  ctaLink: string
+  htmlContent: string
   isActive: boolean
   displayDurationSeconds: number
 }
@@ -359,11 +356,8 @@ const defaultData: Database = {
   banners: [
     {
       id: 'banner_default',
-      title: 'Presentes feitos para durar.',
-      subtitle: 'Cada peça é impressa sob demanda com filamento premium. Personalize com nome, data ou mensagem especial.',
-      imageUrl: '',
-      ctaText: 'Explorar coleção',
-      ctaLink: '/produtos',
+      title: 'Banner de exemplo',
+      htmlContent: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1D2235 0%,#2E3650 100%);color:#F0F5FB;font-family:sans-serif;font-size:22px;font-weight:600;">Configure seus banners no painel admin.</div>',
       isActive: true,
       displayDurationSeconds: 5,
     },
