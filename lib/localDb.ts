@@ -8,7 +8,7 @@ export type Product = {
   name: string
   slug: string
   price: number
-  category: string
+  categories: string[]
   isActive: boolean
   isFeatured: boolean
   isPersonalizable: boolean

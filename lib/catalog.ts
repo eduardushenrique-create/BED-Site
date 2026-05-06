@@ -33,9 +33,9 @@ function serializePrismaProduct(product: any): Product {
     widthCm: product.widthCm ? Number(product.widthCm) : null,
     heightCm: product.heightCm ? Number(product.heightCm) : null,
     depthCm: product.depthCm ? Number(product.depthCm) : null,
-    category: product.category
-      ? { name: product.category.name, slug: product.category.slug }
-      : null,
+    categories: Array.isArray(product.categories)
+      ? product.categories.map((c: any) => ({ name: c.name, slug: c.slug }))
+      : [],
     images: product.images.map((image: any) => ({
       id: image.id,
       url: image.url,
@@ -87,7 +87,7 @@ function getPublicProductWhere(filters: CatalogFilters = {}) {
     isActive: true,
     status: { not: 'draft' },
     visibility: 'public',
-    category: filters.category ? { slug: filters.category, isActive: true } : undefined,
+    categories: filters.category ? { some: { slug: filters.category, isActive: true } } : undefined,
     isFeatured: filters.featured ? true : undefined,
     isPersonalizable: filters.personalizable ? true : undefined,
     OR: filters.search
@@ -96,7 +96,7 @@ function getPublicProductWhere(filters: CatalogFilters = {}) {
           { description: { contains: filters.search, mode: 'insensitive' as const } },
           { shortDescription: { contains: filters.search, mode: 'insensitive' as const } },
           { sku: { contains: filters.search, mode: 'insensitive' as const } },
-          { category: { name: { contains: filters.search, mode: 'insensitive' as const } } },
+          { categories: { some: { name: { contains: filters.search, mode: 'insensitive' as const } } } },
         ]
       : undefined,
     AND: [
@@ -119,7 +119,7 @@ export async function getLocalCatalogProducts(filters: CatalogFilters = {}): Pro
     const products = await prisma.product.findMany({
       where: getPublicProductWhere(filters),
       include: {
-        category: true,
+        categories: true,
         images: { orderBy: { sortOrder: 'asc' } },
         variants: true,
         personalizationFields: { orderBy: { sortOrder: 'asc' } },
@@ -178,7 +178,7 @@ export async function getLocalCatalogProductBySlug(slug: string): Promise<Produc
         slug,
       },
       include: {
-        category: true,
+        categories: true,
         images: { orderBy: { sortOrder: 'asc' } },
         variants: true,
         personalizationFields: { orderBy: { sortOrder: 'asc' } },

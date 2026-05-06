@@ -77,14 +77,14 @@ async function seed() {
         ...productData,
         status: 'published',
         isActive: true,
-        categoryId: category?.id,
+        categories: category ? { set: [{ id: category.id }] } : { set: [] },
         stock: 10,
       },
       create: {
         ...productData,
         status: 'published',
         isActive: true,
-        categoryId: category?.id,
+        categories: category ? { connect: [{ id: category.id }] } : undefined,
         stock: 10,
       },
     })

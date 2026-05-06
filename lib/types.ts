@@ -54,7 +54,7 @@ export interface Product {
   images: ProductImage[]
   variants: ProductVariant[]
   personalizationFields: PersonalizationField[]
-  category: ProductCategory | null
+  categories: ProductCategory[]
   status?: string
   isActive?: boolean
   isFeatured?: boolean

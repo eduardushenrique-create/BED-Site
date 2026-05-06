@@ -177,10 +177,14 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          {product.category && (
-            <span style={{ color: '#4A7AB5', fontSize: '12px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-              {product.category.name}
-            </span>
+          {product.categories?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {product.categories.map(c => (
+                <span key={c.slug} style={{ color: '#4A7AB5', fontSize: '12px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                  {c.name}
+                </span>
+              ))}
+            </div>
           )}
 
           <h1 style={{ fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 700, marginBottom: '10px', color: '#1D2235', marginTop: '8px' }}>

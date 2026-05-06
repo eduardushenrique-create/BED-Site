@@ -36,7 +36,7 @@ function buildProductJsonLd(product: Product, appUrl: string) {
     },
   }
   if (imageUrl) jsonLd.image = imageUrl
-  if (product.category) jsonLd.category = product.category.name
+  if (product.categories?.length) jsonLd.category = product.categories.map(c => c.name).join(', ')
 
   if (product.averageRating != null && (product.reviewCount ?? 0) > 0) {
     jsonLd.aggregateRating = {
