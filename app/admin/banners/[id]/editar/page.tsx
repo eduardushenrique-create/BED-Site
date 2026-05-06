@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, use } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -57,8 +57,11 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
   const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<Omit<Banner, 'id'>>(emptyForm)
+  const [detectedLinks, setDetectedLinks] = useState<{ index: number; label: string; href: string }[]>([])
 
-  const detectedLinks = useMemo(() => parseLinks(formData.htmlContent), [formData.htmlContent])
+  useEffect(() => {
+    setDetectedLinks(parseLinks(formData.htmlContent))
+  }, [formData.htmlContent])
 
   function handleLinkHrefChange(linkIndex: number, newHref: string) {
     setFormData(prev => ({ ...prev, htmlContent: updateLinkHref(prev.htmlContent, linkIndex, newHref) }))
@@ -283,12 +286,12 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
             srcDoc={formData.htmlContent}
             sandbox="allow-scripts allow-same-origin"
             title="Preview do banner"
-            style={{ width: '100%', height: '400px', border: 'none', borderRadius: '8px' }}
+            style={{ width: '100%', height: '560px', border: 'none', borderRadius: '8px' }}
           />
         ) : (
           <div style={{
             width: '100%',
-            height: '400px',
+            height: '560px',
             borderRadius: '8px',
             backgroundColor: '#F0F5FB',
             border: '1px dashed #D8DCE8',

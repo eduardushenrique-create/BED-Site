@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -43,8 +43,11 @@ export default function NovoBannerPage() {
     displayOrder: 0,
   })
   const [saving, setSaving] = useState(false)
+  const [detectedLinks, setDetectedLinks] = useState<{ index: number; label: string; href: string }[]>([])
 
-  const detectedLinks = useMemo(() => parseLinks(formData.htmlContent), [formData.htmlContent])
+  useEffect(() => {
+    setDetectedLinks(parseLinks(formData.htmlContent))
+  }, [formData.htmlContent])
 
   function handleLinkHrefChange(linkIndex: number, newHref: string) {
     setFormData(prev => ({ ...prev, htmlContent: updateLinkHref(prev.htmlContent, linkIndex, newHref) }))
@@ -229,12 +232,12 @@ export default function NovoBannerPage() {
             srcDoc={formData.htmlContent}
             sandbox="allow-scripts allow-same-origin"
             title="Preview do banner"
-            style={{ width: '100%', height: '400px', border: 'none', borderRadius: '8px' }}
+            style={{ width: '100%', height: '560px', border: 'none', borderRadius: '8px' }}
           />
         ) : (
           <div style={{
             width: '100%',
-            height: '400px',
+            height: '560px',
             borderRadius: '8px',
             backgroundColor: '#F0F5FB',
             border: '1px dashed #D8DCE8',
