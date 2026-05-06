@@ -15,7 +15,7 @@ interface Product {
   name: string
   slug: string
   price: number
-  category: string
+  categories: string[]
   description: string
   isActive: boolean
   isFeatured: boolean
@@ -44,7 +44,7 @@ const LS_VIEW_KEY = 'admin.products.view'
 const emptyForm = {
   name: '',
   price: '',
-  category: '',
+  categories: [] as string[],
   description: '',
   stock: '0',
   underOrder: false,
@@ -374,7 +374,7 @@ export default function AdminProductsPage() {
     setFormData({
       name: product.name,
       price: String(product.price),
-      category: product.category,
+      categories: Array.isArray(product.categories) ? product.categories : [],
       description: product.description || '',
       stock: String(product.stock),
       underOrder: product.underOrder || false,
@@ -394,8 +394,8 @@ export default function AdminProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.price || !formData.category) {
-      alert('Preencha nome, preço e categoria.')
+    if (!formData.name || !formData.price || formData.categories.length === 0) {
+      alert('Preencha nome, preço e ao menos uma categoria.')
       return
     }
 
@@ -413,7 +413,7 @@ export default function AdminProductsPage() {
       name: formData.name,
       slug,
       price: parseFloat(formData.price),
-      category: formData.category,
+      categories: formData.categories,
       description: formData.description,
       isPersonalizable: formData.isPersonalizable,
       isFeatured: formData.isFeatured,
@@ -592,21 +592,38 @@ export default function AdminProductsPage() {
                   placeholder="89.90"
                 />
                 <div>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#1D2235' }}>
-                    Categoria
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#1D2235' }}>
+                    Categorias
                   </label>
-                  <select
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    required
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', border: '1px solid #D8DCE8', fontSize: '16px', color: '#1D2235', backgroundColor: 'white' }}
-                  >
-                    <option value="">Selecione...</option>
-                    {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-                  </select>
-                  {!categories.length && (
-                    <p style={{ marginTop: '8px', fontSize: '13px', color: '#B42318' }}>
+                  {categories.length === 0 ? (
+                    <p style={{ fontSize: '13px', color: '#B42318' }}>
                       Cadastre categorias ativas antes de criar produtos.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 14px', borderRadius: '10px', border: '1px solid #D8DCE8', backgroundColor: 'white', maxHeight: '160px', overflowY: 'auto' }}>
+                      {categories.map(c => {
+                        const checked = formData.categories.includes(c.slug)
+                        return (
+                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#1D2235' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const next = checked
+                                  ? formData.categories.filter(s => s !== c.slug)
+                                  : [...formData.categories, c.slug]
+                                setFormData({ ...formData, categories: next })
+                              }}
+                            />
+                            {c.name}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {formData.categories.length === 0 && categories.length > 0 && (
+                    <p style={{ marginTop: '6px', fontSize: '12px', color: '#B42318' }}>
+                      Selecione ao menos uma categoria.
                     </p>
                   )}
                 </div>
@@ -826,19 +843,6 @@ export default function AdminProductsPage() {
             <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ isPersonalizable: false })} style={bulkBtn}>Tirar personalizável</button>
             <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ underOrder: true })} style={bulkBtn}>Sob encomenda</button>
             <button type="button" disabled={bulkBusy} onClick={() => applyBulk({ underOrder: false })} style={bulkBtn}>Tirar sob encomenda</button>
-            <select
-              disabled={bulkBusy}
-              defaultValue=""
-              onChange={e => {
-                const val = e.target.value
-                e.target.value = ''
-                if (val) applyBulk({ category: val }, `Mover ${selectedIds.size} produto(s) para a categoria selecionada?`)
-              }}
-              style={{ ...bulkBtn, padding: '6px 10px' }}
-            >
-              <option value="">Mudar categoria...</option>
-              {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-            </select>
             <button type="button" onClick={clearSelection} disabled={bulkBusy} style={{ ...bulkBtn, background: 'rgba(255,255,255,0.1)' }}>Limpar seleção</button>
           </div>
         </div>
@@ -923,7 +927,7 @@ export default function AdminProductsPage() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '14px 16px', fontSize: '14px', color: '#6B7494', textTransform: 'capitalize' }}>{product.category}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '14px', color: '#6B7494', textTransform: 'capitalize' }}>{(product.categories ?? []).join(', ')}</td>
                     <td style={{ padding: '14px 16px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '14px', color: '#1D2235' }}>
                       R$ {product.price.toFixed(2).replace('.', ',')}
                     </td>

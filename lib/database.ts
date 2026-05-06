@@ -140,7 +140,7 @@ function serializeProduct(product: any): Product & {
     name: product.name,
     slug: product.slug,
     price: money(product.price),
-    category: product.category?.slug || product.category || '',
+    categories: Array.isArray(product.categories) ? product.categories.map((c: any) => c.slug) : [],
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isPersonalizable: product.isPersonalizable,
@@ -298,7 +298,7 @@ export async function listProducts() {
   try {
     const products = await prisma.product.findMany({
       include: {
-        category: true,
+        categories: true,
         images: { orderBy: { sortOrder: 'asc' } },
         variants: { orderBy: { name: 'asc' } },
       },
@@ -335,9 +335,10 @@ export async function createProduct(data: Product) {
   }
 
   try {
-    const category = data.category
-      ? await prisma.category.findUnique({ where: { slug: data.category } })
-      : null
+    const categorySlugs: string[] = Array.isArray((data as any).categories) ? (data as any).categories : []
+    const categoryRows = categorySlugs.length > 0
+      ? await prisma.category.findMany({ where: { slug: { in: categorySlugs } }, select: { id: true } })
+      : []
 
     const persistedMain = data.imageUrl
       ? await persistImageIfDataUrl(data.imageUrl, 'products')
@@ -351,7 +352,7 @@ export async function createProduct(data: Product) {
         description: data.description || null,
         shortDescription: data.description || null,
         price: data.price,
-        categoryId: category?.id || null,
+        categories: categoryRows.length > 0 ? { connect: categoryRows } : undefined,
         isPersonalizable: data.isPersonalizable,
         isFeatured: data.isFeatured,
         isActive: data.isActive,
@@ -364,7 +365,7 @@ export async function createProduct(data: Product) {
           ? { create: [{ url: persistedMain.url, storageKey: persistedMain.storageKey, alt: data.name, isMain: true }] }
           : undefined,
       },
-      include: { category: true, images: true, variants: { orderBy: { name: 'asc' } } },
+      include: { categories: true, images: true, variants: { orderBy: { name: 'asc' } } },
     })
 
     return serializeProduct(product)
@@ -402,9 +403,15 @@ export async function updateProduct(id: string, data: Partial<Product>) {
   }
 
   try {
-    const category = data.category
-      ? await prisma.category.findUnique({ where: { slug: data.category } })
-      : undefined
+    const hasCategoriesField = Object.prototype.hasOwnProperty.call(data, 'categories')
+    let categoriesUpdate: { set: { id: string }[] } | undefined
+    if (hasCategoriesField) {
+      const slugs: string[] = Array.isArray((data as any).categories) ? (data as any).categories : []
+      const rows = slugs.length > 0
+        ? await prisma.category.findMany({ where: { slug: { in: slugs } }, select: { id: true } })
+        : []
+      categoriesUpdate = { set: rows }
+    }
 
     const product = await prisma.product.update({
       where: { id },
@@ -415,7 +422,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
         description: data.description,
         shortDescription: data.description,
         price: data.price,
-        categoryId: category ? category.id : undefined,
+        ...(categoriesUpdate !== undefined ? { categories: categoriesUpdate } : {}),
         isPersonalizable: data.isPersonalizable,
         isFeatured: data.isFeatured,
         isActive: data.isActive,
@@ -427,7 +434,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
           ? { visibility: (data as any).visibility === 'internal' ? 'internal' : 'public' }
           : {}),
       },
-      include: { category: true, images: true },
+      include: { categories: true, images: true },
     })
 
     if (data.imageUrl !== undefined) {
@@ -483,7 +490,7 @@ export async function updateProduct(id: string, data: Partial<Product>) {
       }
     }
 
-    const final = serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { category: true, images: true, variants: { orderBy: { name: 'asc' } } } }))
+    const final = serializeProduct(await prisma.product.findUniqueOrThrow({ where: { id }, include: { categories: true, images: true, variants: { orderBy: { name: 'asc' } } } }))
     // Best-effort restock notifications when the product is now in stock /
     // under order. Won't email anyone if there are no pending subscribers.
     dispatchRestockNotificationsIfNeeded(id).catch(() => {})
@@ -739,7 +746,6 @@ export type BulkProductUpdate = {
   isPersonalizable?: boolean
   underOrder?: boolean
   status?: string
-  category?: string  // slug da categoria; '' significa remover categoria
 }
 
 export async function updateProductsBulk(ids: string[], updates: BulkProductUpdate): Promise<{ updated: number; error?: string }> {
@@ -759,21 +765,6 @@ export async function updateProductsBulk(ids: string[], updates: BulkProductUpda
     data.status = updates.isActive ? 'published' : 'draft'
   }
 
-  if (typeof updates.category === 'string') {
-    if (updates.category === '') {
-      data.categoryId = null
-    } else if (hasDatabase && prisma?.category) {
-      try {
-        const cat = await prisma.category.findUnique({ where: { slug: updates.category } })
-        if (!cat) return { updated: 0, error: `Categoria "${updates.category}" não encontrada.` }
-        data.categoryId = cat.id
-      } catch (error) {
-        reportDbError('updateProductsBulk category lookup failed', error)
-        return { updated: 0, error: 'Erro ao validar categoria.' }
-      }
-    }
-  }
-
   if (Object.keys(data).length === 0) {
     return { updated: 0, error: 'Nenhuma alteração válida informada.' }
   }
@@ -788,7 +779,6 @@ export async function updateProductsBulk(ids: string[], updates: BulkProductUpda
       if (typeof data.isPersonalizable === 'boolean') p.isPersonalizable = data.isPersonalizable as boolean
       if (typeof data.underOrder === 'boolean') p.underOrder = data.underOrder as boolean
       if (typeof data.status === 'string') p.status = data.status as string
-      if (typeof updates.category === 'string') p.category = updates.category
       count++
     })
     writeDB(db)
@@ -3981,7 +3971,7 @@ export async function listWishlistForCustomer(customerId: string): Promise<Wishl
     const productIds: string[] = Array.from(new Set(records.map((r: any) => String(r.productId))))
     const products = await prisma!.product.findMany({
       where: { id: { in: productIds } },
-      include: { images: true, category: true },
+      include: { images: true, categories: true },
     })
     const productMap = new Map(products.map(p => [p.id, serializeProduct(p)]))
 
