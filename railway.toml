@@ -1,0 +1,15 @@
+# Configuração explícita do deploy. Sobrescreve qualquer "Start Command" que
+# eventualmente esteja salvo no painel do Railway — evita o caso em que o
+# painel manda "npm start" e o CMD do Dockerfile é ignorado.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# `prisma migrate deploy` aplica migrations pendentes; `node server.js` sobe
+# o Next em modo standalone. Mesmo comando do CMD do Dockerfile, replicado
+# aqui para garantir override do painel Railway.
+startCommand = "node_modules/.bin/prisma migrate deploy && node server.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
