@@ -10,8 +10,27 @@ export const dynamic = 'force-dynamic'
 
 type ProductCardProduct = Parameters<typeof ProductCard>[0]['product']
 
+// Fallback estatico para a home quando o banco nao retorna categorias publicas
+// (DB vazio, sem produtos publicados, ou erro de query). Cada slug aqui DEVE
+// existir como filtro valido em /produtos?categoria=<slug> — a pagina de
+// produtos faz match best-effort por nome/slug, entao o link nunca quebra.
+type HomeCategoryCard = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+}
+
+const FALLBACK_HOME_CATEGORIES: HomeCategoryCard[] = [
+  { id: 'fallback-decoracao', name: 'Decoração', slug: 'decoracao', description: null },
+  { id: 'fallback-cozinha', name: 'Cozinha', slug: 'cozinha', description: null },
+  { id: 'fallback-escritorio', name: 'Escritório', slug: 'escritorio', description: null },
+  { id: 'fallback-geek-pop', name: 'Geek & Pop', slug: 'geek-pop', description: null },
+  { id: 'fallback-acessorios', name: 'Acessórios', slug: 'acessorios', description: null },
+]
+
 export default async function Home() {
-  const [products, categories, allBanners, featuredReviews] = await Promise.all([
+  const [products, categoriesRaw, allBanners, featuredReviews] = await Promise.all([
     getLocalCatalogProducts({ featured: true }),
     getPublicCatalogCategories(),
     listBanners(),
@@ -20,6 +39,15 @@ export default async function Home() {
   const activeBanners = allBanners.filter(b => b.isActive)
   const allProducts = (Array.isArray(products) ? products : []).filter(Boolean) as ProductCardProduct[]
   const featuredProducts = allProducts.slice(0, 4)
+
+  // Se o catalogo publico nao retornou categorias, mostra o fallback canonico.
+  // Isso evita que a home fique com um vazio confuso quando o admin ainda nao
+  // publicou produtos em categorias ativas (ex.: setup novo, falha pontual).
+  let categories: HomeCategoryCard[] = categoriesRaw
+  if (categories.length === 0) {
+    console.warn('[home] no public categories returned')
+    categories = FALLBACK_HOME_CATEGORIES
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
   const orgJsonLd = {
@@ -74,17 +102,19 @@ export default async function Home() {
                 cursor: 'pointer',
                 transition: 'transform var(--transition-fast)',
                 color: '#1D2235',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
+              <span aria-hidden="true" style={{ color: '#4A7AB5', fontSize: '18px', lineHeight: 1 }}>
+                ▪
+              </span>
               <span style={{ fontWeight: 500 }}>{category.name}</span>
             </Link>
           ))}
         </div>
-        {categories.length === 0 && (
-          <p style={{ marginTop: '20px', textAlign: 'center', color: '#6B7494' }}>
-            Cadastre categorias ativas com produtos publicados para exibi-las aqui.
-          </p>
-        )}
       </section>
 
       <section>
