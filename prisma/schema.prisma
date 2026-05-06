@@ -121,11 +121,7 @@ model CustomerAddress {
 model Banner {
   id                     String   @id @default(cuid())
   title                  String
-  subtitle               String?
-  imageUrl               String
-  storageKey             String?
-  ctaText                String?
-  ctaLink                String?
+  htmlContent            String   @default("") @db.Text
   isActive               Boolean  @default(true)
   displayDurationSeconds Int      @default(5)
   createdAt              DateTime @default(now())

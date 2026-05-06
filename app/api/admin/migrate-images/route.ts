@@ -11,7 +11,7 @@ const DEFAULT_BATCH = 20
 const MAX_BATCH = 50
 
 type MigrationError = {
-  table: 'ProductImage' | 'Banner'
+  table: 'ProductImage'
   id: string
   message: string
 }
@@ -71,50 +71,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ---------- Banner ----------
-  const remainingForBanners = Math.max(0, batchSize - productImages.length)
-  let banners: Array<{ id: string; imageUrl: string }> = []
-  if (remainingForBanners > 0) {
-    banners = await prisma.banner.findMany({
-      where: {
-        storageKey: null,
-        imageUrl: { startsWith: 'data:' },
-      },
-      take: remainingForBanners,
-      orderBy: { id: 'asc' },
-    })
-
-    for (const banner of banners) {
-      if (!isDataUrl(banner.imageUrl)) continue
-      try {
-        const contentType = extractContentType(banner.imageUrl, 'image/jpeg')
-        const uploaded = await storage.upload({ data: banner.imageUrl, contentType, prefix: 'banners' })
-        await prisma.banner.update({
-          where: { id: banner.id },
-          data: { imageUrl: uploaded.url, storageKey: uploaded.storageKey },
-        })
-        migrated += 1
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        console.error('[migrate-images] Banner falhou', banner.id, message)
-        errors.push({ table: 'Banner', id: banner.id, message })
-      }
-    }
-  }
-
   const remainingProductImages = await prisma.productImage.count({
     where: { storageKey: null, url: { startsWith: 'data:' } },
-  })
-  const remainingBanners = await prisma.banner.count({
-    where: { storageKey: null, imageUrl: { startsWith: 'data:' } },
   })
 
   return NextResponse.json({
     migrated,
-    remaining: remainingProductImages + remainingBanners,
+    remaining: remainingProductImages,
     breakdown: {
       productImages: remainingProductImages,
-      banners: remainingBanners,
     },
     batchSize,
     errors,
@@ -129,17 +94,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Banco de dados indisponível.' }, { status: 503 })
   }
 
-  const [remainingProductImages, remainingBanners] = await Promise.all([
-    prisma.productImage.count({ where: { storageKey: null, url: { startsWith: 'data:' } } }),
-    prisma.banner.count({ where: { storageKey: null, imageUrl: { startsWith: 'data:' } } }),
-  ])
+  const remainingProductImages = await prisma.productImage.count({
+    where: { storageKey: null, url: { startsWith: 'data:' } },
+  })
 
   return NextResponse.json({
     storageConfigured: isStorageConfigured(),
-    remaining: remainingProductImages + remainingBanners,
+    remaining: remainingProductImages,
     breakdown: {
       productImages: remainingProductImages,
-      banners: remainingBanners,
     },
   })
 }
