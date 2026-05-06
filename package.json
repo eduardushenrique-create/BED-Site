@@ -10,7 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx lib/seed.ts"
+    "db:seed": "tsx lib/seed.ts",
+    "email:reset-overrides": "node scripts/reset-email-templates.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1041.0",
