@@ -31,15 +31,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma CLI + schema + engines: o Next standalone NÃO copia binários como
-# `prisma`, então precisamos trazer o que `prisma migrate deploy` precisa
-# em runtime. O `@prisma/client` engine fica em node_modules/.prisma.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
 # Diretório para o fallback JSON (quando DATABASE_URL não está configurado)
 RUN mkdir -p data && chown nextjs:nodejs data
 
@@ -47,6 +38,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Aplica migrations pendentes e levanta o Next standalone. Caminho explícito
-# para o binário do prisma porque Railway pode sobrescrever o PATH/CMD.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node server.js"]
+# Migrations rodam manualmente via `railway run npx prisma migrate deploy`,
+# não no startup do container. O Next standalone não traz o CLI completo
+# do Prisma com seus arquivos auxiliares (wasm), então tentar invocá-lo
+# aqui falha em runtime. Manter migrações como passo manual operacional.
+CMD ["node", "server.js"]
