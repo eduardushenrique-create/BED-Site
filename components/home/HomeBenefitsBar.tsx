@@ -1,64 +1,63 @@
-// Server component (sem 'use client'): renderiza estaticamente no SSR e nao
-// adiciona JS ao bundle do cliente. Usado entre o Banner e a secao de
-// Categorias da home como faixa de trust signals.
+// Faixa de reasons-to-believe exibida logo abaixo do banner principal.
+// Server component puro: sem JS no cliente, sem state. SVGs inline em stroke
+// (estilo lucide) para ficar leve e combinar com o resto da home.
 
 type Benefit = {
-  label: string
-  // SVG inline em estilo stroke (lucide-like). aria-label vem do <li> pai.
+  title: string
+  // Cada SVG é renderizado dentro de um <span aria-hidden>; o aria-label do
+  // benefício mora no item da lista.
   icon: React.ReactNode
 }
 
-const STROKE = '#1D2235'
 const ICON_PROPS = {
-  width: 28,
-  height: 28,
+  width: 24,
+  height: 24,
   viewBox: '0 0 24 24',
   fill: 'none',
-  stroke: STROKE,
-  strokeWidth: 1.75,
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
   'aria-hidden': true,
-  focusable: false as const,
 }
 
 const BENEFITS: Benefit[] = [
   {
-    label: 'Envio para todo o Brasil',
+    title: 'Envio para todo o Brasil',
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M3 7h11v8H3z" />
-        <path d="M14 10h4l3 3v2h-7" />
-        <circle cx="7.5" cy="17" r="1.75" />
-        <circle cx="17.5" cy="17" r="1.75" />
+        <path d="M3 7h11v9H3z" />
+        <path d="M14 10h4l3 3v3h-7" />
+        <circle cx="7" cy="18" r="1.6" />
+        <circle cx="17" cy="18" r="1.6" />
       </svg>
     ),
   },
   {
-    label: 'Parcele em até 12x',
+    title: 'Parcele em até 12x',
     icon: (
       <svg {...ICON_PROPS}>
-        <rect x="3" y="6" width="18" height="13" rx="2" />
+        <rect x="3" y="6" width="18" height="12" rx="2" />
         <path d="M3 10h18" />
-        <path d="M7 15h3" />
+        <path d="M7 15h4" />
       </svg>
     ),
   },
   {
-    label: 'Produtos personalizáveis',
+    title: 'Produtos personalizáveis',
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M14.5 4.5l5 5L9 20H4v-5z" />
-        <path d="M13 6l5 5" />
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4z" />
       </svg>
     ),
   },
   {
-    label: 'Filamento PLA sustentável',
+    title: 'Filamento PLA sustentável',
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M12 21c5-3 8-7 8-12a8 8 0 0 0-16 0c0 5 3 9 8 12z" />
-        <path d="M12 12c0-3 2-5 5-5" />
+        <path d="M12 3c4 4 6 7 6 11a6 6 0 1 1-12 0c0-4 2-7 6-11z" />
+        <path d="M12 21v-7" />
       </svg>
     ),
   },
@@ -67,61 +66,54 @@ const BENEFITS: Benefit[] = [
 export default function HomeBenefitsBar() {
   return (
     <section
-      aria-label="Beneficios da loja"
+      aria-label="Por que comprar com a B&D Design"
       style={{
         marginBottom: '64px',
-        backgroundColor: '#FAFCFE',
-        border: '1px solid #D8DCE8',
-        borderRadius: '12px',
-        padding: '20px 16px',
+        background: 'white',
+        borderRadius: '14px',
+        padding: '20px 24px',
+        boxShadow: '0 1px 4px rgba(29,34,53,0.07), 0 4px 12px rgba(29,34,53,0.05)',
       }}
     >
       <ul
+        role="list"
         className="home-benefits-grid"
         style={{
           listStyle: 'none',
-          margin: 0,
           padding: 0,
-          display: 'grid',
-          gap: '16px',
+          margin: 0,
         }}
       >
         {BENEFITS.map((benefit) => (
           <li
-            key={benefit.label}
-            aria-label={benefit.label}
+            key={benefit.title}
+            role="listitem"
+            aria-label={benefit.title}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              minWidth: 0,
+              color: '#1D2235',
             }}
           >
             <span
               aria-hidden="true"
               style={{
+                color: '#4A7AB5',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '40px',
                 height: '40px',
-                borderRadius: '999px',
-                backgroundColor: '#BBCFEB',
-                color: '#1D2235',
+                borderRadius: '10px',
+                background: '#F0F5FB',
                 flexShrink: 0,
               }}
             >
               {benefit.icon}
             </span>
-            <span
-              style={{
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#1D2235',
-                lineHeight: 1.35,
-              }}
-            >
-              {benefit.label}
+            <span style={{ fontSize: '14px', fontWeight: 500, lineHeight: 1.35 }}>
+              {benefit.title}
             </span>
           </li>
         ))}
