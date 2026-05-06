@@ -1,10 +1,37 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
+
+function parseLinks(html: string) {
+  if (!html || typeof window === 'undefined') return []
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return Array.from(doc.querySelectorAll('a[href]')).map((a, i) => ({
+      index: i,
+      label: (a.textContent?.trim().replace(/\s+/g, ' ') || '').slice(0, 60) || `Link ${i + 1}`,
+      href: a.getAttribute('href') || '',
+    }))
+  } catch {
+    return []
+  }
+}
+
+function updateLinkHref(html: string, linkIndex: number, newHref: string): string {
+  let count = 0
+  return html.replace(/<a(\s[^>]*)>/gi, (match, attrs) => {
+    if (!/href=/i.test(attrs)) return match
+    if (count === linkIndex) {
+      count++
+      return `<a${attrs.replace(/href="[^"]*"/i, `href="${newHref}"`)}>`
+    }
+    count++
+    return match
+  })
+}
 
 export default function NovoBannerPage() {
   const router = useRouter()
@@ -16,6 +43,12 @@ export default function NovoBannerPage() {
     displayOrder: 0,
   })
   const [saving, setSaving] = useState(false)
+
+  const detectedLinks = useMemo(() => parseLinks(formData.htmlContent), [formData.htmlContent])
+
+  function handleLinkHrefChange(linkIndex: number, newHref: string) {
+    setFormData(prev => ({ ...prev, htmlContent: updateLinkHref(prev.htmlContent, linkIndex, newHref) }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,6 +131,48 @@ export default function NovoBannerPage() {
               />
             </div>
 
+            {detectedLinks.length > 0 && (
+              <div style={{ border: '1px solid #D8DCE8', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: '#F0F5FB', padding: '12px 16px', borderBottom: '1px solid #D8DCE8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>
+                    Links / botões detectados
+                  </span>
+                  <span style={{ fontSize: '12px', backgroundColor: '#1D2235', color: '#F0F5FB', borderRadius: '999px', padding: '1px 8px' }}>
+                    {detectedLinks.length}
+                  </span>
+                </div>
+                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ fontSize: '12px', color: '#6B7494', margin: 0 }}>
+                    Edite os links abaixo — o HTML é atualizado automaticamente ao sair do campo.
+                  </p>
+                  {detectedLinks.map((link) => (
+                    <div key={`${link.index}-${detectedLinks.length}`}>
+                      <span style={{ fontSize: '12px', color: '#6B7494', display: 'block', marginBottom: '4px' }}>
+                        {link.label ? `"${link.label}"` : `Botão ${link.index + 1}`}
+                      </span>
+                      <input
+                        key={`href-${link.index}-${detectedLinks.length}`}
+                        type="text"
+                        defaultValue={link.href}
+                        onBlur={(e) => handleLinkHrefChange(link.index, e.target.value)}
+                        placeholder="https://..."
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D8DCE8',
+                          fontSize: '13px',
+                          fontFamily: 'monospace',
+                          boxSizing: 'border-box',
+                          backgroundColor: 'white',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Input
               label="Tempo de exibição no carrossel (segundos)"
               type="number"
@@ -152,14 +227,9 @@ export default function NovoBannerPage() {
         {formData.htmlContent ? (
           <iframe
             srcDoc={formData.htmlContent}
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             title="Preview do banner"
-            style={{
-              width: '100%',
-              height: '400px',
-              border: 'none',
-              borderRadius: '8px',
-            }}
+            style={{ width: '100%', height: '400px', border: 'none', borderRadius: '8px' }}
           />
         ) : (
           <div style={{
