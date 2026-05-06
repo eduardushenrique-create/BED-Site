@@ -107,7 +107,7 @@ export default function AdminBannersPage() {
               <div style={{ position: 'relative', height: '180px', backgroundColor: '#1D2235', overflow: 'hidden' }}>
                 <iframe
                   srcDoc={banner.htmlContent || '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#1D2235;color:#BBCFEB;font-family:sans-serif;font-size:13px;opacity:0.7;">Sem conteúdo HTML</div>'}
-                  sandbox="allow-scripts"
+                  sandbox="allow-scripts allow-same-origin"
                   title={`Preview: ${banner.title}`}
                   style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }}
                 />

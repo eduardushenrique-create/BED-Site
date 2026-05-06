@@ -69,7 +69,7 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
       <iframe
         key={current.id}
         srcDoc={current.htmlContent}
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-same-origin"
         title={current.title}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
       />
