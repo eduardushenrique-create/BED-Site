@@ -167,7 +167,7 @@ export async function createPaymentForOrder(input: PaymentCreationInput): Promis
     }
   }
 
-  const checkoutUrl = preference.sandbox_init_point || preference.init_point || undefined
+  const checkoutUrl = preference.init_point || undefined
 
   if (!checkoutUrl) {
     captureMessage('Mercado Pago preference returned without init_point', 'error', {
