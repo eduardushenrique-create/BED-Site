@@ -137,6 +137,22 @@ button {
   }
 }
 
+/* Home benefits bar: 4 trust signals na home. Empilha em 1 coluna em telas
+   muito estreitas, 2x2 em mobile/tablet e 4 colunas em desktop largo. */
+.home-benefits-grid {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 480px) {
+  .home-benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .home-benefits-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* ─── Admin responsive utilities ─────────────────────────────────────────── */
 
 /* Admin root layout: sidebar + main content */

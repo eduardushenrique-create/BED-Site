@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Banner from '@/components/Banner'
 import ProductCard from '@/components/ProductCard'
+import HomeBenefitsBar from '@/components/home/HomeBenefitsBar'
 import { getLocalCatalogProducts, getPublicCatalogCategories } from '@/lib/catalog'
 import { listBanners } from '@/lib/database'
 import { listFeaturedApprovedReviews } from '@/lib/reviews'
@@ -83,6 +84,8 @@ export default async function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <Banner banners={activeBanners.length > 0 ? activeBanners : undefined} />
+
+      <HomeBenefitsBar />
 
       <section style={{ marginBottom: '64px' }}>
         <h2 style={{ fontSize: '32px', fontWeight: 600, marginBottom: '32px', textAlign: 'center', color: '#1D2235' }}>
