@@ -70,6 +70,8 @@ export type Order = {
   items: { productId: string; productName: string; variantId?: string | null; variantName?: string | null; quantity: number; unitPrice: number; observation?: string }[]
   trackingCode: string | null
   expectedDeliveryAt?: string | null
+  productionTimeline?: Record<string, string | null> | null
+  currentStageNote?: string | null
 }
 
 export type Banner = {

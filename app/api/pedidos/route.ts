@@ -11,12 +11,18 @@ import { notifyOrderStatusChange } from '@/lib/order-notifications'
 import { recordAuditEntry } from '@/lib/audit-log'
 import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
+import {
+  getNextStage,
+  getPreviousStage,
+  withTimelineStamp,
+  type ProductionTimeline,
+  type FulfillmentStatus,
+} from '@/lib/order-statuses'
 
 async function validateOrderItems(
   items: Array<{ productId: string; variantId?: string | null }> | undefined,
 ): Promise<NextResponse | null> {
   if (!items || items.length === 0) return null
-  // Skip validation when Prisma is not available (mock mode).
   if (!prisma?.product) return null
 
   for (const item of items) {
@@ -62,13 +68,31 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const auth = await requireApiAdmin()
   if (auth.response) return auth.response
-  const { id, ...data } = await request.json()
-  const itemsError = await validateOrderItems(data.items)
+  const body = await request.json()
+  const { id, action, currentStageNote, ...rest } = body as {
+    id?: string
+    action?: 'advance_stage' | 'regress_stage'
+    currentStageNote?: string | null
+    [key: string]: unknown
+  }
+
+  if (action === 'advance_stage' || action === 'regress_stage') {
+    return handleStageTransition({
+      request,
+      auth,
+      id: id || '',
+      action,
+      currentStageNote: typeof currentStageNote === 'string' ? currentStageNote : null,
+    })
+  }
+
+  const data = rest as Record<string, unknown>
+  const itemsError = await validateOrderItems(data.items as Array<{ productId: string; variantId?: string | null }> | undefined)
   if (itemsError) return itemsError
 
   const before = id ? await getOrderByIdOrNumber(id) : null
 
-  const order = await updateOrder(id, data)
+  const order = await updateOrder(id || '', data)
 
   if (!order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -97,9 +121,6 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  // Best-effort customer notifications when admin changes status. Wrapped in
-  // its own try/catch inside notifyOrderStatusChange — never blocks the
-  // response.
   if (before) {
     notifyOrderStatusChange(
       {
@@ -128,6 +149,99 @@ export async function PUT(request: NextRequest) {
   }
 
   return NextResponse.json(order)
+}
+
+async function handleStageTransition(input: {
+  request: NextRequest
+  auth: Awaited<ReturnType<typeof requireApiAdmin>>
+  id: string
+  action: 'advance_stage' | 'regress_stage'
+  currentStageNote: string | null
+}): Promise<NextResponse> {
+  const { request, auth, id, action, currentStageNote } = input
+
+  if (!id) {
+    return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
+  }
+
+  const before = await getOrderByIdOrNumber(id)
+  if (!before) {
+    return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  }
+
+  const target =
+    action === 'advance_stage'
+      ? getNextStage(before.fulfillmentStatus)
+      : getPreviousStage(before.fulfillmentStatus)
+
+  if (!target) {
+    return NextResponse.json(
+      {
+        error:
+          action === 'advance_stage'
+            ? 'Pedido já está na última fase ou não pode avançar'
+            : 'Pedido não pode regredir desta fase',
+      },
+      { status: 400 },
+    )
+  }
+
+  const currentTimeline =
+    (before as unknown as { productionTimeline?: ProductionTimeline | null }).productionTimeline || null
+  const nextTimeline = withTimelineStamp(currentTimeline, target as FulfillmentStatus)
+
+  const updated = await updateOrder(before.id, {
+    fulfillmentStatus: target,
+    productionTimeline: nextTimeline,
+    currentStageNote: currentStageNote ?? null,
+  } as Parameters<typeof updateOrder>[1])
+
+  if (!updated) {
+    return NextResponse.json({ error: 'Falha ao atualizar pedido' }, { status: 500 })
+  }
+
+  recordAuditEntry({
+    actorEmail: auth.user!.email,
+    actorRole: auth.user!.role || null,
+    action: action === 'advance_stage' ? 'order.advance_stage' : 'order.regress_stage',
+    targetType: 'Order',
+    targetId: updated.id,
+    summary: `Pedido ${updated.orderNumber}: ${before.fulfillmentStatus} → ${target}${currentStageNote ? ` (nota: ${currentStageNote.slice(0, 100)})` : ''}`,
+    metadata: {
+      orderNumber: updated.orderNumber,
+      from: before.fulfillmentStatus,
+      to: target,
+      note: currentStageNote || null,
+    },
+    ip: getClientIp(request),
+  }).catch(() => {})
+
+  notifyOrderStatusChange(
+    {
+      orderNumber: before.orderNumber,
+      customerName: before.customerName,
+      customerEmail: before.customerEmail,
+      total: before.total,
+      trackingCode: before.trackingCode,
+      status: before.status,
+      paymentStatus: before.paymentStatus,
+      fulfillmentStatus: before.fulfillmentStatus,
+      items: before.items.map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
+    },
+    {
+      orderNumber: updated.orderNumber,
+      customerName: updated.customerName,
+      customerEmail: updated.customerEmail,
+      total: updated.total,
+      trackingCode: updated.trackingCode,
+      status: updated.status,
+      paymentStatus: updated.paymentStatus,
+      fulfillmentStatus: updated.fulfillmentStatus,
+      items: (updated.items || []).map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
+    },
+  ).catch(() => {})
+
+  return NextResponse.json(updated)
 }
 
 export async function DELETE(request: NextRequest) {
