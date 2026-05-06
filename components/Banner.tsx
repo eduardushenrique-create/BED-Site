@@ -66,10 +66,12 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
         overflow: 'hidden',
       }}
     >
-      <div
+      <iframe
         key={current.id}
-        dangerouslySetInnerHTML={{ __html: current.htmlContent }}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+        srcDoc={current.htmlContent}
+        sandbox="allow-scripts"
+        title={current.title}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
       />
 
       {activeBanners.length > 1 && (
