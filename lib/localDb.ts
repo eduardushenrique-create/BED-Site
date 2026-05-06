@@ -80,6 +80,7 @@ export type Banner = {
   htmlContent: string
   isActive: boolean
   displayDurationSeconds: number
+  displayOrder: number
 }
 
 export type User = {
@@ -360,6 +361,7 @@ const defaultData: Database = {
       htmlContent: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1D2235 0%,#2E3650 100%);color:#F0F5FB;font-family:sans-serif;font-size:22px;font-weight:600;">Configure seus banners no painel admin.</div>',
       isActive: true,
       displayDurationSeconds: 5,
+      displayOrder: 0,
     },
   ],
   users: [],

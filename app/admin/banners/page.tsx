@@ -10,6 +10,7 @@ type Banner = {
   htmlContent: string
   isActive: boolean
   displayDurationSeconds: number
+  displayOrder: number
 }
 
 export default function AdminBannersPage() {
@@ -126,8 +127,9 @@ export default function AdminBannersPage() {
               </div>
               <div style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>{banner.title}</h3>
-                <div style={{ fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
-                  Tempo no carrossel: {banner.displayDurationSeconds || 5}s
+                <div style={{ fontSize: '13px', color: '#6B7494', marginBottom: '16px', display: 'flex', gap: '16px' }}>
+                  <span>Ordem: {banner.displayOrder ?? 0}</span>
+                  <span>Tempo no carrossel: {banner.displayDurationSeconds || 5}s</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button

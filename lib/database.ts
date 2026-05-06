@@ -220,6 +220,7 @@ function serializeBanner(banner: any): Banner {
     htmlContent: banner.htmlContent || '',
     isActive: banner.isActive,
     displayDurationSeconds: typeof banner.displayDurationSeconds === 'number' ? banner.displayDurationSeconds : 5,
+    displayOrder: typeof banner.displayOrder === 'number' ? banner.displayOrder : 0,
   }
 }
 
@@ -1254,13 +1255,17 @@ export async function deleteAddress(customerId: string, id: string): Promise<boo
 }
 
 export async function listBanners() {
-  if (!hasDatabase || !prisma?.banner) return readDB().banners
+  if (!hasDatabase || !prisma?.banner) {
+    const db = readDB()
+    return [...db.banners].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+  }
   try {
-    const banners = await prisma.banner.findMany({ orderBy: { createdAt: 'desc' } })
+    const banners = await prisma.banner.findMany({ orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }] })
     return banners.map(serializeBanner)
   } catch (error) {
     reportDbError('listBanners Prisma failed, using fallback', error)
-    return readDB().banners
+    const db = readDB()
+    return [...db.banners].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
   }
 }
 
