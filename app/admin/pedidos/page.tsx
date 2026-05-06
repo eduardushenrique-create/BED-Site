@@ -5,8 +5,16 @@ import Link from 'next/link'
 import Input from '@/components/Input'
 import Button from '@/components/Button'
 import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-pricing'
-
-// --- Types ---
+import {
+  FULFILLMENT_STATUSES,
+  PAYMENT_STATUSES,
+  getFulfillmentInfo,
+  getPaymentInfo,
+  getNextStage,
+  getPreviousStage,
+  canAdvance,
+  canRegress,
+} from '@/lib/order-statuses'
 
 type ProductVariant = {
   id: string
@@ -71,32 +79,9 @@ type Order = {
   expectedDeliveryAt?: string | null
 }
 
-// --- Helpers ---
-
-/** Composite key for identifying a cart line (product + optional variant). */
 function itemKey(productId: string, variantId: string | null): string {
   return `${productId}::${variantId ?? ''}`
 }
-
-// --- Status options ---
-
-const fulfillmentStatuses = [
-  { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'in_production', label: 'Em produção', color: '#3B82F6' },
-  { value: 'ready_to_ship', label: 'Pronto para envio', color: '#1D7A72' },
-  { value: 'shipped', label: 'Enviado', color: '#8B5CF6' },
-  { value: 'delivered', label: 'Entregue', color: '#10B981' },
-  { value: 'cancelled', label: 'Cancelado', color: '#EF4444' },
-]
-
-const paymentStatuses = [
-  { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'paid', label: 'Pago', color: '#10B981' },
-  { value: 'failed', label: 'Recusado', color: '#EF4444' },
-  { value: 'refunded', label: 'Estornado', color: '#8B5CF6' },
-]
-
-// --- Sub-components ---
 
 function StatusCard({ label, count, color }: { label: string; count: number; color: string }) {
   return (
@@ -107,11 +92,6 @@ function StatusCard({ label, count, color }: { label: string; count: number; col
   )
 }
 
-/**
- * Shows a variant picker for a product when the user clicks the product card.
- * Each variant row shows label, SKU, stock, price and a badge if out-of-stock.
- * Admin can force-add even out-of-stock variants (badge shown, not blocked).
- */
 function VariantPicker({
   product,
   onSelect,
@@ -198,8 +178,6 @@ function VariantPicker({
   )
 }
 
-// --- Main page ---
-
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -218,8 +196,8 @@ export default function AdminOrdersPage() {
   const [searchCustomer, setSearchCustomer] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [foundCustomers, setFoundCustomers] = useState<{id: string; name: string; email: string; phone: string}[]>([])
-  /** productId for which the variant picker is currently open */
   const [variantPickerFor, setVariantPickerFor] = useState<string | null>(null)
+  const [pendingActionFor, setPendingActionFor] = useState<string | null>(null)
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     customerEmail: '',
@@ -305,6 +283,50 @@ export default function AdminOrdersPage() {
     }
   }
 
+  async function handleAdvanceStage(orderId: string) {
+    setPendingActionFor(orderId)
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, action: 'advance_stage' }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        alert(err?.error || 'Não foi possível avançar a fase')
+        return
+      }
+      await loadOrders()
+    } catch (e) {
+      console.error('Error advancing stage:', e)
+      alert('Erro de conexão ao avançar fase.')
+    } finally {
+      setPendingActionFor(null)
+    }
+  }
+
+  async function handleRegressStage(orderId: string) {
+    setPendingActionFor(orderId)
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, action: 'regress_stage' }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        alert(err?.error || 'Não foi possível voltar a fase')
+        return
+      }
+      await loadOrders()
+    } catch (e) {
+      console.error('Error regressing stage:', e)
+      alert('Erro de conexão ao voltar fase.')
+    } finally {
+      setPendingActionFor(null)
+    }
+  }
+
   const filteredOrders = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : null
     const toTs = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : null
@@ -381,7 +403,6 @@ export default function AdminOrdersPage() {
       .map(row => row.map(escapeCsvField).join(';'))
       .join('\n')
 
-    // Add UTF-8 BOM so Excel opens with correct encoding.
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -398,6 +419,7 @@ export default function AdminOrdersPage() {
     total: orders.length,
     pending: orders.filter(o => o.paymentStatus === 'pending').length,
     paid: orders.filter(o => o.paymentStatus === 'paid').length,
+    aguardandoProducao: orders.filter(o => o.fulfillmentStatus === 'aguardando_producao').length,
     production: orders.filter(o => o.fulfillmentStatus === 'in_production' || o.fulfillmentStatus === 'production').length,
     readyToShip: orders.filter(o => o.fulfillmentStatus === 'ready_to_ship').length,
     shipped: orders.filter(o => o.fulfillmentStatus === 'shipped').length,
@@ -443,17 +465,11 @@ export default function AdminOrdersPage() {
     }
   }
 
-  /**
-   * Called when admin clicks a product card.
-   * - No variants → add directly (same behavior as before).
-   * - Has variants → open inline variant picker.
-   */
   const handleAddProduct = (product: Product) => {
     if (product.variants && product.variants.length > 0) {
       setVariantPickerFor(product.id)
       return
     }
-    // No variants — add directly, incrementing if the same product is already in.
     const key = itemKey(product.id, null)
     const existing = newOrderItems.find(item => itemKey(item.productId, item.variantId) === key)
     if (existing) {
@@ -475,7 +491,6 @@ export default function AdminOrdersPage() {
     setSearchProduct('')
   }
 
-  /** Called when admin picks a specific variant from the sub-picker. */
   const handleAddVariant = (product: Product, variant: ProductVariant) => {
     setVariantPickerFor(null)
     const vLabel = describeVariant(variant)
@@ -613,6 +628,7 @@ export default function AdminOrdersPage() {
         <StatusCard label="Total" count={statusCounts.total} color="#1D2235" />
         <StatusCard label="Pendentes" count={statusCounts.pending} color="#F59E0B" />
         <StatusCard label="Pagos" count={statusCounts.paid} color="#10B981" />
+        <StatusCard label="Aguardando Produção" count={statusCounts.aguardandoProducao} color="#94A3B8" />
         <StatusCard label="Produção" count={statusCounts.production} color="#3B82F6" />
         <StatusCard label="Enviados" count={statusCounts.shipped} color="#8B5CF6" />
         <StatusCard label="Entregues" count={statusCounts.delivered} color="#059669" />
@@ -623,12 +639,12 @@ export default function AdminOrdersPage() {
           <Input placeholder="Buscar por cliente, e-mail ou pedido..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
         <select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}>
-          <option value="">Todos Status</option>
-          {fulfillmentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="">Todas as fases</option>
+          {FULFILLMENT_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px' }}>
           <option value="">Todos Pagamentos</option>
-          {paymentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {PAYMENT_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
 
@@ -703,56 +719,77 @@ export default function AdminOrdersPage() {
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Cliente</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Total</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Pagamento</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Status</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Fase Atual</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Data do Pedido</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Prev. Entrega</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 600 }}>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map(order => (
-                <tr key={order.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
-                  <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px' }}>{order.orderNumber}</td>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ fontWeight: 500 }}>{order.customerName}</div>
-                    <div style={{ fontSize: '12px', color: '#6B7494' }}>{order.customerEmail}</div>
-                  </td>
-                  <td style={{ padding: '16px', fontWeight: 600 }}>R$ {order.total.toFixed(2).replace('.', ',')}</td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', backgroundColor: paymentStatuses.find(s => s.value === order.paymentStatus)?.color + '20', color: paymentStatuses.find(s => s.value === order.paymentStatus)?.color }}>
-                      {paymentStatuses.find(s => s.value === order.paymentStatus)?.label || order.paymentStatus}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', backgroundColor: fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.color + '20', color: fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.color }}>
-                      {fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.label || order.fulfillmentStatus}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
-                  <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>
-                    {order.expectedDeliveryAt
-                      ? new Date(order.expectedDeliveryAt).toLocaleDateString('pt-BR')
-                      : '—'}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
-                      {order.paymentStatus === 'paid' && order.fulfillmentStatus === 'ready_to_ship' ? (
-                        <span style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#DFF4EC', color: '#1D7A72' }}>
-                          Pronto para envio
-                        </span>
-                      ) : order.paymentStatus === 'paid' && (order.fulfillmentStatus === 'pending' || order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'production') ? (
-                        <Link
-                          href={`/admin/producao?q=${encodeURIComponent(order.orderNumber)}`}
-                          style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#E0EAFB', color: '#2A4F8A', textDecoration: 'none' }}
-                        >
-                          Acompanhar produção
-                        </Link>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredOrders.map(order => {
+                const fInfo = getFulfillmentInfo(order.fulfillmentStatus)
+                const pInfo = getPaymentInfo(order.paymentStatus)
+                const next = getNextStage(order.fulfillmentStatus)
+                const previous = getPreviousStage(order.fulfillmentStatus)
+                const advanceEnabled = canAdvance(order.fulfillmentStatus)
+                const regressEnabled = canRegress(order.fulfillmentStatus)
+                const isPending = pendingActionFor === order.id
+                return (
+                  <tr key={order.id} style={{ borderBottom: '1px solid #D8DCE8' }}>
+                    <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px' }}>{order.orderNumber}</td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ fontWeight: 500 }}>{order.customerName}</div>
+                      <div style={{ fontSize: '12px', color: '#6B7494' }}>{order.customerEmail}</div>
+                    </td>
+                    <td style={{ padding: '16px', fontWeight: 600 }}>R$ {order.total.toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', backgroundColor: (pInfo?.color || '#6B7494') + '20', color: pInfo?.color || '#6B7494' }}>
+                        {pInfo?.label || order.paymentStatus}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', backgroundColor: (fInfo?.color || '#6B7494') + '20', color: fInfo?.color || '#6B7494' }}>
+                        {fInfo?.label || order.fulfillmentStatus}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
+                    <td style={{ padding: '16px', fontSize: '13px', color: '#6B7494' }}>
+                      {order.expectedDeliveryAt
+                        ? new Date(order.expectedDeliveryAt).toLocaleDateString('pt-BR')
+                        : '—'}
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
+                        {regressEnabled && previous && (
+                          <button
+                            type="button"
+                            onClick={() => handleRegressStage(order.id)}
+                            disabled={isPending}
+                            aria-label={`Voltar para ${getFulfillmentInfo(previous)?.label || previous}`}
+                            title={`Voltar para ${getFulfillmentInfo(previous)?.label || previous}`}
+                            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: isPending ? 'not-allowed' : 'pointer', fontSize: '12px', color: '#6B7494', opacity: isPending ? 0.6 : 1 }}
+                          >
+                            ←
+                          </button>
+                        )}
+                        {advanceEnabled && next && (
+                          <button
+                            type="button"
+                            onClick={() => handleAdvanceStage(order.id)}
+                            disabled={isPending}
+                            aria-label={`Avançar para ${getFulfillmentInfo(next)?.label || next}`}
+                            title={`Avançar para ${getFulfillmentInfo(next)?.label || next}`}
+                            style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', backgroundColor: '#1D2235', color: 'white', cursor: isPending ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, opacity: isPending ? 0.6 : 1 }}
+                          >
+                            Avançar →
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -761,7 +798,6 @@ export default function AdminOrdersPage() {
       {showAddModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(29,34,53,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '14px', maxWidth: '1100px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 60px rgba(29,34,53,0.25)' }}>
-            {/* Header */}
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E3E9F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Novo Pedido</h2>
@@ -779,10 +815,8 @@ export default function AdminOrdersPage() {
               </button>
             </div>
 
-            {/* Body — scrollable */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
 
-              {/* Section: Itens do Pedido (split panel) */}
               <section style={{ marginBottom: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div>
@@ -801,11 +835,10 @@ export default function AdminOrdersPage() {
                 </div>
 
                 <div className="admin-order-split">
-                  {/* LEFT: Product catalog */}
                   <div style={{ border: '1px solid #E3E9F4', borderRadius: '12px', backgroundColor: '#FAFCFE', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '440px' }}>
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #E3E9F4', backgroundColor: 'white' }}>
                       <Input
-                        placeholder="🔍  Buscar produto pelo nome..."
+                        placeholder="Buscar produto pelo nome..."
                         value={searchProduct}
                         onChange={(e) => setSearchProduct(e.target.value)}
                       />
@@ -854,7 +887,7 @@ export default function AdminOrdersPage() {
                                     </span>
                                     {isSelected && (
                                       <span style={{ fontSize: '10px', fontWeight: 700, color: '#D4849A', background: 'white', border: '1px solid #D4849A', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
-                                        ✓ NO PEDIDO
+                                        NO PEDIDO
                                       </span>
                                     )}
                                   </div>
@@ -895,7 +928,6 @@ export default function AdminOrdersPage() {
                                 </div>
                               </button>
 
-                              {/* Inline variant picker (replaces absolute positioning that overlapped other rows) */}
                               {isPickerOpen && hasVariants && (
                                 <div style={{ marginTop: '6px', padding: '12px', borderRadius: '10px', backgroundColor: 'white', border: '1.5px solid #BBCFEB', boxShadow: '0 4px 12px rgba(29,34,53,0.06)' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -957,11 +989,10 @@ export default function AdminOrdersPage() {
                     </div>
                   </div>
 
-                  {/* RIGHT: Cart */}
                   <div style={{ border: '1px solid #E3E9F4', borderRadius: '12px', backgroundColor: 'white', display: 'flex', flexDirection: 'column', minHeight: '440px', maxHeight: '440px' }}>
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #E3E9F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        🛒 Carrinho
+                        Carrinho
                       </span>
                       {newOrderItems.length > 0 && (
                         <button
@@ -977,7 +1008,6 @@ export default function AdminOrdersPage() {
                     <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
                       {newOrderItems.length === 0 ? (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#6B7494', padding: '24px' }}>
-                          <div style={{ fontSize: '40px', marginBottom: '8px', opacity: 0.4 }}>🛍️</div>
                           <p style={{ fontSize: '13px', margin: 0 }}>
                             Nenhum item adicionado.
                           </p>
@@ -1040,7 +1070,6 @@ export default function AdminOrdersPage() {
               </section>
 
 
-              {/* Section: Cliente & Endereço */}
               <section>
                 <div style={{ marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1D2235' }}>
@@ -1053,7 +1082,7 @@ export default function AdminOrdersPage() {
 
                 <div style={{ position: 'relative', marginBottom: '20px' }}>
                   <Input
-                    placeholder="🔍  Buscar cliente por nome, e-mail ou telefone..."
+                    placeholder="Buscar cliente por nome, e-mail ou telefone..."
                     value={searchCustomer}
                     onChange={(e) => {
                       setSearchCustomer(e.target.value)
@@ -1099,7 +1128,6 @@ export default function AdminOrdersPage() {
               </section>
             </div>
 
-            {/* Footer fixo */}
             <div style={{ padding: '16px 28px', borderTop: '1px solid #E3E9F4', backgroundColor: '#FAFCFE', display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ fontSize: '13px', color: '#6B7494' }}>
                 {newOrderItems.length === 0

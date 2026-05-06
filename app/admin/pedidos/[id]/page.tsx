@@ -6,8 +6,17 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import OrderMaterialsCard from '@/components/admin/OrderMaterialsCard'
 import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-pricing'
-
-// --- Types ---
+import {
+  FULFILLMENT_STATUSES,
+  PAYMENT_STATUSES,
+  getFulfillmentInfo,
+  getNextStage,
+  getPreviousStage,
+  canAdvance,
+  canRegress,
+  listTimelineEntries,
+  type ProductionTimeline,
+} from '@/lib/order-statuses'
 
 type ProductVariant = {
   id: string
@@ -72,19 +81,14 @@ type Order = {
   items: OrderItem[]
   trackingCode: string | null
   expectedDeliveryAt?: string | null
+  productionTimeline?: ProductionTimeline | null
+  currentStageNote?: string | null
 }
 
-// --- Helpers ---
-
-/** Composite key for identifying a cart line (product + optional variant). */
 function itemKey(productId: string, variantId: string | null): string {
   return `${productId}::${variantId ?? ''}`
 }
 
-/**
- * Variant picker sub-component — same visual as page.tsx counterpart.
- * Admin can force-add even out-of-stock variants (badge shown, not blocked).
- */
 function VariantPicker({
   product,
   onSelect,
@@ -171,7 +175,6 @@ function VariantPicker({
   )
 }
 
-/** Ensures all items from the API have the variantId/variantName shape. */
 function normalizeItems(items: unknown[]): OrderItem[] {
   return (items || []).map(raw => {
     const item = raw as Record<string, unknown>
@@ -186,23 +189,6 @@ function normalizeItems(items: unknown[]): OrderItem[] {
   })
   })
 }
-
-const fulfillmentStatuses = [
-  { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'in_production', label: 'Em produção', color: '#3B82F6' },
-  { value: 'ready_to_ship', label: 'Pronto para envio', color: '#0EA5E9' },
-  { value: 'shipped', label: 'Enviado', color: '#8B5CF6' },
-  { value: 'delivered', label: 'Entregue', color: '#10B981' },
-  { value: 'cancelled', label: 'Cancelado', color: '#EF4444' },
-]
-
-const paymentStatuses = [
-  { value: 'pending', label: 'Pendente', color: '#F59E0B' },
-  { value: 'paid', label: 'Pago', color: '#10B981' },
-  { value: 'rejected', label: 'Recusado', color: '#EF4444' },
-  { value: 'cancelled', label: 'Cancelado', color: '#6B7494' },
-  { value: 'refunded', label: 'Estornado', color: '#8B5CF6' },
-]
 
 function Card({ title, children }: { title: string, children: React.ReactNode }) {
   return (
@@ -247,6 +233,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showCloneModal, setShowCloneModal] = useState(false)
   const [showRefundModal, setShowRefundModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false)
+  const [advanceNote, setAdvanceNote] = useState('')
+  const [stageActionLoading, setStageActionLoading] = useState(false)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [refunding, setRefunding] = useState(false)
@@ -335,7 +324,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }, [resolvedParams.id])
 
   const isCancelled = order?.status === 'cancelled' || order?.fulfillmentStatus === 'cancelled'
-    
+
   const hasChanges =
     formData.fulfillmentStatus !== (order?.fulfillmentStatus || '') ||
     formData.paymentStatus !== (order?.paymentStatus || '') ||
@@ -370,6 +359,61 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  const handleAdvanceStageConfirm = async () => {
+    if (!order) return
+    setStageActionLoading(true)
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: order.id,
+          action: 'advance_stage',
+          currentStageNote: advanceNote.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        alert(err?.error || 'Não foi possível avançar a fase')
+        return
+      }
+      setShowAdvanceModal(false)
+      setAdvanceNote('')
+      loadOrder()
+    } catch (e) {
+      console.error('Error advancing stage:', e)
+      alert('Erro de conexão ao avançar fase.')
+    } finally {
+      setStageActionLoading(false)
+    }
+  }
+
+  const handleRegressStage = async () => {
+    if (!order) return
+    setStageActionLoading(true)
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: order.id,
+          action: 'regress_stage',
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        alert(err?.error || 'Não foi possível voltar a fase')
+        return
+      }
+      loadOrder()
+    } catch (e) {
+      console.error('Error regressing stage:', e)
+      alert('Erro de conexão ao voltar fase.')
+    } finally {
+      setStageActionLoading(false)
+    }
+  }
+
   const handleDeleteOrder = async () => {
     if (!order) return
     if (deleteConfirmInput.trim() !== order.orderNumber) return
@@ -395,7 +439,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleSendEmail = () => {
     if (!order) return
     const subject = encodeURIComponent(`Pedido ${order.orderNumber} - Forma 3D`)
-    const statusLabel = fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.label || order.fulfillmentStatus
+    const statusLabel = getFulfillmentInfo(order.fulfillmentStatus)?.label || order.fulfillmentStatus
     const body = encodeURIComponent(
       `Olá ${order.customerName}!\n\nSeu pedido ${order.orderNumber} está com status: ${statusLabel}.\n\nValor: R$ ${order.total.toFixed(2).replace('.', ',')}\n\nObrigado!\nForma 3D`
     )
@@ -405,8 +449,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleSendWhatsApp = () => {
     if (!order) return
     const phone = order.customerPhone.replace(/\D/g, '')
-    const statusLabel = fulfillmentStatuses.find(s => s.value === order.fulfillmentStatus)?.label || order.fulfillmentStatus
-    const message = encodeURIComponent(`Olá ${order.customerName}! 👋\n\nSeu pedido *${order.orderNumber}* está com status: *${statusLabel}*\n\nValor: R$ ${order.total.toFixed(2).replace('.', ',')}\n\nObrigado! Forma 3D`)
+    const statusLabel = getFulfillmentInfo(order.fulfillmentStatus)?.label || order.fulfillmentStatus
+    const message = encodeURIComponent(`Olá ${order.customerName}!\n\nSeu pedido *${order.orderNumber}* está com status: *${statusLabel}*\n\nValor: R$ ${order.total.toFixed(2).replace('.', ',')}\n\nObrigado! Forma 3D`)
     window.open(`https://wa.me/55${phone}?text=${message}`, '_blank')
   }
 
@@ -487,10 +531,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  /**
-   * Called when admin clicks a product card inside the Edit Items modal.
-   * Products with variants open the inline picker; without variants add directly.
-   */
   const handleAddProduct = (product: Product) => {
     if (product.variants && product.variants.length > 0) {
       setVariantPickerFor(product.id)
@@ -516,7 +556,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  /** Called when admin picks a specific variant from the sub-picker. */
   const handleAddVariant = (product: Product, variant: ProductVariant) => {
     setVariantPickerFor(null)
     const vLabel = describeVariant(variant)
@@ -604,6 +643,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     )
   }
 
+  const nextStage = getNextStage(order.fulfillmentStatus)
+  const previousStage = getPreviousStage(order.fulfillmentStatus)
+  const advanceEnabled = canAdvance(order.fulfillmentStatus) && !isCancelled
+  const regressEnabled = canRegress(order.fulfillmentStatus) && !isCancelled
+  const nextStageInfo = nextStage ? getFulfillmentInfo(nextStage) : null
+  const previousStageInfo = previousStage ? getFulfillmentInfo(previousStage) : null
+  const timelineEntries = listTimelineEntries(order.productionTimeline)
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
@@ -612,7 +659,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </Link>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '12px' }}>
             Pedido <span style={{ fontFamily: 'var(--font-mono)' }}>{order.orderNumber}</span>
@@ -622,13 +669,54 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <StatusBadge status={formData.fulfillmentStatus} options={fulfillmentStatuses} />
-          {hasChanges && <span style={{ fontSize: '12px', color: '#F59E0B', fontWeight: 500 }}>⚠️ Alterações pendentes</span>}
+          <StatusBadge status={formData.fulfillmentStatus} options={FULFILLMENT_STATUSES} />
+          {hasChanges && <span style={{ fontSize: '12px', color: '#F59E0B', fontWeight: 500 }}>Alterações pendentes</span>}
         </div>
       </div>
 
+      {(advanceEnabled || regressEnabled) && (
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#1D2235' }}>Pipeline de Produção</h2>
+              <p style={{ fontSize: '13px', color: '#6B7494', margin: '4px 0 0 0' }}>
+                Fase atual: <strong style={{ color: getFulfillmentInfo(order.fulfillmentStatus)?.color || '#1D2235' }}>{getFulfillmentInfo(order.fulfillmentStatus)?.label || order.fulfillmentStatus}</strong>
+                {nextStageInfo && <> · próxima: {nextStageInfo.label}</>}
+              </p>
+              {order.currentStageNote && (
+                <p style={{ fontSize: '13px', color: '#1D2235', backgroundColor: '#F0F5FB', padding: '8px 12px', borderRadius: '6px', margin: '8px 0 0 0', borderLeft: '3px solid #BBCFEB' }}>
+                  <strong style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6B7494' }}>Nota da fase atual:</strong>
+                  <br />{order.currentStageNote}
+                </p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {regressEnabled && previousStageInfo && (
+                <button
+                  type="button"
+                  onClick={handleRegressStage}
+                  disabled={stageActionLoading}
+                  style={{ padding: '12px 18px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: stageActionLoading ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, color: '#6B7494', opacity: stageActionLoading ? 0.6 : 1 }}
+                >
+                  ← Voltar para {previousStageInfo.label}
+                </button>
+              )}
+              {advanceEnabled && nextStageInfo && (
+                <button
+                  type="button"
+                  onClick={() => { setAdvanceNote(''); setShowAdvanceModal(true) }}
+                  disabled={stageActionLoading}
+                  style={{ padding: '12px 22px', backgroundColor: '#1D2235', border: 'none', borderRadius: '8px', cursor: stageActionLoading ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, color: 'white', opacity: stageActionLoading ? 0.6 : 1 }}
+                >
+                  Avançar para {nextStageInfo.label} →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="admin-order-grid">
-        {/* Coluna esquerda: dados do cliente e pagamento */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <Card title="Cliente">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -652,7 +740,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <p style={{ fontSize: '14px', color: '#6B7494' }}>Status</p>
-                <StatusBadge status={formData.paymentStatus} options={paymentStatuses} />
+                <StatusBadge status={formData.paymentStatus} options={PAYMENT_STATUSES} />
               </div>
               <div>
                 <p style={{ fontSize: '14px', color: '#6B7494' }}>Método</p>
@@ -662,15 +750,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div>
                   <label style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>Atualizar pagamento</label>
                   <select value={formData.paymentStatus} onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px', backgroundColor: 'white' }}>
-                    {paymentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    {PAYMENT_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
               )}
             </div>
           </Card>
+
+          <Card title="Linha do Tempo">
+            {timelineEntries.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#6B7494', margin: 0 }}>
+                —
+                <br />
+                <span style={{ fontSize: '12px' }}>Pedidos anteriores ao novo fluxo de pipeline não têm timeline registrada.</span>
+              </p>
+            ) : (
+              <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {timelineEntries.map(entry => {
+                  const info = getFulfillmentInfo(entry.status)
+                  return (
+                    <li key={entry.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '999px', backgroundColor: info?.color || '#6B7494', marginTop: '6px', flexShrink: 0 }} aria-hidden="true" />
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>{entry.label}</div>
+                        <div style={{ fontSize: '12px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>
+                          {new Date(entry.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </Card>
         </div>
 
-        {/* Coluna direita: itens, materiais, status e ações */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <Card title="Itens do Pedido">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -713,10 +827,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <Card title="Status & Logística">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>Status do pedido</label>
+                <label style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>Status do pedido (avançado)</label>
                 <select value={formData.fulfillmentStatus} onChange={(e) => setFormData({ ...formData, fulfillmentStatus: e.target.value })} disabled={isCancelled} style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D8DCE8', fontSize: '14px', backgroundColor: isCancelled ? '#F0F5FB' : 'white', color: isCancelled ? '#6B7494' : 'inherit' }}>
-                  {fulfillmentStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {FULFILLMENT_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
+                <p style={{ fontSize: '11px', color: '#6B7494', marginTop: '6px' }}>
+                  Use os botões Avançar/Voltar acima para o fluxo padrão. Esta seleção é fallback manual e não registra nota nem timestamp do pipeline.
+                </p>
               </div>
               <div>
                 <label style={{ fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
@@ -774,24 +891,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button onClick={handleSendEmail} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>📧 E-mail</button>
-            <button onClick={handleSendWhatsApp} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#25D366', border: 'none', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>💬 WhatsApp</button>
-            <button onClick={handlePrintLabel} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>🖨️ Etiqueta</button>
+            <button onClick={handleSendEmail} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>E-mail</button>
+            <button onClick={handleSendWhatsApp} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#25D366', border: 'none', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>WhatsApp</button>
+            <button onClick={handlePrintLabel} disabled={isCancelled} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: isCancelled ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCancelled ? 0.5 : 1 }}>Etiqueta</button>
             {!isCancelled && (
-              <button onClick={() => setShowCancelModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>❌ Cancelar</button>
+              <button onClick={() => setShowCancelModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>Cancelar</button>
             )}
           </div>
 
           {!isCancelled && (
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
               <button onClick={() => { setEditingItems(normalizeItems(order.items)); setVariantPickerFor(null); setShowEditItemsModal(true) }} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#3B82F6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>Editar Itens</button>
-              <button onClick={() => setShowCloneModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#8B5CF6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>📋 Clonar Pedido</button>
+              <button onClick={() => setShowCloneModal(true)} style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#8B5CF6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>Clonar Pedido</button>
               {order.paymentStatus === 'paid' && (
                 <button
                   onClick={() => { setRefundError(''); setShowRefundModal(true) }}
                   style={{ flex: 1, minWidth: '120px', padding: '12px 20px', backgroundColor: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                  💸 Estornar pagamento
+                  Estornar pagamento
                 </button>
               )}
             </div>
@@ -805,7 +922,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               onClick={() => { setDeleteConfirmInput(''); setShowDeleteModal(true) }}
               style={{ padding: '10px 18px', backgroundColor: 'white', border: '1px solid #B42318', borderRadius: '8px', cursor: 'pointer', color: '#B42318', fontWeight: 600, fontSize: '13px' }}
             >
-              🗑️ Excluir pedido permanentemente
+              Excluir pedido permanentemente
             </button>
             <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '8px' }}>
               Diferente de cancelar — apaga o registro do banco. Use para pedidos de teste ou criados por engano. Pedidos pagos devem ser estornados antes.
@@ -813,6 +930,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
+
+      {showAdvanceModal && nextStageInfo && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: 'white', padding: '28px', borderRadius: '12px', maxWidth: '460px', width: '100%' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px', color: '#1D2235' }}>
+              Avançar para {nextStageInfo.label}?
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6B7494', marginBottom: '16px' }}>
+              Você pode adicionar uma nota interna sobre o que foi feito nesta fase. (Opcional — substitui qualquer nota anterior.)
+            </p>
+            <label htmlFor="stage-note" style={{ fontSize: '12px', fontWeight: 600, color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' }}>
+              Nota da fase (opcional)
+            </label>
+            <textarea
+              id="stage-note"
+              value={advanceNote}
+              onChange={(e) => setAdvanceNote(e.target.value)}
+              rows={4}
+              placeholder="Ex: arte aprovada pelo cliente, slicing concluído, etc."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', marginBottom: '20px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                disabled={stageActionLoading}
+                onClick={() => setShowAdvanceModal(false)}
+                style={{ padding: '10px 20px', backgroundColor: 'white', border: '1px solid #D8DCE8', borderRadius: '8px', cursor: stageActionLoading ? 'not-allowed' : 'pointer', fontWeight: 500 }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={stageActionLoading}
+                onClick={handleAdvanceStageConfirm}
+                style={{ padding: '10px 22px', backgroundColor: '#1D2235', border: 'none', borderRadius: '8px', cursor: stageActionLoading ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 600, opacity: stageActionLoading ? 0.7 : 1 }}
+              >
+                {stageActionLoading ? 'Avançando...' : 'Confirmar avanço'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEditItemsModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -831,7 +990,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <p style={{ fontSize: '14px', color: '#6B7494' }}>R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p>
                     </div>
                     <input type="number" min="1" value={item.quantity} onChange={(e) => handleUpdateQuantity(key, parseInt(e.target.value) || 1)} style={{ width: '60px', padding: '8px', borderRadius: '4px', border: '1px solid #D8DCE8' }} />
-                    <button onClick={() => handleRemoveItem(key)} style={{ padding: '8px 12px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', color: '#EF4444' }}>✕</button>
+                    <button onClick={() => handleRemoveItem(key)} style={{ padding: '8px 12px', backgroundColor: '#FEE2E2', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer', color: '#EF4444' }}>×</button>
                   </div>
                 )
               })}
@@ -1003,4 +1162,3 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     </div>
   )
 }
-
