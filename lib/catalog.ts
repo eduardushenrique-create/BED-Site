@@ -9,6 +9,11 @@ type CatalogFilters = {
   featured?: boolean
   personalizable?: boolean
   search?: string
+  /**
+   * Limita a busca a produtos com `price <= maxPrice`. Útil para vitrines
+   * tipo "lembrancinhas até R$ 30" sem precisar de uma rota dedicada.
+   */
+  maxPrice?: number
 }
 
 function serializePrismaProduct(product: any): Product {
@@ -90,6 +95,7 @@ function getPublicProductWhere(filters: CatalogFilters = {}) {
     categories: filters.category ? { some: { slug: filters.category, isActive: true } } : undefined,
     isFeatured: filters.featured ? true : undefined,
     isPersonalizable: filters.personalizable ? true : undefined,
+    price: typeof filters.maxPrice === 'number' ? { lte: filters.maxPrice } : undefined,
     OR: filters.search
       ? [
           { name: { contains: filters.search, mode: 'insensitive' as const } },
