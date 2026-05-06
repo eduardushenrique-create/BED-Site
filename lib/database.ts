@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import {
   readDB,
@@ -50,6 +50,10 @@ import {
   fireLowStockAlertInBackground,
   fireOrderShortageAlertInBackground,
 } from '@/lib/stock-alerts'
+import {
+  withTimelineStamp,
+  type ProductionTimeline,
+} from '@/lib/order-statuses'
 
 const log = createLogger({ component: 'database' })
 
@@ -279,6 +283,10 @@ function serializeOrder(order: any): Order {
       order.expectedDeliveryAt instanceof Date
         ? order.expectedDeliveryAt.toISOString()
         : order.expectedDeliveryAt || null,
+    productionTimeline: (order.productionTimeline && typeof order.productionTimeline === 'object'
+      ? order.productionTimeline
+      : null) as Record<string, string | null> | null,
+    currentStageNote: order.currentStageNote ?? null,
   }
 }
 
@@ -1681,12 +1689,35 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
   }
 }
 
-export async function updateOrder(id: string, data: Partial<Order>) {
+type OrderUpdateData = Partial<Order> & {
+  productionTimeline?: ProductionTimeline | null
+  currentStageNote?: string | null
+}
+
+export async function updateOrder(id: string, data: OrderUpdateData) {
   if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
     if (index === -1) return null
-    db.orders[index] = { ...db.orders[index], ...data }
+
+    const previous = db.orders[index]
+    const localAutoTransition =
+      data.paymentStatus === 'paid' &&
+      !data.fulfillmentStatus &&
+      previous.paymentStatus !== 'paid' &&
+      previous.fulfillmentStatus === 'pending'
+
+    const localPatch: Partial<Order> = localAutoTransition
+      ? {
+          fulfillmentStatus: 'aguardando_producao',
+          productionTimeline: withTimelineStamp(
+            previous.productionTimeline as ProductionTimeline | null | undefined,
+            'aguardando_producao',
+          ),
+        }
+      : {}
+
+    db.orders[index] = { ...previous, ...data, ...localPatch }
     writeDB(db)
     return db.orders[index]
   }
@@ -1706,6 +1737,41 @@ export async function updateOrder(id: string, data: Partial<Order>) {
       }
     }
 
+    const timelinePatch: Pick<Prisma.OrderUpdateInput, 'productionTimeline'> | Record<string, never> =
+      Object.prototype.hasOwnProperty.call(data, 'productionTimeline') && data.productionTimeline
+        ? { productionTimeline: data.productionTimeline as Prisma.InputJsonValue }
+        : Object.prototype.hasOwnProperty.call(data, 'productionTimeline')
+          ? { productionTimeline: Prisma.JsonNull }
+          : {}
+
+    const stageNotePatch: Pick<Prisma.OrderUpdateInput, 'currentStageNote'> | Record<string, never> =
+      Object.prototype.hasOwnProperty.call(data, 'currentStageNote')
+        ? { currentStageNote: data.currentStageNote ?? null }
+        : {}
+
+    let autoTransitionPatch: Pick<Prisma.OrderUpdateInput, 'fulfillmentStatus' | 'productionTimeline'> | Record<string, never> = {}
+    if (
+      data.paymentStatus === 'paid' &&
+      !data.fulfillmentStatus &&
+      !Object.prototype.hasOwnProperty.call(data, 'productionTimeline')
+    ) {
+      const previous = await prisma.order.findUnique({
+        where: { id },
+        select: { paymentStatus: true, fulfillmentStatus: true, productionTimeline: true },
+      })
+
+      if (previous && previous.paymentStatus !== 'paid' && previous.fulfillmentStatus === 'pending') {
+        const nextTimeline = withTimelineStamp(
+          previous.productionTimeline as ProductionTimeline | null | undefined,
+          'aguardando_producao',
+        )
+        autoTransitionPatch = {
+          fulfillmentStatus: 'aguardando_producao',
+          productionTimeline: nextTimeline as Prisma.InputJsonValue,
+        }
+      }
+    }
+
     const order = await prisma.order.update({
       where: { id },
       data: {
@@ -1717,6 +1783,9 @@ export async function updateOrder(id: string, data: Partial<Order>) {
         shippingTotal: data.shippingCost,
         total: data.total,
         ...(expectedDelivery !== undefined ? { expectedDeliveryAt: expectedDelivery } : {}),
+        ...timelinePatch,
+        ...stageNotePatch,
+        ...autoTransitionPatch,
       },
       include: { address: true, payment: true, items: { include: { variant: true } } },
     })
@@ -1770,11 +1839,23 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
     const index = db.orders.findIndex(order => order.orderNumber === orderNumber)
     if (index === -1) return null
 
+    const previous = db.orders[index]
+    const autoTransition =
+      data.paymentStatus === 'paid' &&
+      previous.paymentStatus !== 'paid' &&
+      previous.fulfillmentStatus === 'pending'
+
+    const nextTimeline = autoTransition
+      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'aguardando_producao')
+      : previous.productionTimeline
+
     db.orders[index] = {
-      ...db.orders[index],
+      ...previous,
       paymentStatus: data.paymentStatus,
       status: data.status,
       paymentMethod: data.method,
+      ...(autoTransition ? { fulfillmentStatus: 'aguardando_producao' } : {}),
+      productionTimeline: nextTimeline ?? null,
       paymentDetails: {
         provider: data.provider,
         providerPaymentId: data.providerPaymentId || undefined,
@@ -1792,11 +1873,32 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
   }
 
   try {
+    const previous = await prisma.order.findUnique({
+      where: { orderNumber },
+      select: { paymentStatus: true, fulfillmentStatus: true, productionTimeline: true },
+    })
+
+    const autoTransition =
+      previous &&
+      data.paymentStatus === 'paid' &&
+      previous.paymentStatus !== 'paid' &&
+      previous.fulfillmentStatus === 'pending'
+
+    const nextTimeline = autoTransition
+      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'aguardando_producao')
+      : null
+
     const order = await prisma.order.update({
       where: { orderNumber },
       data: {
         status: data.status,
         paymentStatus: data.paymentStatus,
+        ...(autoTransition && nextTimeline
+          ? {
+              fulfillmentStatus: 'aguardando_producao',
+              productionTimeline: nextTimeline as Prisma.InputJsonValue,
+            }
+          : {}),
         payment: {
           upsert: {
             create: {
