@@ -120,8 +120,8 @@ export async function getResolvedTemplate(slug: EmailTemplateSlug): Promise<{
 // Helpers de construção de HTML
 // ============================================================================
 
-const STORE_URL = 'https://beddesigns.com.br'
-const LOGO_URL = 'https://beddesigns.com.br/logo.svg'
+const STORE_URL = 'https://www.beddesigns.com.br'
+const LOGO_URL = 'https://www.beddesigns.com.br/logo.svg'
 
 // Zero-width + nbsp characters prevent email clients from bleeding the preheader
 // into the body preview.
