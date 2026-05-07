@@ -2874,7 +2874,7 @@ export async function ensureProductionTasksForOrder(
     const db = readDB()
     const order = db.orders.find((o) => o.id === orderId)
     if (!order) return { created: 0, skipped: 'order_not_found' }
-    if (order.status !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+    if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
 
     let created = 0
     for (const item of (order.items as any[]) || []) {
@@ -2912,7 +2912,7 @@ export async function ensureProductionTasksForOrder(
       include: { items: { include: { product: true } } },
     })
     if (!order) return { created: 0, skipped: 'order_not_found' }
-    if (order.status !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+    if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
 
     let created = 0
     for (const item of order.items) {
