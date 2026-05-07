@@ -239,15 +239,18 @@ function serializeOrder(order: any): Order {
     customerName: order.customerName,
     customerEmail: order.customerEmail,
     customerPhone: order.customerPhone || '',
-    shippingAddress: {
-      street: order.address?.street || '',
-      number: order.address?.number || '',
-      complement: order.address?.complement || '',
-      neighborhood: order.address?.neighborhood || '',
-      city: order.address?.city || '',
-      state: order.address?.state || '',
-      zipCode: order.address?.zipCode || '',
-    },
+    shippingAddress: order.address
+      ? {
+          street: order.address.street || '',
+          number: order.address.number || '',
+          complement: order.address.complement || '',
+          neighborhood: order.address.neighborhood || '',
+          city: order.address.city || '',
+          state: order.address.state || '',
+          zipCode: order.address.zipCode || '',
+        }
+      : null,
+    deliveryMethod: (order.deliveryMethod === 'pickup' ? 'pickup' : 'shipping'),
     total: money(order.total),
     subtotal: money(order.subtotal),
     shippingCost: money(order.shippingTotal),
@@ -1576,6 +1579,14 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
   }
 
   try {
+    // Pipeline-redesign: pedidos com retirada nao precisam de endereco. O
+    // admin pode criar pedido manual com `shippingAddress: null` quando
+    // deliveryMethod='pickup'.
+    const deliveryMethod =
+      (data as unknown as { deliveryMethod?: string | null }).deliveryMethod === 'pickup'
+        ? 'pickup'
+        : 'shipping'
+    const hasShippingAddress = Boolean(data.shippingAddress?.zipCode)
     const order = await prisma.order.create({
       data: {
         orderNumber: data.orderNumber,
@@ -1591,17 +1602,22 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
         paymentStatus: data.paymentStatus,
         fulfillmentStatus: data.fulfillmentStatus,
         trackingCode: data.trackingCode,
-        address: {
-          create: {
-            zipCode: data.shippingAddress.zipCode,
-            street: data.shippingAddress.street,
-            number: data.shippingAddress.number,
-            complement: data.shippingAddress.complement,
-            neighborhood: data.shippingAddress.neighborhood,
-            city: data.shippingAddress.city,
-            state: data.shippingAddress.state,
-          },
-        },
+        deliveryMethod,
+        ...(hasShippingAddress
+          ? {
+              address: {
+                create: {
+                  zipCode: data.shippingAddress!.zipCode,
+                  street: data.shippingAddress!.street,
+                  number: data.shippingAddress!.number,
+                  complement: data.shippingAddress!.complement,
+                  neighborhood: data.shippingAddress!.neighborhood,
+                  city: data.shippingAddress!.city,
+                  state: data.shippingAddress!.state,
+                },
+              },
+            }
+          : {}),
         payment: {
           create: {
             provider: 'manual',
