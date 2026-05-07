@@ -2876,14 +2876,22 @@ export async function ensureProductionTasksForOrder(
     if (!order) return { created: 0, skipped: 'order_not_found' }
     if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
 
+    const items = (order.items as any[]) || []
     let created = 0
-    for (const item of (order.items as any[]) || []) {
+    let eligibleCount = 0
+    let alreadyExists = 0
+    for (const item of items) {
       const itemId = item.id || `${order.id}_${item.productId}`
-      if (db.productionTasks.some((t) => t.orderItemId === itemId)) continue
       const product = db.products.find((p) => p.id === item.productId)
       if (!product) continue
       const eligible = product.underOrder === true || product.isPersonalizable === true
       if (!eligible) continue
+      eligibleCount += 1
+
+      if (db.productionTasks.some((t) => t.orderItemId === itemId)) {
+        alreadyExists += 1
+        continue
+      }
 
       const dueAt = computeFallbackDueAt(product as any, null)
       const priority = isUrgent(dueAt) ? 'urgent' : 'normal'
@@ -2903,6 +2911,20 @@ export async function ensureProductionTasksForOrder(
       created += 1
     }
     if (created > 0) writeDB(db)
+    // Sinaliza ao caller (UI/audit) o motivo de zero criacoes:
+    // - no_eligible_items: pedido tem items, mas nenhum eh produzivel
+    //   (ie: nenhum produto tem underOrder=true ou isPersonalizable=true).
+    //   Provavel config esquecida no produto — admin precisa revisar.
+    // - already_exists: tasks ja foram criadas em uma chamada anterior
+    //   (idempotencia funcionando — nao eh um problema).
+    if (created === 0) {
+      if (items.length > 0 && eligibleCount === 0) {
+        return { created: 0, skipped: 'no_eligible_items' }
+      }
+      if (alreadyExists > 0) {
+        return { created: 0, skipped: 'already_exists' }
+      }
+    }
     return { created }
   }
 
@@ -2915,15 +2937,21 @@ export async function ensureProductionTasksForOrder(
     if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
 
     let created = 0
+    let eligibleCount = 0
+    let alreadyExists = 0
     for (const item of order.items) {
       const eligible =
         Boolean(item.product?.underOrder) || Boolean(item.product?.isPersonalizable)
       if (!eligible) continue
+      eligibleCount += 1
 
       const exists = await prisma.productionTask.findUnique({
         where: { orderItemId: item.id },
       })
-      if (exists) continue
+      if (exists) {
+        alreadyExists += 1
+        continue
+      }
 
       const dueAt =
         order.productionDeadline ||
@@ -2959,6 +2987,14 @@ export async function ensureProductionTasksForOrder(
       }
     }
 
+    if (created === 0) {
+      if (order.items.length > 0 && eligibleCount === 0) {
+        return { created: 0, skipped: 'no_eligible_items' }
+      }
+      if (alreadyExists > 0) {
+        return { created: 0, skipped: 'already_exists' }
+      }
+    }
     return { created }
   } catch (error) {
     reportDbError('ensureProductionTasksForOrder Prisma failed', error)
