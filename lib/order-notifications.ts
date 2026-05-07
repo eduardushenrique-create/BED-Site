@@ -1,13 +1,22 @@
 import 'server-only'
 
 import {
+  sendOrderAwaitingPayment,
+  sendOrderConfirmed,
   sendOrderDelivered,
   sendOrderInProduction,
+  sendOrderReadyToPickup,
   sendOrderRefunded,
   sendOrderShipped,
   sendPaymentApproved,
 } from '@/lib/email'
 import { captureException } from '@/lib/observability'
+
+const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || 'https://www.beddesigns.com.br'
+
+function buildOrderUrl(orderNumber: string): string {
+  return `${STORE_URL.replace(/\/$/, '')}/meus-pedidos/${encodeURIComponent(orderNumber)}`
+}
 
 export type OrderSnapshot = {
   orderNumber: string
@@ -64,8 +73,34 @@ export async function notifyOrderStatusChange(
       await sendOrderRefunded(after.customerEmail, after.customerName, after.orderNumber, after.total)
     }
 
+    // Pipeline-redesign: 3 e-mails novos disparam aqui (mais o existente
+    // order_in_production). So enviam quando a transicao realmente aconteceu
+    // — `previous` vs `after` na mesma fase nao re-envia.
+    if (fulfillmentChanged && after.fulfillmentStatus === 'confirmado') {
+      await sendOrderConfirmed(after.customerEmail, after.customerName, after.orderNumber)
+    }
+
+    if (fulfillmentChanged && after.fulfillmentStatus === 'aguardando_pagamento') {
+      await sendOrderAwaitingPayment(
+        after.customerEmail,
+        after.customerName,
+        after.orderNumber,
+        after.total,
+        buildOrderUrl(after.orderNumber),
+      )
+    }
+
     if (fulfillmentChanged && after.fulfillmentStatus === 'in_production') {
       await sendOrderInProduction(after.customerEmail, after.customerName, after.orderNumber)
+    }
+
+    if (fulfillmentChanged && after.fulfillmentStatus === 'ready_to_pickup') {
+      await sendOrderReadyToPickup(
+        after.customerEmail,
+        after.customerName,
+        after.orderNumber,
+        buildOrderUrl(after.orderNumber),
+      )
     }
 
     // Notify shipped only if the change happened here (not via the ME webhook,

@@ -18,8 +18,11 @@ import { hasDatabase } from '@/lib/database'
  */
 export type EmailTemplateSlug =
   | 'order_confirmation'
+  | 'order_confirmed'
+  | 'order_awaiting_payment'
   | 'payment_approved'
   | 'order_in_production'
+  | 'order_ready_to_pickup'
   | 'order_shipped'
   | 'order_delivered'
   | 'order_refunded'
@@ -269,6 +272,73 @@ ${p('Em breve seu pedido entrar&aacute; em produ&ccedil;&atilde;o. Voc&ecirc; re
   },
 
   // --------------------------------------------------------------------------
+  order_confirmed: {
+    slug: 'order_confirmed',
+    label: 'Pedido confirmado pelo admin',
+    description: 'Disparado quando o admin valida o pedido (passa de "Pendente" para "Confirmado").',
+    variables: [
+      { name: 'orderNumber', description: 'Número do pedido', example: 'BED-000123' },
+      { name: 'customerFirstName', description: 'Primeiro nome do cliente', example: 'Maria' },
+    ],
+    defaultSubject: 'Pedido {{orderNumber}} confirmado pela equipe - B&D Artes & Impressões',
+    defaultHtml: buildEmail({
+      preheader: 'Sua compra foi confirmada pela nossa equipe. Já vai entrar na fila!',
+      accentColor: '#22A39F',
+      accentBg: '#D8F4F2',
+      icon: '&#10003;',
+      heading: 'Tudo certo, pedido confirmado!',
+      content: `
+${p('Ol&aacute;, <strong style="color:#1D2235;">{{customerFirstName}}</strong>! Acabamos de revisar o seu pedido e est&aacute; tudo certo.')}
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 24px;">
+<tr><td align="center" bgcolor="#F0FAF9" style="background-color:#F0FAF9;border:1px solid #A8E1DD;border-radius:10px;padding:20px;">
+  <p style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#22A39F;margin:0 0 6px;font-weight:600;">Pedido</p>
+  <p style="font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:700;color:#1D2235;margin:0;letter-spacing:1px;">{{orderNumber}}</p>
+</td></tr>
+</table>
+
+${p('A nossa equipe j&aacute; revisou estoque, dados de entrega e detalhes do pedido. Agora ele entra na fila para a pr&oacute;xima etapa: pagamento, fila de produ&ccedil;&atilde;o ou separa&ccedil;&atilde;o, conforme o caso.')}
+${p('Voc&ecirc; vai receber um novo e-mail assim que o pedido avan&ccedil;ar de fase. Qualquer d&uacute;vida, &eacute; s&oacute; responder este e-mail. &#128522;', '14px', '#6B7494')}`,
+    }),
+  },
+
+  // --------------------------------------------------------------------------
+  order_awaiting_payment: {
+    slug: 'order_awaiting_payment',
+    label: 'Pedido aguardando pagamento',
+    description: 'Disparado quando o pedido entra em "Aguardando pagamento" (PIX não pago, cartão recusado, ou pagamento combinado para a entrega/retirada).',
+    variables: [
+      { name: 'orderNumber', description: 'Número do pedido', example: 'BED-000123' },
+      { name: 'customerFirstName', description: 'Primeiro nome do cliente', example: 'Maria' },
+      { name: 'total', description: 'Total formatado em BRL', example: '199,90' },
+      { name: 'orderUrl', description: 'Link para a tela do pedido em "Meus pedidos"', example: 'https://www.beddesigns.com.br/meus-pedidos/BED-000123' },
+    ],
+    defaultSubject: 'Pedido {{orderNumber}} aguardando pagamento - B&D Artes & Impressões',
+    defaultHtml: buildEmail({
+      preheader: 'Seu pedido está reservado. Falta só o pagamento para seguir.',
+      accentColor: '#D97706',
+      accentBg: '#FEF3C7',
+      icon: '&#9203;',
+      heading: 'Aguardando seu pagamento',
+      content: `
+${p('Ol&aacute;, <strong style="color:#1D2235;">{{customerFirstName}}</strong>! Seu pedido <strong style="color:#1D2235;">{{orderNumber}}</strong> est&aacute; reservado e esperando a confirma&ccedil;&atilde;o do pagamento.')}
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 24px;">
+<tr><td align="center" bgcolor="#FFFAEB" style="background-color:#FFFAEB;border:1px solid #FBD38D;border-radius:10px;padding:20px;">
+  <p style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#B45309;margin:0 0 6px;font-weight:600;">Total a pagar</p>
+  <p style="font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:700;color:#1D2235;margin:0;letter-spacing:1px;">R$&nbsp;{{total}}</p>
+</td></tr>
+</table>
+
+${p('Assim que o pagamento for confirmado, o pedido avan&ccedil;a automaticamente para a pr&oacute;xima etapa. Se voc&ecirc; combinou pagar na entrega ou na retirada, n&atilde;o se preocupe — vamos seguir conforme o combinado e atualizar voc&ecirc; por aqui.')}
+
+${btn('Ver pedido', '{{orderUrl}}', '#1D2235')}
+
+${p('Qualquer d&uacute;vida sobre o pagamento, &eacute; s&oacute; responder este e-mail.', '14px', '#6B7494')}`,
+    }),
+  },
+
+  // --------------------------------------------------------------------------
   payment_approved: {
     slug: 'payment_approved',
     label: 'Pagamento aprovado',
@@ -348,6 +418,52 @@ ${infoBox(`
 </table>`, '#EEF3FB', '#BBCFEB')}
 
 ${p('Cada pe&ccedil;a &eacute; impressa sob demanda com muito cuidado. Assim que estiver pronta e postada, voc&ecirc; receber&aacute; o c&oacute;digo de rastreio por e-mail.', '14px', '#6B7494')}`,
+    }),
+  },
+
+  // --------------------------------------------------------------------------
+  order_ready_to_pickup: {
+    slug: 'order_ready_to_pickup',
+    label: 'Pronto para retirada',
+    description: 'Disparado quando pedido com retirada no local fica pronto para o cliente buscar.',
+    variables: [
+      { name: 'orderNumber', description: 'Número do pedido', example: 'BED-000123' },
+      { name: 'customerFirstName', description: 'Primeiro nome do cliente', example: 'Maria' },
+      { name: 'orderUrl', description: 'Link para a tela do pedido', example: 'https://www.beddesigns.com.br/meus-pedidos/BED-000123' },
+    ],
+    defaultSubject: 'Pedido {{orderNumber}} pronto para retirada - B&D Artes & Impressões',
+    defaultHtml: buildEmail({
+      preheader: 'Seu pedido está pronto! Combine a retirada com a gente.',
+      accentColor: '#0E9F6E',
+      accentBg: '#D1FAE5',
+      icon: '&#127873;',
+      heading: 'Pronto para retirada!',
+      content: `
+${p('Boa not&iacute;cia, <strong style="color:#1D2235;">{{customerFirstName}}</strong>! Seu pedido <strong style="color:#1D2235;">{{orderNumber}}</strong> est&aacute; pronto e aguardando a sua retirada.')}
+
+${infoBox(`
+<p style="font-family:Arial,sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0E9F6E;margin:0 0 14px;">Como retirar</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+    <td style="padding:6px 0;font-family:Arial,sans-serif;font-size:14px;color:#1D2235;line-height:1.6;">
+      <strong>1.</strong> Responda este e-mail ou nos chame pelo WhatsApp para combinar dia e hor&aacute;rio.
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 0;font-family:Arial,sans-serif;font-size:14px;color:#1D2235;line-height:1.6;">
+      <strong>2.</strong> Tenha em m&atilde;os o n&uacute;mero do pedido e um documento com foto.
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 0;font-family:Arial,sans-serif;font-size:14px;color:#1D2235;line-height:1.6;">
+      <strong>3.</strong> Caso o pagamento esteja combinado para a retirada, traga o valor combinado.
+    </td>
+  </tr>
+</table>`, '#ECFDF5', '#A7F3D0')}
+
+${btn('Ver detalhes do pedido', '{{orderUrl}}', '#0E9F6E')}
+
+${p('Qualquer d&uacute;vida, &eacute; s&oacute; responder este e-mail.', '14px', '#6B7494')}`,
     }),
   },
 

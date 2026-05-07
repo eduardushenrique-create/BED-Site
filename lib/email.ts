@@ -158,6 +158,57 @@ export async function sendOrderInProduction(
   })
 }
 
+export async function sendOrderConfirmed(
+  email: string,
+  customerName: string,
+  orderNumber: string,
+): Promise<boolean> {
+  return sendTemplate({
+    slug: 'order_confirmed',
+    to: email,
+    variables: {
+      orderNumber,
+      customerFirstName: firstName(customerName),
+    },
+  })
+}
+
+export async function sendOrderAwaitingPayment(
+  email: string,
+  customerName: string,
+  orderNumber: string,
+  total: number,
+  orderUrl: string,
+): Promise<boolean> {
+  return sendTemplate({
+    slug: 'order_awaiting_payment',
+    to: email,
+    variables: {
+      orderNumber,
+      customerFirstName: firstName(customerName),
+      total: moneyBR(total),
+      orderUrl,
+    },
+  })
+}
+
+export async function sendOrderReadyToPickup(
+  email: string,
+  customerName: string,
+  orderNumber: string,
+  orderUrl: string,
+): Promise<boolean> {
+  return sendTemplate({
+    slug: 'order_ready_to_pickup',
+    to: email,
+    variables: {
+      orderNumber,
+      customerFirstName: firstName(customerName),
+      orderUrl,
+    },
+  })
+}
+
 export async function sendOrderRefunded(
   email: string,
   customerName: string,

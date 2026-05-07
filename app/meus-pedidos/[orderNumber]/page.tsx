@@ -19,6 +19,8 @@ type OrderDetail = {
   trackingCode: string | null
   expectedDeliveryAt?: string | null
   createdAt: string
+  // Pipeline-redesign: pedido com retirada nao tem endereco; pode vir null.
+  deliveryMethod?: 'shipping' | 'pickup' | null
   shippingAddress: {
     street: string
     number: string
@@ -27,7 +29,7 @@ type OrderDetail = {
     city: string
     state: string
     zipCode: string
-  }
+  } | null
   items: Array<{
     productId: string
     productName: string
@@ -246,14 +248,27 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
             </Section>
           )}
 
-          <Section title="Endereço de entrega">
-            <p style={{ margin: 0, lineHeight: 1.6 }}>
-              {order.shippingAddress.street}, {order.shippingAddress.number}
-              {order.shippingAddress.complement ? ` — ${order.shippingAddress.complement}` : ''}<br />
-              {order.shippingAddress.neighborhood}<br />
-              {order.shippingAddress.city} - {order.shippingAddress.state}<br />
-              CEP {order.shippingAddress.zipCode}
-            </p>
+          <Section title={order.deliveryMethod === 'pickup' ? 'Retirada no local' : 'Endereço de entrega'}>
+            {order.deliveryMethod === 'pickup' ? (
+              <div style={{ lineHeight: 1.6 }}>
+                <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '999px', backgroundColor: '#DFF4EC', color: '#0E9F6E', fontWeight: 600, fontSize: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Retirada
+                </span>
+                <p style={{ margin: '12px 0 0', color: '#6B7494', fontSize: '13px' }}>
+                  Você combina a retirada do pedido com a gente. Quando estiver pronto, enviaremos um e-mail com as orientações.
+                </p>
+              </div>
+            ) : order.shippingAddress ? (
+              <p style={{ margin: 0, lineHeight: 1.6 }}>
+                {order.shippingAddress.street}, {order.shippingAddress.number}
+                {order.shippingAddress.complement ? ` — ${order.shippingAddress.complement}` : ''}<br />
+                {order.shippingAddress.neighborhood}<br />
+                {order.shippingAddress.city} - {order.shippingAddress.state}<br />
+                CEP {order.shippingAddress.zipCode}
+              </p>
+            ) : (
+              <p style={{ margin: 0, color: '#6B7494', fontSize: '13px' }}>Endereço não informado.</p>
+            )}
           </Section>
         </div>
 
@@ -413,34 +428,71 @@ function buildTimeline(order: OrderDetail, production: ProductionData | null) {
   const paid = order.paymentStatus === 'paid' || order.status === 'paid'
   const cancelled = order.status === 'cancelled'
   const refunded = order.status === 'refunded' || order.paymentStatus === 'refunded'
-  const fulfillmentInProduction = order.fulfillmentStatus === 'in_production' || order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered'
-  const shipped = order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered'
+  const isPickup = order.deliveryMethod === 'pickup'
+
+  // Pipeline-redesign: timeline considera as fases novas. As terminais
+  // mudam por modalidade — pickup pula 'shipped' e tem 'ready_to_pickup'.
+  const PIPELINE_ORDER = [
+    'pending',
+    'confirmado',
+    'aguardando_pagamento',
+    'na_fila',
+    'arte_em_montagem',
+    'liberado_producao',
+    'in_production',
+    'ready_to_ship',
+    'ready_to_pickup',
+    'shipped',
+    'delivered',
+  ] as const
+  const currentIdx = PIPELINE_ORDER.indexOf(order.fulfillmentStatus as typeof PIPELINE_ORDER[number])
+  const reached = (status: typeof PIPELINE_ORDER[number]): boolean => {
+    const i = PIPELINE_ORDER.indexOf(status)
+    return currentIdx >= i && i >= 0
+  }
+
+  const fulfillmentInProduction = reached('in_production')
+  const shipped = reached('shipped')
   const delivered = order.fulfillmentStatus === 'delivered'
+  const readyToPickup = reached('ready_to_pickup')
+  const confirmed = reached('confirmado')
 
   const productionActive = !!(production && production.hasProduction && production.overall && production.overall.status !== 'completed')
   const productionCompleted = !!(production && production.hasProduction && production.overall && production.overall.status === 'completed')
 
-  // Não regredir etapas: produção considerada "feita" quando webhook avançou OU quando produção operacional completou.
   const inProduction = fulfillmentInProduction || productionActive || productionCompleted
   const readyOrShipped = shipped || (productionCompleted && !shipped)
 
   if (cancelled) return [{ label: 'Pedido cancelado', detail: undefined, done: true }]
   if (refunded) return [{ label: 'Pedido reembolsado', detail: undefined, done: true }]
 
-  const productionLabel = productionCompleted && !shipped ? 'Pronto para envio' : 'Em produção'
+  const productionLabel = productionCompleted && !shipped ? 'Pronto' : 'Em produção'
   let productionDetail: string | undefined
-  if (productionCompleted && !shipped) {
-    productionDetail = 'Itens prontos, aguardando envio'
+  if (productionCompleted && !shipped && !readyToPickup) {
+    productionDetail = isPickup ? 'Itens prontos, aguardando retirada' : 'Itens prontos, aguardando envio'
   } else if (productionActive && production?.overall) {
     productionDetail = `${production.overall.label} · ${production.overall.progressPercent}%`
   } else if (!inProduction) {
-    productionDetail = 'Inicia após pagamento'
+    productionDetail = 'Inicia após confirmação do pedido'
   }
 
-  return [
+  const baseSteps = [
     { label: 'Pedido recebido', detail: formatDate(order.createdAt), done: true },
+    { label: 'Pedido confirmado', detail: confirmed ? undefined : 'Em análise pela equipe', done: confirmed },
     { label: 'Pagamento confirmado', detail: paid ? undefined : 'Aguardando confirmação', done: paid },
     { label: productionLabel, detail: productionDetail, done: inProduction || readyOrShipped },
+  ]
+
+  // Etapas finais: divergem por modalidade.
+  if (isPickup) {
+    return [
+      ...baseSteps,
+      { label: 'Pronto para retirada', detail: readyToPickup ? 'Combine a retirada com a gente' : undefined, done: readyToPickup },
+      { label: 'Entregue', detail: undefined, done: delivered },
+    ]
+  }
+  return [
+    ...baseSteps,
     { label: 'Enviado', detail: shipped ? (order.trackingCode || undefined) : undefined, done: shipped },
     { label: 'Entregue', detail: undefined, done: delivered },
   ]
