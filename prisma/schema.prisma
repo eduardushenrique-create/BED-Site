@@ -203,6 +203,10 @@ model Order {
   expectedDeliveryAt DateTime?
   productionTimeline Json?
   currentStageNote   String?
+  // Pipeline-redesign: distingue ready_to_ship (envio por correio/transportadora)
+  // de ready_to_pickup (cliente busca presencialmente). Default 'shipping' eh
+  // seguro pra historico — pedidos antigos seguiam fluxo de envio.
+  deliveryMethod     String    @default("shipping") // 'shipping' | 'pickup'
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)

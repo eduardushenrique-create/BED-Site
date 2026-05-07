@@ -562,7 +562,7 @@ export default function AdminOrdersPage() {
     total: orders.length,
     pending: orders.filter(o => o.paymentStatus === 'pending').length,
     paid: orders.filter(o => o.paymentStatus === 'paid').length,
-    aguardandoProducao: orders.filter(o => o.fulfillmentStatus === 'aguardando_producao').length,
+    aguardandoProducao: orders.filter(o => o.fulfillmentStatus === 'na_fila').length,
     production: orders.filter(o => o.fulfillmentStatus === 'in_production' || o.fulfillmentStatus === 'production').length,
     readyToShip: orders.filter(o => o.fulfillmentStatus === 'ready_to_ship').length,
     shipped: orders.filter(o => o.fulfillmentStatus === 'shipped').length,

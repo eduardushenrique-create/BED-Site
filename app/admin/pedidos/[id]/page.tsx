@@ -11,10 +11,12 @@ import {
   PAYMENT_STATUSES,
   getFulfillmentInfo,
   getNextStage,
+  getOrderType,
   getPreviousStage,
   canAdvance,
   canRegress,
   listTimelineEntries,
+  type DeliveryMethod,
   type ProductionTimeline,
 } from '@/lib/order-statuses'
 
@@ -692,10 +694,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     )
   }
 
-  const nextStage = getNextStage(order.fulfillmentStatus)
-  const previousStage = getPreviousStage(order.fulfillmentStatus)
-  const advanceEnabled = canAdvance(order.fulfillmentStatus) && !isCancelled
-  const regressEnabled = canRegress(order.fulfillmentStatus) && !isCancelled
+  // Pipeline aplicavel depende do tipo de pedido e metodo de entrega; passar
+  // ao helper para que Avancar/Voltar levem para a fase correta de cada fluxo.
+  const stageOptions = {
+    type: getOrderType(order.items as Parameters<typeof getOrderType>[0]),
+    deliveryMethod: ((order as unknown as { deliveryMethod?: string | null })
+      .deliveryMethod || 'shipping') as DeliveryMethod,
+  }
+
+  const nextStage = getNextStage(order.fulfillmentStatus, stageOptions)
+  const previousStage = getPreviousStage(order.fulfillmentStatus, stageOptions)
+  const advanceEnabled = canAdvance(order.fulfillmentStatus, stageOptions) && !isCancelled
+  const regressEnabled = canRegress(order.fulfillmentStatus, stageOptions) && !isCancelled
   const nextStageInfo = nextStage ? getFulfillmentInfo(nextStage) : null
   const previousStageInfo = previousStage ? getFulfillmentInfo(previousStage) : null
   const timelineEntries = listTimelineEntries(order.productionTimeline)
