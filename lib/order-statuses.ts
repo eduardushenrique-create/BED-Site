@@ -210,12 +210,18 @@ export function getOrderType(items: OrderItemForType[] | null | undefined): Orde
 interface StageNavOptions {
   type?: OrderType | null
   deliveryMethod?: DeliveryMethod | null
+  // paymentStatus permite que `confirmado` pule `aguardando_pagamento` quando
+  // o pedido ja foi pago. Sem ele, `confirmado` sempre cai em
+  // `aguardando_pagamento` (default conservador: admin tem que avancar mais
+  // uma vez se o pagamento ja chegou).
+  paymentStatus?: PaymentStatus | string | null
 }
 
 /**
  * Proximo estagio segundo o pipeline aplicavel.
  *
  * Casos especiais:
+ * - confirmado: pula `aguardando_pagamento` se paymentStatus='paid'.
  * - in_production (pipeline sob_encomenda) -> ready_to_pickup se delivery=pickup,
  *                                              senao ready_to_ship.
  * - aguardando_pagamento (pipeline pronta_entrega) -> ready_to_pickup se
@@ -232,9 +238,18 @@ export function getNextStage(
 
   const type = options?.type ?? 'sob_encomenda'
   const delivery = options?.deliveryMethod ?? 'shipping'
+  const paymentPaid = options?.paymentStatus === 'paid'
 
   // Branches especiais antes do pipeline linear.
   if (current === 'ready_to_pickup') return 'delivered'
+
+  // confirmado: se ja pago, pula aguardando_pagamento e vai direto pra fila/envio.
+  if (current === 'confirmado' && paymentPaid) {
+    if (type === 'pronta_entrega') {
+      return delivery === 'pickup' ? 'ready_to_pickup' : 'ready_to_ship'
+    }
+    return 'na_fila'
+  }
 
   // Pipeline sob_encomenda: depois de in_production decide envio vs retirada.
   if (type === 'sob_encomenda' && current === 'in_production') {
@@ -298,6 +313,31 @@ export function canRegress(
   options?: StageNavOptions,
 ): boolean {
   return getPreviousStage(current, options) !== null
+}
+
+/**
+ * Auto-transicao quando o pagamento eh confirmado: se o pedido estava em
+ * `aguardando_pagamento`, avanca para a proxima fase do pipeline (sob encomenda
+ * vai para `na_fila`, pronta entrega vai para `ready_to_ship` ou
+ * `ready_to_pickup` conforme delivery).
+ *
+ * Em qualquer outra fase (pending, confirmado, na_fila, in_production etc),
+ * a confirmacao de pagamento NAO mexe no fulfillment — admin avanca
+ * manualmente. Essa eh a checagem de seguranca que o stakeholder pediu
+ * (pedido site com pagamento aprovado nao pula a validacao do admin).
+ *
+ * Retorna o novo fulfillmentStatus ou null (nao auto-transitar).
+ */
+export function autoTransitionOnPayment(
+  currentFulfillmentStatus: string | null | undefined,
+  options: { type: OrderType; deliveryMethod: DeliveryMethod },
+): FulfillmentStatus | null {
+  if (currentFulfillmentStatus !== 'aguardando_pagamento') return null
+
+  if (options.type === 'pronta_entrega') {
+    return options.deliveryMethod === 'pickup' ? 'ready_to_pickup' : 'ready_to_ship'
+  }
+  return 'na_fila'
 }
 
 // ---------------------------------------------------------------------------

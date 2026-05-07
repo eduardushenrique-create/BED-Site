@@ -51,7 +51,11 @@ import {
   fireOrderShortageAlertInBackground,
 } from '@/lib/stock-alerts'
 import {
+  autoTransitionOnPayment,
+  getOrderType,
   withTimelineStamp,
+  type DeliveryMethod,
+  type FulfillmentStatus,
   type ProductionTimeline,
 } from '@/lib/order-statuses'
 
@@ -1658,21 +1662,34 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
     if (index === -1) return null
 
     const previous = db.orders[index]
-    const localAutoTransition =
+    // Pipeline-redesign: auto-transicao SO acontece quando o pagamento eh
+    // confirmado E o pedido estava em `aguardando_pagamento`. Em `pending`,
+    // o admin tem que validar manualmente (resposta 2 do stakeholder:
+    // checagem de seguranca antes de avancar).
+    let localPatch: Partial<Order> = {}
+    if (
       data.paymentStatus === 'paid' &&
       !data.fulfillmentStatus &&
       previous.paymentStatus !== 'paid' &&
-      previous.fulfillmentStatus === 'pending'
-
-    const localPatch: Partial<Order> = localAutoTransition
-      ? {
-          fulfillmentStatus: 'na_fila',
+      previous.fulfillmentStatus === 'aguardando_pagamento'
+    ) {
+      const orderType = getOrderType((previous.items || []) as Parameters<typeof getOrderType>[0])
+      const delivery = ((previous as unknown as { deliveryMethod?: string | null })
+        .deliveryMethod || 'shipping') as DeliveryMethod
+      const next = autoTransitionOnPayment(previous.fulfillmentStatus, {
+        type: orderType,
+        deliveryMethod: delivery,
+      })
+      if (next) {
+        localPatch = {
+          fulfillmentStatus: next,
           productionTimeline: withTimelineStamp(
             previous.productionTimeline as ProductionTimeline | null | undefined,
-            'na_fila',
+            next,
           ),
         }
-      : {}
+      }
+    }
 
     db.orders[index] = { ...previous, ...data, ...localPatch }
     writeDB(db)
@@ -1706,6 +1723,9 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
         ? { currentStageNote: data.currentStageNote ?? null }
         : {}
 
+    // Pipeline-redesign: auto-transicao SO acontece quando o pagamento eh
+    // confirmado E o pedido estava em `aguardando_pagamento`. Em `pending`,
+    // o admin tem que validar manualmente (resposta 2 do stakeholder).
     let autoTransitionPatch: Pick<Prisma.OrderUpdateInput, 'fulfillmentStatus' | 'productionTimeline'> | Record<string, never> = {}
     if (
       data.paymentStatus === 'paid' &&
@@ -1714,17 +1734,35 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
     ) {
       const previous = await prisma.order.findUnique({
         where: { id },
-        select: { paymentStatus: true, fulfillmentStatus: true, productionTimeline: true },
+        select: {
+          paymentStatus: true,
+          fulfillmentStatus: true,
+          productionTimeline: true,
+          deliveryMethod: true,
+          items: { include: { product: { select: { underOrder: true, isPersonalizable: true } } } },
+        },
       })
 
-      if (previous && previous.paymentStatus !== 'paid' && previous.fulfillmentStatus === 'pending') {
-        const nextTimeline = withTimelineStamp(
-          previous.productionTimeline as ProductionTimeline | null | undefined,
-          'na_fila',
-        )
-        autoTransitionPatch = {
-          fulfillmentStatus: 'na_fila',
-          productionTimeline: nextTimeline as Prisma.InputJsonValue,
+      if (
+        previous &&
+        previous.paymentStatus !== 'paid' &&
+        previous.fulfillmentStatus === 'aguardando_pagamento'
+      ) {
+        const orderType = getOrderType(previous.items as Parameters<typeof getOrderType>[0])
+        const delivery = (previous.deliveryMethod || 'shipping') as DeliveryMethod
+        const next = autoTransitionOnPayment(previous.fulfillmentStatus, {
+          type: orderType,
+          deliveryMethod: delivery,
+        })
+        if (next) {
+          const nextTimeline = withTimelineStamp(
+            previous.productionTimeline as ProductionTimeline | null | undefined,
+            next,
+          )
+          autoTransitionPatch = {
+            fulfillmentStatus: next,
+            productionTimeline: nextTimeline as Prisma.InputJsonValue,
+          }
         }
       }
     }
@@ -1797,13 +1835,27 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
     if (index === -1) return null
 
     const previous = db.orders[index]
-    const autoTransition =
+    // Pipeline-redesign: auto-transita apenas se pagamento foi confirmado E
+    // pedido estava em `aguardando_pagamento`. Em outras fases (pending,
+    // confirmado, na_fila etc), confirmacao de pagamento NAO mexe no
+    // fulfillment — admin avanca manualmente.
+    let autoNext: FulfillmentStatus | null = null
+    if (
       data.paymentStatus === 'paid' &&
       previous.paymentStatus !== 'paid' &&
-      previous.fulfillmentStatus === 'pending'
+      previous.fulfillmentStatus === 'aguardando_pagamento'
+    ) {
+      const orderType = getOrderType((previous.items || []) as Parameters<typeof getOrderType>[0])
+      const delivery = ((previous as unknown as { deliveryMethod?: string | null })
+        .deliveryMethod || 'shipping') as DeliveryMethod
+      autoNext = autoTransitionOnPayment(previous.fulfillmentStatus, {
+        type: orderType,
+        deliveryMethod: delivery,
+      })
+    }
 
-    const nextTimeline = autoTransition
-      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'na_fila')
+    const nextTimeline = autoNext
+      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, autoNext)
       : previous.productionTimeline
 
     db.orders[index] = {
@@ -1811,7 +1863,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       paymentStatus: data.paymentStatus,
       status: data.status,
       paymentMethod: data.method,
-      ...(autoTransition ? { fulfillmentStatus: 'na_fila' } : {}),
+      ...(autoNext ? { fulfillmentStatus: autoNext } : {}),
       productionTimeline: nextTimeline ?? null,
       paymentDetails: {
         provider: data.provider,
@@ -1832,17 +1884,34 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
   try {
     const previous = await prisma.order.findUnique({
       where: { orderNumber },
-      select: { paymentStatus: true, fulfillmentStatus: true, productionTimeline: true },
+      select: {
+        paymentStatus: true,
+        fulfillmentStatus: true,
+        productionTimeline: true,
+        deliveryMethod: true,
+        items: { include: { product: { select: { underOrder: true, isPersonalizable: true } } } },
+      },
     })
 
-    const autoTransition =
+    // Pipeline-redesign: auto-transita apenas se pagamento foi confirmado E
+    // pedido estava em `aguardando_pagamento`.
+    let autoNext: FulfillmentStatus | null = null
+    if (
       previous &&
       data.paymentStatus === 'paid' &&
       previous.paymentStatus !== 'paid' &&
-      previous.fulfillmentStatus === 'pending'
+      previous.fulfillmentStatus === 'aguardando_pagamento'
+    ) {
+      const orderType = getOrderType(previous.items as Parameters<typeof getOrderType>[0])
+      const delivery = (previous.deliveryMethod || 'shipping') as DeliveryMethod
+      autoNext = autoTransitionOnPayment(previous.fulfillmentStatus, {
+        type: orderType,
+        deliveryMethod: delivery,
+      })
+    }
 
-    const nextTimeline = autoTransition
-      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'na_fila')
+    const nextTimeline = autoNext
+      ? withTimelineStamp(previous?.productionTimeline as ProductionTimeline | null | undefined, autoNext)
       : null
 
     const order = await prisma.order.update({
@@ -1850,9 +1919,9 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       data: {
         status: data.status,
         paymentStatus: data.paymentStatus,
-        ...(autoTransition && nextTimeline
+        ...(autoNext && nextTimeline
           ? {
-              fulfillmentStatus: 'na_fila',
+              fulfillmentStatus: autoNext,
               productionTimeline: nextTimeline as Prisma.InputJsonValue,
             }
           : {}),
