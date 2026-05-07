@@ -12,6 +12,7 @@ import {
   FULFILLMENT_STATUSES,
   PAYMENT_STATUSES,
 } from '@/lib/order-statuses'
+import { triggerProductionTasksOnStatusChange } from '@/lib/order-production-bridge'
 
 export const dynamic = 'force-dynamic'
 
@@ -168,6 +169,25 @@ export async function POST(request: NextRequest) {
           continue
         }
         succeeded += 1
+
+        // Mesma garantia do PUT individual (app/api/pedidos/route.ts): se a
+        // operacao em massa moveu o pedido para uma fase de producao, gera
+        // as ProductionTask. Idempotente, nao bloqueia a transicao em caso
+        // de falha (bridge captura excecoes internamente).
+        if (
+          payload?.fulfillmentStatus &&
+          before.fulfillmentStatus !== updated.fulfillmentStatus
+        ) {
+          await triggerProductionTasksOnStatusChange(
+            {
+              id: updated.id,
+              fulfillmentStatus: updated.fulfillmentStatus,
+              status: updated.status,
+              orderNumber: updated.orderNumber,
+            },
+            before.fulfillmentStatus,
+          ).catch(() => {})
+        }
 
         const fields: string[] = []
         if (before.paymentStatus !== updated.paymentStatus) fields.push(`pagamento ${before.paymentStatus}->${updated.paymentStatus}`)
