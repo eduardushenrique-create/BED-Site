@@ -229,8 +229,8 @@ function toLocalDateTimeInput(iso: string | null | undefined): string {
 const PRODUCTION_WARNINGS: Record<string, string> = {
   no_eligible_items:
     'Pedido movido, mas nenhum item possui marcação de produção (sob encomenda ou personalizável). Revise os produtos para que apareçam na tabela de produção.',
-  order_not_paid:
-    'Pedido movido, mas como o pagamento ainda não foi confirmado, as tarefas de produção não foram criadas. Confirme o pagamento para liberar a impressão.',
+  not_in_production_phase:
+    'Pedido movido, mas ainda não está em uma fase produtiva (Liberado para produção / Em produção). As tarefas serão criadas quando avançar.',
   already_exists:
     'Tarefas de produção já existiam para este pedido — nada novo foi criado.',
   error:
@@ -240,6 +240,7 @@ const PRODUCTION_WARNINGS: Record<string, string> = {
 type ProductionTriggerSummary = {
   tasksCreated?: number
   warning?: string
+  unpaid?: boolean
   error?: boolean
 } | null | undefined
 
@@ -254,7 +255,11 @@ function announceProductionTrigger(trigger: ProductionTriggerSummary) {
     return
   }
   if (typeof trigger.tasksCreated === 'number' && trigger.tasksCreated > 0) {
-    alert(`Pedido movido. ${trigger.tasksCreated} tarefa(s) de produção criada(s).`)
+    const created = trigger.tasksCreated
+    const unpaidNote = trigger.unpaid
+      ? '\n\nAtenção: o pagamento deste pedido ainda não foi confirmado. As tarefas foram criadas mesmo assim (pagamento na entrega/retirada).'
+      : ''
+    alert(`Pedido movido. ${created} tarefa(s) de produção criada(s).${unpaidNote}`)
   }
 }
 

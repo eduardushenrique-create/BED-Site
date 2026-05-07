@@ -2863,7 +2863,20 @@ function computeQuantityAndStatus(
 export interface EnsureProductionResult {
   created: number
   skipped?: string
+  // unpaid=true: criou tasks mesmo com paymentStatus != 'paid'. Cenario valido
+  // (pagamento na entrega/retirada combinado com cliente, pedido manual feito
+  // pelo admin antes do pagamento, etc) — UI deve apenas avisar o admin, nao
+  // bloquear.
+  unpaid?: boolean
 }
+
+// Tasks de producao so existem a partir das fases produtivas. Antes disso o
+// admin ainda esta confirmando, montando arte etc. — criar task agora seria
+// ruido na fila do operador.
+const PRODUCTION_PHASES = new Set<string>([
+  'liberado_producao',
+  'in_production',
+])
 
 export async function ensureProductionTasksForOrder(
   orderId: string
@@ -2874,7 +2887,12 @@ export async function ensureProductionTasksForOrder(
     const db = readDB()
     const order = db.orders.find((o) => o.id === orderId)
     if (!order) return { created: 0, skipped: 'order_not_found' }
-    if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+    // Gate por fase produtiva, NAO por pagamento. Pagamento eh sinalizado via
+    // `unpaid` no resultado para que a UI avise sem bloquear (e-commerce
+    // aceita pagamento na entrega/retirada).
+    if (!PRODUCTION_PHASES.has(order.fulfillmentStatus)) {
+      return { created: 0, skipped: 'not_in_production_phase' }
+    }
 
     const items = (order.items as any[]) || []
     let created = 0
@@ -2911,12 +2929,7 @@ export async function ensureProductionTasksForOrder(
       created += 1
     }
     if (created > 0) writeDB(db)
-    // Sinaliza ao caller (UI/audit) o motivo de zero criacoes:
-    // - no_eligible_items: pedido tem items, mas nenhum eh produzivel
-    //   (ie: nenhum produto tem underOrder=true ou isPersonalizable=true).
-    //   Provavel config esquecida no produto — admin precisa revisar.
-    // - already_exists: tasks ja foram criadas em uma chamada anterior
-    //   (idempotencia funcionando — nao eh um problema).
+    const unpaid = order.paymentStatus !== 'paid' && created > 0 ? { unpaid: true } : {}
     if (created === 0) {
       if (items.length > 0 && eligibleCount === 0) {
         return { created: 0, skipped: 'no_eligible_items' }
@@ -2925,7 +2938,7 @@ export async function ensureProductionTasksForOrder(
         return { created: 0, skipped: 'already_exists' }
       }
     }
-    return { created }
+    return { created, ...unpaid }
   }
 
   try {
@@ -2934,7 +2947,9 @@ export async function ensureProductionTasksForOrder(
       include: { items: { include: { product: true } } },
     })
     if (!order) return { created: 0, skipped: 'order_not_found' }
-    if (order.paymentStatus !== 'paid') return { created: 0, skipped: 'order_not_paid' }
+    if (!PRODUCTION_PHASES.has(order.fulfillmentStatus)) {
+      return { created: 0, skipped: 'not_in_production_phase' }
+    }
 
     let created = 0
     let eligibleCount = 0
@@ -2987,6 +3002,7 @@ export async function ensureProductionTasksForOrder(
       }
     }
 
+    const unpaid = order.paymentStatus !== 'paid' && created > 0 ? { unpaid: true } : {}
     if (created === 0) {
       if (order.items.length > 0 && eligibleCount === 0) {
         return { created: 0, skipped: 'no_eligible_items' }
@@ -2995,7 +3011,7 @@ export async function ensureProductionTasksForOrder(
         return { created: 0, skipped: 'already_exists' }
       }
     }
-    return { created }
+    return { created, ...unpaid }
   } catch (error) {
     reportDbError('ensureProductionTasksForOrder Prisma failed', error)
     return { created: 0, skipped: 'error' }
@@ -3024,16 +3040,13 @@ export interface SyncProductionResult {
   ordersScanned: number
 }
 
-// Sync varre todas as fases pos-pagamento ate (inclusive) in_production. Antes
-// pegava apenas {pending, in_production}, deixando pedidos parados em
-// aguardando_producao, em_revisao, arte_em_montagem ou liberado_producao
-// orfaos. Apos in_production o pedido vai pra ready_to_ship/shipped, ja
-// produzido — nao precisa de task; assim mantemos o set fechado.
+// Sync varre apenas as fases produtivas: a tarefa de producao so faz sentido
+// quando o admin marcou o pedido como liberado/em producao. Pedidos em fases
+// anteriores (pending, aguardando_producao, em_revisao, arte_em_montagem)
+// ainda estao em pre-producao e nao precisam aparecer no painel do operador.
+// Pedidos em fases posteriores (ready_to_ship, shipped, delivered) ja foram
+// produzidos. Pagamento NAO eh requisito (cabe pagamento na entrega/retirada).
 const SYNC_FULFILLMENT_STATUSES = new Set<string>([
-  'pending',
-  'aguardando_producao',
-  'em_revisao',
-  'arte_em_montagem',
   'liberado_producao',
   'in_production',
 ])
@@ -3047,10 +3060,8 @@ export async function syncProductionTasksForPaidOrders(input?: {
     const db = readDB()
     const candidates = orderNumber
       ? db.orders.filter((o) => o.orderNumber === orderNumber)
-      : db.orders.filter(
-          (o) =>
-            o.paymentStatus === 'paid' &&
-            SYNC_FULFILLMENT_STATUSES.has(o.fulfillmentStatus)
+      : db.orders.filter((o) =>
+          SYNC_FULFILLMENT_STATUSES.has(o.fulfillmentStatus)
         )
 
     let created = 0
@@ -3077,7 +3088,6 @@ export async function syncProductionTasksForPaidOrders(input?: {
     } else {
       candidates = await prisma.order.findMany({
         where: {
-          paymentStatus: 'paid',
           fulfillmentStatus: { in: Array.from(SYNC_FULFILLMENT_STATUSES) },
         },
         select: { id: true },
