@@ -2988,6 +2988,20 @@ export interface SyncProductionResult {
   ordersScanned: number
 }
 
+// Sync varre todas as fases pos-pagamento ate (inclusive) in_production. Antes
+// pegava apenas {pending, in_production}, deixando pedidos parados em
+// aguardando_producao, em_revisao, arte_em_montagem ou liberado_producao
+// orfaos. Apos in_production o pedido vai pra ready_to_ship/shipped, ja
+// produzido — nao precisa de task; assim mantemos o set fechado.
+const SYNC_FULFILLMENT_STATUSES = new Set<string>([
+  'pending',
+  'aguardando_producao',
+  'em_revisao',
+  'arte_em_montagem',
+  'liberado_producao',
+  'in_production',
+])
+
 export async function syncProductionTasksForPaidOrders(input?: {
   orderNumber?: string
 }): Promise<SyncProductionResult> {
@@ -2999,8 +3013,8 @@ export async function syncProductionTasksForPaidOrders(input?: {
       ? db.orders.filter((o) => o.orderNumber === orderNumber)
       : db.orders.filter(
           (o) =>
-            o.status === 'paid' &&
-            (o.fulfillmentStatus === 'pending' || o.fulfillmentStatus === 'in_production')
+            o.paymentStatus === 'paid' &&
+            SYNC_FULFILLMENT_STATUSES.has(o.fulfillmentStatus)
         )
 
     let created = 0
@@ -3027,8 +3041,8 @@ export async function syncProductionTasksForPaidOrders(input?: {
     } else {
       candidates = await prisma.order.findMany({
         where: {
-          status: 'paid',
-          fulfillmentStatus: { in: ['pending', 'in_production'] },
+          paymentStatus: 'paid',
+          fulfillmentStatus: { in: Array.from(SYNC_FULFILLMENT_STATUSES) },
         },
         select: { id: true },
       })
