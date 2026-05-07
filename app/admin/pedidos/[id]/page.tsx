@@ -221,6 +221,43 @@ function toLocalDateTimeInput(iso: string | null | undefined): string {
   }
 }
 
+// Mensagens consumidas a partir de response.production.warning vindo do
+// PUT /api/pedidos. O backend (ensureProductionTasksForOrder) sinaliza
+// quando a transicao para fase de producao nao gerou tasks novas, e por
+// que. Sem esse alerta, o admin avanca o pedido e depois nao entende por
+// que a tabela /admin/producao continua vazia.
+const PRODUCTION_WARNINGS: Record<string, string> = {
+  no_eligible_items:
+    'Pedido movido, mas nenhum item possui marcação de produção (sob encomenda ou personalizável). Revise os produtos para que apareçam na tabela de produção.',
+  order_not_paid:
+    'Pedido movido, mas como o pagamento ainda não foi confirmado, as tarefas de produção não foram criadas. Confirme o pagamento para liberar a impressão.',
+  already_exists:
+    'Tarefas de produção já existiam para este pedido — nada novo foi criado.',
+  error:
+    'Pedido movido, mas falhou ao gerar as tarefas de produção. Tente o botão "Sincronizar" no painel de produção.',
+}
+
+type ProductionTriggerSummary = {
+  tasksCreated?: number
+  warning?: string
+  error?: boolean
+} | null | undefined
+
+function announceProductionTrigger(trigger: ProductionTriggerSummary) {
+  if (!trigger) return
+  if (trigger.error) {
+    alert(PRODUCTION_WARNINGS.error)
+    return
+  }
+  if (trigger.warning && PRODUCTION_WARNINGS[trigger.warning]) {
+    alert(PRODUCTION_WARNINGS[trigger.warning])
+    return
+  }
+  if (typeof trigger.tasksCreated === 'number' && trigger.tasksCreated > 0) {
+    alert(`Pedido movido. ${trigger.tasksCreated} tarefa(s) de produção criada(s).`)
+  }
+}
+
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -340,7 +377,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         ? new Date(formData.expectedDeliveryAt).toISOString()
         : null
 
-      await fetch('/api/pedidos', {
+      const res = await fetch('/api/pedidos', {
         method: 'PUT',
         body: JSON.stringify({
           id: order.id,
@@ -350,7 +387,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           expectedDeliveryAt: expectedIso,
         }),
       })
-      alert('Pedido atualizado!')
+      const updated = res.ok ? await res.json().catch(() => null) : null
+      if (updated?.production) {
+        announceProductionTrigger(updated.production)
+      } else {
+        alert('Pedido atualizado!')
+      }
       loadOrder()
     } catch (e) {
       console.error('Error saving order:', e)
@@ -377,6 +419,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         alert(err?.error || 'Não foi possível avançar a fase')
         return
       }
+      const updated = await res.json().catch(() => null)
+      announceProductionTrigger(updated?.production)
       setShowAdvanceModal(false)
       setAdvanceNote('')
       loadOrder()
