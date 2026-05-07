@@ -13,9 +13,11 @@ const log = createLogger({ component: 'order-production-bridge' })
  *   fase de produção, ou já estava em uma). Resposta inerte por design.
  * - `triggered=true`: tentamos criar tasks. `created` indica quantas foram
  *   efetivamente criadas (0 também é válido — pode ter sido idempotente). Se
- *   houver `skipped`, traz o motivo (ex: `order_not_paid`, `order_not_found`,
- *   `no_eligible_items`). `error=true` indica falha inesperada (já reportada
- *   ao Sentry); o caller deve seguir com a transição normalmente.
+ *   houver `skipped`, traz o motivo (`already_exists`, `no_eligible_items`,
+ *   `not_in_production_phase`, `order_not_found`). `unpaid=true` sinaliza
+ *   que tasks foram criadas mesmo com pagamento pendente — caller deve
+ *   avisar (mas não bloquear). `error=true` indica falha inesperada (já
+ *   reportada ao Sentry); o caller deve seguir com a transição normalmente.
  */
 export type TriggerProductionResult =
   | { triggered: false }
@@ -23,6 +25,7 @@ export type TriggerProductionResult =
       triggered: true
       created: number
       skipped?: string
+      unpaid?: boolean
       error?: boolean
     }
 
@@ -57,9 +60,9 @@ const PRODUCTION_TRIGGER_STATUSES = new Set<string>([
  * Casos de borda:
  * - `previousStatus` já era uma fase de produção: nada a fazer.
  * - `order.fulfillmentStatus` não é fase de produção: nada a fazer.
- * - Pedido sem `paymentStatus='paid'`: a função `ensureProductionTasksForOrder`
- *   vai retornar `skipped: 'order_not_paid'`. Propagamos esse motivo no
- *   resultado para que o caller exiba um warning. NÃO bloqueamos a transição.
+ * - Pedido sem `paymentStatus='paid'`: NÃO bloqueia. Tasks são criadas e o
+ *   resultado vem com `unpaid: true` para o caller avisar o admin
+ *   (pagamento na entrega/retirada eh fluxo legitimo).
  */
 export async function triggerProductionTasksOnStatusChange(
   order: OrderForBridge,
@@ -82,6 +85,7 @@ export async function triggerProductionTasksOnStatusChange(
         from: previousStatus || null,
         created: result.created,
         skipped: result.skipped || null,
+        unpaid: result.unpaid || false,
       },
       'production tasks ensured on fulfillmentStatus change (liberado_producao | in_production)',
     )
@@ -89,6 +93,7 @@ export async function triggerProductionTasksOnStatusChange(
       triggered: true,
       created: result.created,
       skipped: result.skipped,
+      unpaid: result.unpaid,
     }
   } catch (err) {
     captureException(err, {

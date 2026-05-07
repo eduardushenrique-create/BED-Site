@@ -33,10 +33,12 @@ function summarizeProductionTrigger(result: TriggerProductionResult) {
   }
   const responsePayload: Record<string, unknown> = { tasksCreated: result.created }
   if (result.skipped) responsePayload.warning = result.skipped
+  if (result.unpaid) responsePayload.unpaid = true
   if (result.error) responsePayload.error = true
 
   const auditMetadata: Record<string, unknown> = { created: result.created }
   if (result.skipped) auditMetadata.skipped = result.skipped
+  if (result.unpaid) auditMetadata.unpaid = true
   if (result.error) auditMetadata.error = true
 
   return { responsePayload, auditMetadata }

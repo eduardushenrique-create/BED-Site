@@ -308,7 +308,7 @@ export default function AdminProducaoPage() {
               opacity: syncing ? 0.7 : 1,
             }}
           >
-            {syncing ? 'Sincronizando...' : 'Sincronizar pedidos pagos'}
+            {syncing ? 'Sincronizando...' : 'Sincronizar pedidos em produção'}
           </button>
         </div>
       </header>
