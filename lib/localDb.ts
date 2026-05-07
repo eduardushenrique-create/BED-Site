@@ -37,6 +37,8 @@ export type Order = {
   customerEmail: string
   customerPhone: string
   customerCpf?: string
+  // Pipeline-redesign: pedido com retirada (deliveryMethod='pickup') nao
+  // precisa de endereco — pode vir null.
   shippingAddress: {
     street: string
     number: string
@@ -45,7 +47,8 @@ export type Order = {
     city: string
     state: string
     zipCode: string
-  }
+  } | null
+  deliveryMethod?: 'shipping' | 'pickup'
   total: number
   subtotal: number
   shippingCost: number

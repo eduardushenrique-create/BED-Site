@@ -61,6 +61,7 @@ type Order = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  // Pipeline-redesign: pedido com retirada nao tem endereco.
   shippingAddress: {
     street: string
     number: string
@@ -69,7 +70,8 @@ type Order = {
     city: string
     state: string
     zipCode: string
-  }
+  } | null
+  deliveryMethod?: 'shipping' | 'pickup' | null
   total: number
   subtotal: number
   shippingCost: number
@@ -507,7 +509,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const handlePrintLabel = () => {
     if (!order) return
-    const labelContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiqueta - ${order.orderNumber}</title></head><body style="font-family:Arial;padding:20px;max-width:400px"><div style="border:2px solid #333;padding:15px"><div style="border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:15px;display:flex;justify-content:space-between"><div style="font-size:18px;font-weight:bold;color:#D4849A">FORMA 3D</div><div style="font-size:12px;color:#666">${order.orderNumber}</div></div><div><h3 style="margin:0 0 8px 0;font-size:14px;text-transform:uppercase;color:#666">Destinatário</h3><div style="font-size:13px;line-height:1.4"><strong>${order.customerName}</strong><br>${order.shippingAddress.street}, ${order.shippingAddress.number}<br>${order.shippingAddress.complement || ''}<br>${order.shippingAddress.neighborhood}<br>${order.shippingAddress.city} - ${order.shippingAddress.state}<br>CEP: ${order.shippingAddress.zipCode}</div></div><div style="text-align:center;margin:15px 0;padding:10px;border:1px dashed #999;background:#f9f9f9"><strong>${order.trackingCode || 'SEM RASTREAMENTO'}</strong></div></div></body></html>`
+    if (!order.shippingAddress) {
+      alert('Pedido com retirada no local não tem endereço para etiqueta.')
+      return
+    }
+    const addr = order.shippingAddress
+    const labelContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiqueta - ${order.orderNumber}</title></head><body style="font-family:Arial;padding:20px;max-width:400px"><div style="border:2px solid #333;padding:15px"><div style="border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:15px;display:flex;justify-content:space-between"><div style="font-size:18px;font-weight:bold;color:#D4849A">FORMA 3D</div><div style="font-size:12px;color:#666">${order.orderNumber}</div></div><div><h3 style="margin:0 0 8px 0;font-size:14px;text-transform:uppercase;color:#666">Destinatário</h3><div style="font-size:13px;line-height:1.4"><strong>${order.customerName}</strong><br>${addr.street}, ${addr.number}<br>${addr.complement || ''}<br>${addr.neighborhood}<br>${addr.city} - ${addr.state}<br>CEP: ${addr.zipCode}</div></div><div style="text-align:center;margin:15px 0;padding:10px;border:1px dashed #999;background:#f9f9f9"><strong>${order.trackingCode || 'SEM RASTREAMENTO'}</strong></div></div></body></html>`
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(labelContent)
@@ -785,14 +792,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </Card>
 
-          <Card title="Endereço de Entrega">
-            <p style={{ lineHeight: 1.6 }}>
-              {order.shippingAddress.street}, {order.shippingAddress.number}<br />
-              {order.shippingAddress.complement && <>{order.shippingAddress.complement}<br /></>}
-              {order.shippingAddress.neighborhood}<br />
-              {order.shippingAddress.city} - {order.shippingAddress.state}<br />
-              CEP: {order.shippingAddress.zipCode}
-            </p>
+          <Card title={stageOptions.deliveryMethod === 'pickup' ? 'Retirada no local' : 'Endereço de Entrega'}>
+            {stageOptions.deliveryMethod === 'pickup' ? (
+              <div style={{ lineHeight: 1.6 }}>
+                <p style={{ margin: 0 }}>
+                  <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '999px', backgroundColor: '#DFF4EC', color: '#0E9F6E', fontWeight: 600, fontSize: '12px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Retirada
+                  </span>
+                </p>
+                <p style={{ marginTop: '12px', color: '#6B7494', fontSize: '13px' }}>
+                  Cliente busca o pedido no local. Sem endereço de entrega cadastrado.
+                </p>
+              </div>
+            ) : order.shippingAddress ? (
+              <p style={{ lineHeight: 1.6 }}>
+                {order.shippingAddress.street}, {order.shippingAddress.number}<br />
+                {order.shippingAddress.complement && <>{order.shippingAddress.complement}<br /></>}
+                {order.shippingAddress.neighborhood}<br />
+                {order.shippingAddress.city} - {order.shippingAddress.state}<br />
+                CEP: {order.shippingAddress.zipCode}
+              </p>
+            ) : (
+              <p style={{ color: '#6B7494', fontSize: '13px' }}>Endereço não informado.</p>
+            )}
           </Card>
 
           <Card title="Pagamento">

@@ -220,6 +220,13 @@ export default function AdminOrdersPage() {
     city: '',
     state: '',
     zipCode: '',
+    // Pipeline-redesign: novos campos da Fase 3.
+    deliveryMethod: 'shipping' as 'shipping' | 'pickup',
+    // 'paymentOnDelivery' nao eh um campo persistido — eh so um flag de UI
+    // para sinalizar que o pagamento sera combinado na entrega/retirada.
+    // Quando ligado, o admin nao precisa preencher dados de frete e o pedido
+    // nasce com paymentMethod='manual', paymentStatus='pending'.
+    paymentOnDelivery: false,
   })
 
   useEffect(() => {
@@ -685,12 +692,23 @@ export default function AdminOrdersPage() {
       return
     }
 
+    // Pipeline-redesign: quando admin marca "pagamento na entrega/retirada",
+    // o pedido nasce em 'aguardando_pagamento' (resposta 4 do stakeholder
+    // sobre criacao manual). Senao fica em 'pending' por default.
+    const initialFulfillment = newOrderForm.paymentOnDelivery
+      ? 'aguardando_pagamento'
+      : 'pending'
+
+    // Endereco fica vazio para retirada (nao precisa) — o cliente busca no
+    // local. Para envio segue exigindo os campos preenchidos.
+    const isPickup = newOrderForm.deliveryMethod === 'pickup'
+
     const orderData = {
       orderNumber: `BD-${Date.now().toString(36).toUpperCase()}`,
       customerName: newOrderForm.customerName,
       customerEmail: newOrderForm.customerEmail,
       customerPhone: newOrderForm.customerPhone,
-      shippingAddress: {
+      shippingAddress: isPickup ? null : {
         street: newOrderForm.street,
         number: newOrderForm.number,
         complement: newOrderForm.complement,
@@ -699,12 +717,13 @@ export default function AdminOrdersPage() {
         state: newOrderForm.state,
         zipCode: newOrderForm.zipCode,
       },
+      deliveryMethod: newOrderForm.deliveryMethod,
       total: orderSubtotal,
       subtotal: orderSubtotal,
       shippingCost: 0,
       status: 'pending',
       paymentStatus: 'pending',
-      fulfillmentStatus: 'pending',
+      fulfillmentStatus: initialFulfillment,
       paymentMethod: 'manual',
       createdAt: new Date().toISOString(),
       items: newOrderItems,
@@ -738,7 +757,7 @@ export default function AdminOrdersPage() {
 
       setShowAddModal(false)
       setSearchCustomer('')
-      setNewOrderForm({ customerName: '', customerEmail: '', customerPhone: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '' })
+      setNewOrderForm({ customerName: '', customerEmail: '', customerPhone: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '', deliveryMethod: 'shipping', paymentOnDelivery: false })
       setNewOrderItems([])
       loadOrders()
     } catch (e) {
@@ -1444,19 +1463,52 @@ export default function AdminOrdersPage() {
                   <Input label="Nome do cliente" value={newOrderForm.customerName} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })} required />
                   <Input label="E-mail" type="email" value={newOrderForm.customerEmail} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerEmail: e.target.value })} required />
                   <Input label="Telefone" value={newOrderForm.customerPhone} onChange={(e) => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })} required placeholder="(11) 99999-9999" />
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                    <Input label="CEP" value={newOrderForm.zipCode} onChange={(e) => setNewOrderForm({ ...newOrderForm, zipCode: e.target.value })} required placeholder="00000-000" style={{ flex: 1 }} />
-                    <button onClick={handleViaCep} disabled={cepLoading} style={{ padding: '11px 14px', backgroundColor: '#1D2235', color: 'white', border: 'none', borderRadius: '6px', cursor: cepLoading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px' }}>
-                      {cepLoading ? '...' : 'Buscar'}
-                    </button>
-                  </div>
-                  <Input label="Rua" value={newOrderForm.street} onChange={(e) => setNewOrderForm({ ...newOrderForm, street: e.target.value })} required style={{ gridColumn: '1 / -1' }} />
-                  <Input label="Número" value={newOrderForm.number} onChange={(e) => setNewOrderForm({ ...newOrderForm, number: e.target.value })} required />
-                  <Input label="Complemento" value={newOrderForm.complement} onChange={(e) => setNewOrderForm({ ...newOrderForm, complement: e.target.value })} />
-                  <Input label="Bairro" value={newOrderForm.neighborhood} onChange={(e) => setNewOrderForm({ ...newOrderForm, neighborhood: e.target.value })} required />
-                  <Input label="Cidade" value={newOrderForm.city} onChange={(e) => setNewOrderForm({ ...newOrderForm, city: e.target.value })} required />
-                  <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
                 </div>
+
+                {/* Método de entrega: define se cliente recebe ou retira no local. */}
+                <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '10px', backgroundColor: '#F5F8FD', border: '1px solid #E3E9F4' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6B7494', marginBottom: '10px' }}>
+                    Método de entrega
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <label style={{ flex: 1, padding: '10px 14px', border: `2px solid ${newOrderForm.deliveryMethod === 'shipping' ? '#1D2235' : '#D8DCE8'}`, borderRadius: '8px', cursor: 'pointer', backgroundColor: newOrderForm.deliveryMethod === 'shipping' ? 'white' : 'transparent', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="radio" name="deliveryMethod" checked={newOrderForm.deliveryMethod === 'shipping'} onChange={() => setNewOrderForm({ ...newOrderForm, deliveryMethod: 'shipping' })} style={{ accentColor: '#1D2235' }} />
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#1D2235' }}>Envio</span>
+                    </label>
+                    <label style={{ flex: 1, padding: '10px 14px', border: `2px solid ${newOrderForm.deliveryMethod === 'pickup' ? '#1D2235' : '#D8DCE8'}`, borderRadius: '8px', cursor: 'pointer', backgroundColor: newOrderForm.deliveryMethod === 'pickup' ? 'white' : 'transparent', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="radio" name="deliveryMethod" checked={newOrderForm.deliveryMethod === 'pickup'} onChange={() => setNewOrderForm({ ...newOrderForm, deliveryMethod: 'pickup' })} style={{ accentColor: '#1D2235' }} />
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#1D2235' }}>Retirada no local</span>
+                    </label>
+                  </div>
+
+                  <label style={{ marginTop: '12px', display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={newOrderForm.paymentOnDelivery} onChange={(e) => setNewOrderForm({ ...newOrderForm, paymentOnDelivery: e.target.checked })} style={{ marginTop: '3px', accentColor: '#1D2235' }} />
+                    <span style={{ fontSize: '13px', color: '#1D2235' }}>
+                      <strong>Pagamento combinado na {newOrderForm.deliveryMethod === 'pickup' ? 'retirada' : 'entrega'}</strong>
+                      <span style={{ display: 'block', color: '#6B7494', fontSize: '12px', marginTop: '2px' }}>
+                        Pedido nasce em &quot;Aguardando pagamento&quot;. Quando o pagamento for confirmado, transita automaticamente.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {/* Endereço: obrigatório só para envio. Retirada usa endereço da loja. */}
+                {newOrderForm.deliveryMethod === 'shipping' && (
+                  <div className="admin-order-form-grid" style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                      <Input label="CEP" value={newOrderForm.zipCode} onChange={(e) => setNewOrderForm({ ...newOrderForm, zipCode: e.target.value })} required placeholder="00000-000" style={{ flex: 1 }} />
+                      <button onClick={handleViaCep} disabled={cepLoading} style={{ padding: '11px 14px', backgroundColor: '#1D2235', color: 'white', border: 'none', borderRadius: '6px', cursor: cepLoading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                        {cepLoading ? '...' : 'Buscar'}
+                      </button>
+                    </div>
+                    <Input label="Rua" value={newOrderForm.street} onChange={(e) => setNewOrderForm({ ...newOrderForm, street: e.target.value })} required style={{ gridColumn: '1 / -1' }} />
+                    <Input label="Número" value={newOrderForm.number} onChange={(e) => setNewOrderForm({ ...newOrderForm, number: e.target.value })} required />
+                    <Input label="Complemento" value={newOrderForm.complement} onChange={(e) => setNewOrderForm({ ...newOrderForm, complement: e.target.value })} />
+                    <Input label="Bairro" value={newOrderForm.neighborhood} onChange={(e) => setNewOrderForm({ ...newOrderForm, neighborhood: e.target.value })} required />
+                    <Input label="Cidade" value={newOrderForm.city} onChange={(e) => setNewOrderForm({ ...newOrderForm, city: e.target.value })} required />
+                    <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
+                  </div>
+                )}
               </section>
             </div>
 
