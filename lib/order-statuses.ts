@@ -1,11 +1,21 @@
+// Pipeline redesign (Fase 1):
+// - Dois pipelines selecionados por tipo de pedido (`sob_encomenda` /
+//   `pronta_entrega`).
+// - getNextStage/getPreviousStage agora exigem o tipo do pedido.
+//   Sem `type` o pipeline retorna como se fosse 'sob_encomenda' (mais
+//   permissivo) — fallback para call-sites antigas.
+// - Branches finais (envio vs retirada) controlados por Order.deliveryMethod.
+
 export type FulfillmentStatus =
   | 'pending'
-  | 'aguardando_producao'
-  | 'em_revisao'
+  | 'confirmado'
+  | 'aguardando_pagamento'
+  | 'na_fila'
   | 'arte_em_montagem'
   | 'liberado_producao'
   | 'in_production'
   | 'ready_to_ship'
+  | 'ready_to_pickup'
   | 'shipped'
   | 'delivered'
   | 'cancelled'
@@ -18,10 +28,16 @@ export type PaymentStatus =
   | 'cancelled'
   | 'refunded'
 
+export type OrderType = 'sob_encomenda' | 'pronta_entrega'
+
+export type DeliveryMethod = 'shipping' | 'pickup'
+
 export type FulfillmentStatusInfo = {
   value: FulfillmentStatus
   label: string
   color: string
+  // pipelineOrder is informational. Use the per-pipeline arrays below for
+  // navigation (getNextStage / getPreviousStage), not this number.
   pipelineOrder: number | null
   timelineKey: string | null
 }
@@ -32,10 +48,24 @@ export type PaymentStatusInfo = {
   color: string
 }
 
-export const FULFILLMENT_PIPELINE: FulfillmentStatus[] = [
+// ---------------------------------------------------------------------------
+// Pipelines
+// ---------------------------------------------------------------------------
+
+// Pipeline 1: produtos sob encomenda ou personalizados.
+// pending -> confirmado -> aguardando_pagamento -> na_fila ->
+//   arte_em_montagem -> liberado_producao -> in_production ->
+//   {ready_to_ship -> shipped} | ready_to_pickup -> delivered
+//
+// O ramo final (shipped vs ready_to_pickup) eh decidido pelo Order.deliveryMethod
+// no momento de avancar a partir de in_production. listing abaixo eh do
+// fluxo "shipping" (mais comum); o helper getNextStage trata o ramo de
+// pickup explicitamente.
+export const PIPELINE_SOB_ENCOMENDA: FulfillmentStatus[] = [
   'pending',
-  'aguardando_producao',
-  'em_revisao',
+  'confirmado',
+  'aguardando_pagamento',
+  'na_fila',
   'arte_em_montagem',
   'liberado_producao',
   'in_production',
@@ -44,17 +74,39 @@ export const FULFILLMENT_PIPELINE: FulfillmentStatus[] = [
   'delivered',
 ]
 
+// Pipeline 2: produtos a pronta entrega (sem necessidade de producao).
+// pending -> confirmado -> aguardando_pagamento ->
+//   {ready_to_ship -> shipped} | ready_to_pickup -> delivered
+export const PIPELINE_PRONTA_ENTREGA: FulfillmentStatus[] = [
+  'pending',
+  'confirmado',
+  'aguardando_pagamento',
+  'ready_to_ship',
+  'shipped',
+  'delivered',
+]
+
+function getPipeline(type: OrderType | null | undefined): FulfillmentStatus[] {
+  return type === 'pronta_entrega' ? PIPELINE_PRONTA_ENTREGA : PIPELINE_SOB_ENCOMENDA
+}
+
+// Mantido para compat com callers antigos que iteram fases. Default = pipeline
+// sob encomenda (mais completo).
+export const FULFILLMENT_PIPELINE: FulfillmentStatus[] = PIPELINE_SOB_ENCOMENDA
+
 export const FULFILLMENT_STATUSES: FulfillmentStatusInfo[] = [
-  { value: 'pending',             label: 'Pendente',             color: '#F59E0B', pipelineOrder: 0, timelineKey: null },
-  { value: 'aguardando_producao', label: 'Aguardando produção',  color: '#94A3B8', pipelineOrder: 1, timelineKey: 'aguardando_producao_at' },
-  { value: 'em_revisao',          label: 'Em revisão',           color: '#A78BFA', pipelineOrder: 2, timelineKey: 'em_revisao_at' },
-  { value: 'arte_em_montagem',    label: 'Arte em montagem',     color: '#F472B6', pipelineOrder: 3, timelineKey: 'arte_montagem_at' },
-  { value: 'liberado_producao',   label: 'Liberado para produção', color: '#38BDF8', pipelineOrder: 4, timelineKey: 'liberado_producao_at' },
-  { value: 'in_production',       label: 'Em produção',          color: '#3B82F6', pipelineOrder: 5, timelineKey: 'in_production_at' },
-  { value: 'ready_to_ship',       label: 'Pronto para envio',    color: '#1D7A72', pipelineOrder: 6, timelineKey: 'ready_to_ship_at' },
-  { value: 'shipped',             label: 'Enviado',              color: '#8B5CF6', pipelineOrder: 7, timelineKey: 'shipped_at' },
-  { value: 'delivered',           label: 'Entregue',             color: '#10B981', pipelineOrder: 8, timelineKey: 'delivered_at' },
-  { value: 'cancelled',           label: 'Cancelado',            color: '#EF4444', pipelineOrder: null, timelineKey: null },
+  { value: 'pending',              label: 'Pendente',                color: '#F59E0B', pipelineOrder: 0,  timelineKey: null },
+  { value: 'confirmado',           label: 'Confirmado',              color: '#22D3EE', pipelineOrder: 1,  timelineKey: 'confirmado_at' },
+  { value: 'aguardando_pagamento', label: 'Aguardando pagamento',    color: '#FB923C', pipelineOrder: 2,  timelineKey: 'aguardando_pagamento_at' },
+  { value: 'na_fila',              label: 'Na fila',                 color: '#94A3B8', pipelineOrder: 3,  timelineKey: 'na_fila_at' },
+  { value: 'arte_em_montagem',     label: 'Arte em montagem',        color: '#F472B6', pipelineOrder: 4,  timelineKey: 'arte_montagem_at' },
+  { value: 'liberado_producao',    label: 'Liberado para produção',  color: '#38BDF8', pipelineOrder: 5,  timelineKey: 'liberado_producao_at' },
+  { value: 'in_production',        label: 'Em produção',             color: '#3B82F6', pipelineOrder: 6,  timelineKey: 'in_production_at' },
+  { value: 'ready_to_ship',        label: 'Pronto para envio',       color: '#1D7A72', pipelineOrder: 7,  timelineKey: 'ready_to_ship_at' },
+  { value: 'ready_to_pickup',      label: 'Pronto para retirada',    color: '#0E9F6E', pipelineOrder: 7,  timelineKey: 'ready_to_pickup_at' },
+  { value: 'shipped',              label: 'Enviado',                 color: '#8B5CF6', pipelineOrder: 8,  timelineKey: 'shipped_at' },
+  { value: 'delivered',            label: 'Entregue',                color: '#10B981', pipelineOrder: 9,  timelineKey: 'delivered_at' },
+  { value: 'cancelled',            label: 'Cancelado',               color: '#EF4444', pipelineOrder: null, timelineKey: null },
 ]
 
 export const PAYMENT_STATUSES: PaymentStatusInfo[] = [
@@ -68,11 +120,20 @@ export const PAYMENT_STATUSES: PaymentStatusInfo[] = [
 
 export const TERMINAL_FULFILLMENT_STATUSES: FulfillmentStatus[] = ['delivered', 'cancelled']
 
+// Quais transicoes notificam o cliente (template de e-mail dispara).
+// Os 3 novos sao templates novos da Fase 4 (confirmado, aguardando_pagamento,
+// ready_to_pickup).
 export const FULFILLMENT_STATUSES_NOTIFYING_CUSTOMER: FulfillmentStatus[] = [
+  'confirmado',
+  'aguardando_pagamento',
   'in_production',
+  'ready_to_pickup',
   'shipped',
   'delivered',
 ]
+
+// Fases produtivas: usadas pela bridge para criar ProductionTask.
+export const PRODUCTION_PHASES: FulfillmentStatus[] = ['liberado_producao', 'in_production']
 
 export function getFulfillmentInfo(status: string | null | undefined): FulfillmentStatusInfo | null {
   if (!status) return null
@@ -102,39 +163,156 @@ export function isTerminalStatus(status: string | null | undefined): boolean {
   return TERMINAL_FULFILLMENT_STATUSES.includes(status as FulfillmentStatus)
 }
 
-export function getNextStage(current: string | null | undefined): FulfillmentStatus | null {
-  if (!current) return null
-  if (current === 'cancelled') return null
-  const idx = FULFILLMENT_PIPELINE.indexOf(current as FulfillmentStatus)
-  if (idx === -1) return null
-  if (idx >= FULFILLMENT_PIPELINE.length - 1) return null
-  return FULFILLMENT_PIPELINE[idx + 1]
+export function isProductionPhase(status: string | null | undefined): boolean {
+  if (!status) return false
+  return PRODUCTION_PHASES.includes(status as FulfillmentStatus)
 }
 
-export function getPreviousStage(current: string | null | undefined): FulfillmentStatus | null {
+// ---------------------------------------------------------------------------
+// Order type derivation
+// ---------------------------------------------------------------------------
+
+// Item shape minimo que sabemos derivar tipo. Aceita tanto OrderItem hidratado
+// (com product) quanto a versao serializada que so tem flags coladas.
+export interface OrderItemForType {
+  product?: {
+    underOrder?: boolean | null
+    isPersonalizable?: boolean | null
+  } | null
+  underOrder?: boolean | null
+  isPersonalizable?: boolean | null
+}
+
+/**
+ * Determina o pipeline aplicavel ao pedido.
+ *
+ * Regra: se ALGUM item do pedido for sob encomenda ou personalizavel, o
+ * pedido inteiro segue o pipeline `sob_encomenda` (mais lento, com etapas
+ * de producao). Caso contrario, segue `pronta_entrega`.
+ *
+ * Pedidos vazios ou sem informacao defaultam para `sob_encomenda` por seguranca
+ * — eh o pipeline mais completo, evita "pular" fases caso a derivacao falhe.
+ */
+export function getOrderType(items: OrderItemForType[] | null | undefined): OrderType {
+  if (!items || items.length === 0) return 'sob_encomenda'
+  for (const item of items) {
+    const underOrder = Boolean(item.product?.underOrder ?? item.underOrder)
+    const personalizable = Boolean(item.product?.isPersonalizable ?? item.isPersonalizable)
+    if (underOrder || personalizable) return 'sob_encomenda'
+  }
+  return 'pronta_entrega'
+}
+
+// ---------------------------------------------------------------------------
+// Stage navigation
+// ---------------------------------------------------------------------------
+
+interface StageNavOptions {
+  type?: OrderType | null
+  deliveryMethod?: DeliveryMethod | null
+}
+
+/**
+ * Proximo estagio segundo o pipeline aplicavel.
+ *
+ * Casos especiais:
+ * - in_production (pipeline sob_encomenda) -> ready_to_pickup se delivery=pickup,
+ *                                              senao ready_to_ship.
+ * - aguardando_pagamento (pipeline pronta_entrega) -> ready_to_pickup se
+ *                                              delivery=pickup, senao ready_to_ship.
+ * - ready_to_pickup -> delivered (pula 'shipped').
+ */
+export function getNextStage(
+  current: string | null | undefined,
+  options?: StageNavOptions,
+): FulfillmentStatus | null {
+  if (!current) return null
+  if (current === 'cancelled') return null
+  if (current === 'delivered') return null
+
+  const type = options?.type ?? 'sob_encomenda'
+  const delivery = options?.deliveryMethod ?? 'shipping'
+
+  // Branches especiais antes do pipeline linear.
+  if (current === 'ready_to_pickup') return 'delivered'
+
+  // Pipeline sob_encomenda: depois de in_production decide envio vs retirada.
+  if (type === 'sob_encomenda' && current === 'in_production') {
+    return delivery === 'pickup' ? 'ready_to_pickup' : 'ready_to_ship'
+  }
+
+  // Pipeline pronta_entrega: depois de aguardando_pagamento decide envio vs retirada.
+  if (type === 'pronta_entrega' && current === 'aguardando_pagamento') {
+    return delivery === 'pickup' ? 'ready_to_pickup' : 'ready_to_ship'
+  }
+
+  const pipeline = getPipeline(type)
+  const idx = pipeline.indexOf(current as FulfillmentStatus)
+  if (idx === -1) return null
+  if (idx >= pipeline.length - 1) return null
+  return pipeline[idx + 1]
+}
+
+/**
+ * Estagio anterior segundo o pipeline aplicavel.
+ *
+ * Casos especiais (espelham getNextStage):
+ * - ready_to_pickup volta para in_production (sob_encomenda) ou
+ *                   aguardando_pagamento (pronta_entrega).
+ * - delivered volta para shipped (envio) ou ready_to_pickup (retirada).
+ */
+export function getPreviousStage(
+  current: string | null | undefined,
+  options?: StageNavOptions,
+): FulfillmentStatus | null {
   if (!current) return null
   if (current === 'cancelled') return null
   if (current === 'pending') return null
-  const idx = FULFILLMENT_PIPELINE.indexOf(current as FulfillmentStatus)
+
+  const type = options?.type ?? 'sob_encomenda'
+  const delivery = options?.deliveryMethod ?? 'shipping'
+
+  // Branches especiais.
+  if (current === 'ready_to_pickup') {
+    return type === 'pronta_entrega' ? 'aguardando_pagamento' : 'in_production'
+  }
+  if (current === 'delivered') {
+    return delivery === 'pickup' ? 'ready_to_pickup' : 'shipped'
+  }
+
+  const pipeline = getPipeline(type)
+  const idx = pipeline.indexOf(current as FulfillmentStatus)
   if (idx <= 0) return null
-  return FULFILLMENT_PIPELINE[idx - 1]
+  return pipeline[idx - 1]
 }
 
-export function canAdvance(current: string | null | undefined): boolean {
-  return getNextStage(current) !== null
+export function canAdvance(
+  current: string | null | undefined,
+  options?: StageNavOptions,
+): boolean {
+  return getNextStage(current, options) !== null
 }
 
-export function canRegress(current: string | null | undefined): boolean {
-  return getPreviousStage(current) !== null
+export function canRegress(
+  current: string | null | undefined,
+  options?: StageNavOptions,
+): boolean {
+  return getPreviousStage(current, options) !== null
 }
+
+// ---------------------------------------------------------------------------
+// Production timeline
+// ---------------------------------------------------------------------------
 
 export type ProductionTimeline = {
-  aguardando_producao_at?: string | null
-  em_revisao_at?: string | null
+  confirmado_at?: string | null
+  aguardando_pagamento_at?: string | null
+  na_fila_at?: string | null
   arte_montagem_at?: string | null
   liberado_producao_at?: string | null
   in_production_at?: string | null
   ready_to_ship_at?: string | null
+  ready_to_pickup_at?: string | null
   shipped_at?: string | null
   delivered_at?: string | null
 }

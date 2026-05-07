@@ -13,10 +13,12 @@ import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
 import {
   getNextStage,
+  getOrderType,
   getPreviousStage,
   withTimelineStamp,
-  type ProductionTimeline,
+  type DeliveryMethod,
   type FulfillmentStatus,
+  type ProductionTimeline,
 } from '@/lib/order-statuses'
 import {
   triggerProductionTasksOnStatusChange,
@@ -214,10 +216,19 @@ async function handleStageTransition(input: {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
+  // Pipeline depende do tipo de pedido (sob encomenda vs pronta entrega) e do
+  // metodo de entrega (correio vs retirada). Os helpers retornam diferentes
+  // proximas fases conforme essas dimensoes.
+  const stageOptions = {
+    type: getOrderType(before.items as Parameters<typeof getOrderType>[0]),
+    deliveryMethod: ((before as unknown as { deliveryMethod?: string | null })
+      .deliveryMethod || 'shipping') as DeliveryMethod,
+  }
+
   const target =
     action === 'advance_stage'
-      ? getNextStage(before.fulfillmentStatus)
-      : getPreviousStage(before.fulfillmentStatus)
+      ? getNextStage(before.fulfillmentStatus, stageOptions)
+      : getPreviousStage(before.fulfillmentStatus, stageOptions)
 
   if (!target) {
     return NextResponse.json(

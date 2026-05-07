@@ -1666,10 +1666,10 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
 
     const localPatch: Partial<Order> = localAutoTransition
       ? {
-          fulfillmentStatus: 'aguardando_producao',
+          fulfillmentStatus: 'na_fila',
           productionTimeline: withTimelineStamp(
             previous.productionTimeline as ProductionTimeline | null | undefined,
-            'aguardando_producao',
+            'na_fila',
           ),
         }
       : {}
@@ -1720,10 +1720,10 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
       if (previous && previous.paymentStatus !== 'paid' && previous.fulfillmentStatus === 'pending') {
         const nextTimeline = withTimelineStamp(
           previous.productionTimeline as ProductionTimeline | null | undefined,
-          'aguardando_producao',
+          'na_fila',
         )
         autoTransitionPatch = {
-          fulfillmentStatus: 'aguardando_producao',
+          fulfillmentStatus: 'na_fila',
           productionTimeline: nextTimeline as Prisma.InputJsonValue,
         }
       }
@@ -1803,7 +1803,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       previous.fulfillmentStatus === 'pending'
 
     const nextTimeline = autoTransition
-      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'aguardando_producao')
+      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'na_fila')
       : previous.productionTimeline
 
     db.orders[index] = {
@@ -1811,7 +1811,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       paymentStatus: data.paymentStatus,
       status: data.status,
       paymentMethod: data.method,
-      ...(autoTransition ? { fulfillmentStatus: 'aguardando_producao' } : {}),
+      ...(autoTransition ? { fulfillmentStatus: 'na_fila' } : {}),
       productionTimeline: nextTimeline ?? null,
       paymentDetails: {
         provider: data.provider,
@@ -1842,7 +1842,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       previous.fulfillmentStatus === 'pending'
 
     const nextTimeline = autoTransition
-      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'aguardando_producao')
+      ? withTimelineStamp(previous.productionTimeline as ProductionTimeline | null | undefined, 'na_fila')
       : null
 
     const order = await prisma.order.update({
@@ -1852,7 +1852,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
         paymentStatus: data.paymentStatus,
         ...(autoTransition && nextTimeline
           ? {
-              fulfillmentStatus: 'aguardando_producao',
+              fulfillmentStatus: 'na_fila',
               productionTimeline: nextTimeline as Prisma.InputJsonValue,
             }
           : {}),
@@ -3042,8 +3042,9 @@ export interface SyncProductionResult {
 
 // Sync varre apenas as fases produtivas: a tarefa de producao so faz sentido
 // quando o admin marcou o pedido como liberado/em producao. Pedidos em fases
-// anteriores (pending, aguardando_producao, em_revisao, arte_em_montagem)
-// ainda estao em pre-producao e nao precisam aparecer no painel do operador.
+// anteriores (pending, confirmado, aguardando_pagamento, na_fila,
+// arte_em_montagem) ainda estao em pre-producao e nao precisam aparecer no
+// painel do operador.
 // Pedidos em fases posteriores (ready_to_ship, shipped, delivered) ja foram
 // produzidos. Pagamento NAO eh requisito (cabe pagamento na entrega/retirada).
 const SYNC_FULFILLMENT_STATUSES = new Set<string>([
