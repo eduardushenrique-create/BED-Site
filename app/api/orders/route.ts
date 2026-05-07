@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import {
   createOrder,
+  updateOrder,
   updateOrderPaymentByNumber,
   validateAndCalculateCoupon,
   incrementCouponUsage,
@@ -13,6 +14,7 @@ import { createPaymentForOrder, mapMercadoPagoStatus } from '@/lib/payment'
 import { validateCEP, validateCPF, validateEmail } from '@/lib/validation'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
+import { withTimelineStamp, type ProductionTimeline } from '@/lib/order-statuses'
 
 const log = createLogger({ component: 'api.orders' })
 
@@ -296,6 +298,28 @@ export async function POST(request: Request) {
       checkoutUrl: payment.checkoutUrl || null,
       rawPayload: rawPayloadWithCoupon,
     })
+
+    // Pipeline-redesign (resposta 4 do stakeholder): pedido criado pelo site
+    // sem pagamento concluido entra automaticamente em 'aguardando_pagamento'.
+    // Pedido pago no checkout (raro com PIX, possivel com cartao approved) fica
+    // em 'pending' para o admin validar (resposta 2: checagem de seguranca).
+    if (updatedOrder && mappedStatus.paymentStatus !== 'paid') {
+      try {
+        const currentTimeline =
+          (updatedOrder as unknown as { productionTimeline?: ProductionTimeline | null })
+            .productionTimeline || null
+        await updateOrder(updatedOrder.id, {
+          fulfillmentStatus: 'aguardando_pagamento',
+          productionTimeline: withTimelineStamp(currentTimeline, 'aguardando_pagamento'),
+        } as Parameters<typeof updateOrder>[1])
+      } catch (transitionError) {
+        captureException(transitionError, {
+          context: 'api.orders',
+          detail: 'auto-transition to aguardando_pagamento failed',
+          orderNumber,
+        })
+      }
+    }
 
     // Hard-fail when the user picked card but Mercado Pago did not return a checkout URL.
     // Without checkoutUrl the client can't redirect to MP and the customer ends up at the
