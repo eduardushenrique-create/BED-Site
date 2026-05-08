@@ -70,7 +70,19 @@ export type Order = {
     pixCopyPaste?: string
   }
   createdAt: string
-  items: { productId: string; productName: string; variantId?: string | null; variantName?: string | null; quantity: number; unitPrice: number; observation?: string }[]
+  items: {
+    productId: string
+    productName: string
+    variantId?: string | null
+    variantName?: string | null
+    quantity: number
+    unitPrice: number
+    observation?: string
+    // Pipeline-redesign: flags do produto carregadas junto pra
+    // getOrderType() classificar o pedido corretamente.
+    underOrder?: boolean
+    isPersonalizable?: boolean
+  }[]
   trackingCode: string | null
   expectedDeliveryAt?: string | null
   productionTimeline?: Record<string, string | null> | null
