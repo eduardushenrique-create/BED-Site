@@ -31,6 +31,17 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Prisma CLI + schema + migrations ficam disponiveis no container final
+# para o startup wrapper rodar `prisma migrate deploy` automaticamente. Sem
+# isso, cada deploy exigia rodar migrations manualmente, abrindo janelas
+# em que o Prisma client esperava colunas que ainda nao existiam no banco.
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Wrapper de startup: roda migrations e depois sobe o Next.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/start.mjs ./scripts/start.mjs
+
 # Diretório para o fallback JSON (quando DATABASE_URL não está configurado)
 RUN mkdir -p data && chown nextjs:nodejs data
 
@@ -38,8 +49,6 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Migrations rodam manualmente via `railway run npx prisma migrate deploy`,
-# não no startup do container. O Next standalone não traz o CLI completo
-# do Prisma com seus arquivos auxiliares (wasm), então tentar invocá-lo
-# aqui falha em runtime. Manter migrações como passo manual operacional.
-CMD ["node", "server.js"]
+# Startup auto-migrate: chama prisma migrate deploy antes de subir o Next.
+# Migrations sao idempotentes; se DATABASE_URL nao existir, pula com aviso.
+CMD ["node", "scripts/start.mjs"]
