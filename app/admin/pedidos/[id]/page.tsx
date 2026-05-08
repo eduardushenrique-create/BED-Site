@@ -9,6 +9,7 @@ import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-p
 import {
   FULFILLMENT_STATUSES,
   PAYMENT_STATUSES,
+  getEffectivePipeline,
   getFulfillmentInfo,
   getNextStage,
   getOrderType,
@@ -17,6 +18,8 @@ import {
   canRegress,
   listTimelineEntries,
   type DeliveryMethod,
+  type FulfillmentStatus,
+  type OrderType,
   type ProductionTimeline,
 } from '@/lib/order-statuses'
 
@@ -53,6 +56,10 @@ type OrderItem = {
   quantity: number
   unitPrice: number
   observation?: string
+  // Flags do produto exigidas para classificar o pipeline (sob_encomenda
+  // vs pronta_entrega) via getOrderType().
+  underOrder?: boolean
+  isPersonalizable?: boolean
 }
 
 type Order = {
@@ -264,6 +271,138 @@ function announceProductionTrigger(trigger: ProductionTriggerSummary) {
       ? '\n\nAtenção: o pagamento deste pedido ainda não foi confirmado. As tarefas foram criadas mesmo assim (pagamento na entrega/retirada).'
       : ''
     alert(`Pedido movido. ${created} tarefa(s) de produção criada(s).${unpaidNote}`)
+  }
+}
+
+/**
+ * Linha do tempo visual do pipeline. Mostra todas as fases pelas quais o
+ * pedido vai passar (resolvidas conforme tipo do pedido + deliveryMethod),
+ * com 3 estados visuais por fase:
+ *
+ *   - DONE   (verde, com check): fase ja foi atingida.
+ *   - CURRENT (azul, com pulso): fase atual, em destaque.
+ *   - FUTURE (cinza claro): fase ainda nao alcancada.
+ *
+ * Pedido cancelado vira um banner unico cinza-vermelho.
+ */
+function PipelineTimeline({
+  type,
+  deliveryMethod,
+  currentStatus,
+  productionTimeline,
+}: {
+  type: OrderType
+  deliveryMethod: DeliveryMethod
+  currentStatus: string
+  productionTimeline: ProductionTimeline | Record<string, string | null> | null | undefined
+}) {
+  const isCancelled = currentStatus === 'cancelled'
+
+  if (isCancelled) {
+    return (
+      <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', marginBottom: '24px', borderLeft: '4px solid #EF4444' }}>
+        <p style={{ margin: 0, fontWeight: 600, color: '#EF4444' }}>Pedido cancelado</p>
+        <p style={{ margin: '4px 0 0 0', color: '#6B7494', fontSize: '13px' }}>Não há mais transições previstas para este pedido.</p>
+      </div>
+    )
+  }
+
+  const pipeline = getEffectivePipeline(type, deliveryMethod)
+  const currentIdx = pipeline.indexOf(currentStatus as FulfillmentStatus)
+  const typeLabel = type === 'pronta_entrega' ? 'Pronta entrega' : 'Sob encomenda'
+  const methodLabel = deliveryMethod === 'pickup' ? 'Retirada' : 'Envio'
+
+  return (
+    <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Linha do tempo do pedido
+        </h2>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '999px', backgroundColor: type === 'sob_encomenda' ? '#E8F0FB' : '#DFF4EC', color: type === 'sob_encomenda' ? '#4A7AB5' : '#0E9F6E', fontSize: '11px', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            {typeLabel}
+          </span>
+          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '999px', backgroundColor: '#F0F5FB', color: '#6B7494', fontSize: '11px', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            {methodLabel}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+        <ol style={{ display: 'flex', alignItems: 'flex-start', gap: 0, listStyle: 'none', padding: 0, margin: 0, minWidth: 'min-content' }}>
+          {pipeline.map((status, idx) => {
+            const info = getFulfillmentInfo(status)
+            const isDone = currentIdx > idx
+            const isCurrent = currentIdx === idx
+            const isFuture = currentIdx < idx
+
+            const dotBg = isCurrent ? (info?.color || '#1D2235') : isDone ? '#0E9F6E' : '#FFFFFF'
+            const dotBorder = isFuture ? '#D8DCE8' : 'transparent'
+            const dotColor = isCurrent || isDone ? 'white' : '#9AA1B8'
+            const labelColor = isCurrent ? '#1D2235' : isDone ? '#0E9F6E' : '#9AA1B8'
+            const labelWeight = isCurrent ? 700 : isDone ? 500 : 400
+
+            const timelineKey = info?.timelineKey
+            const stamp = timelineKey && productionTimeline
+              ? (productionTimeline as Record<string, string | null>)[timelineKey]
+              : null
+            const stampLabel = stamp ? formatTimelineDate(stamp) : null
+
+            const isLast = idx === pipeline.length - 1
+
+            return (
+              <li key={status} style={{ display: 'flex', alignItems: 'flex-start', flex: isLast ? '0 0 auto' : 1, minWidth: '110px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto', minWidth: '110px' }}>
+                  <div
+                    aria-current={isCurrent ? 'step' : undefined}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: dotBg,
+                      border: `2px solid ${dotBorder}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: dotColor,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      boxShadow: isCurrent ? `0 0 0 4px ${(info?.color || '#1D2235')}26` : 'none',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {isDone ? '✓' : idx + 1}
+                  </div>
+                  <div style={{ marginTop: '8px', textAlign: 'center', padding: '0 4px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: labelWeight, color: labelColor, lineHeight: 1.3 }}>
+                      {info?.label || status}
+                    </div>
+                    {stampLabel && (
+                      <div style={{ fontSize: '10px', color: '#9AA1B8', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+                        {stampLabel}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {!isLast && (
+                  <div style={{ flex: 1, height: '2px', backgroundColor: isDone ? '#0E9F6E' : '#E3E9F4', marginTop: '15px' }} />
+                )}
+              </li>
+            )
+          })}
+        </ol>
+      </div>
+    </div>
+  )
+}
+
+function formatTimelineDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (!Number.isFinite(d.getTime())) return ''
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
   }
 }
 
@@ -739,6 +878,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {hasChanges && <span style={{ fontSize: '12px', color: '#F59E0B', fontWeight: 500 }}>Alterações pendentes</span>}
         </div>
       </div>
+
+      <PipelineTimeline
+        type={stageOptions.type}
+        deliveryMethod={stageOptions.deliveryMethod}
+        currentStatus={order.fulfillmentStatus}
+        productionTimeline={order.productionTimeline}
+      />
 
       {(advanceEnabled || regressEnabled) && (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

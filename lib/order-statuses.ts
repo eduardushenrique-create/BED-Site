@@ -90,6 +90,32 @@ function getPipeline(type: OrderType | null | undefined): FulfillmentStatus[] {
   return type === 'pronta_entrega' ? PIPELINE_PRONTA_ENTREGA : PIPELINE_SOB_ENCOMENDA
 }
 
+/**
+ * Retorna a sequencia EFETIVA de fases pelas quais o pedido vai passar,
+ * considerando tipo + deliveryMethod. Diferente de PIPELINE_*, esta funcao
+ * ja resolve o branch de envio vs retirada:
+ *
+ * - shipping: usa ready_to_ship -> shipped -> delivered (default).
+ * - pickup:   substitui ready_to_ship por ready_to_pickup e remove shipped
+ *             (cliente busca, vai direto pra delivered).
+ *
+ * Use esta funcao para renderizar timelines / visualizacoes do progresso
+ * do pedido. Para navegacao (Avancar/Voltar) continue usando getNextStage/
+ * getPreviousStage que ja conhecem os branches especiais.
+ */
+export function getEffectivePipeline(
+  type: OrderType,
+  deliveryMethod: DeliveryMethod = 'shipping',
+): FulfillmentStatus[] {
+  const base = getPipeline(type)
+  if (deliveryMethod === 'pickup') {
+    return base
+      .map(s => (s === 'ready_to_ship' ? ('ready_to_pickup' as FulfillmentStatus) : s))
+      .filter(s => s !== 'shipped')
+  }
+  return base
+}
+
 // Mantido para compat com callers antigos que iteram fases. Default = pipeline
 // sob encomenda (mais completo).
 export const FULFILLMENT_PIPELINE: FulfillmentStatus[] = PIPELINE_SOB_ENCOMENDA
