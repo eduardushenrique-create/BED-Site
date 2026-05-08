@@ -1147,8 +1147,8 @@ export default function AdminOrdersPage() {
       )}
 
       {showAddModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(29,34,53,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '14px', maxWidth: '1100px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 60px rgba(29,34,53,0.25)' }}>
+        <div className="admin-modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(29,34,53,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div className="admin-modal-panel" style={{ backgroundColor: 'white', borderRadius: '14px', maxWidth: '1100px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 60px rgba(29,34,53,0.25)' }}>
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E3E9F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Novo Pedido</h2>
@@ -1279,7 +1279,7 @@ export default function AdminOrdersPage() {
                                 </div>
                               </button>
 
-                              {isPickerOpen && hasVariants && (
+                              <div className="admin-slide-field" data-open={String(isPickerOpen && hasVariants)}>
                                 <div style={{ marginTop: '6px', padding: '12px', borderRadius: '10px', backgroundColor: 'white', border: '1.5px solid #BBCFEB', boxShadow: '0 4px 12px rgba(29,34,53,0.06)' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                     <span style={{ fontWeight: 700, fontSize: '12px', color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -1328,7 +1328,7 @@ export default function AdminOrdersPage() {
                                     })}
                                   </div>
                                 </div>
-                              )}
+                              </div>
                             </div>
                           )
                         })
@@ -1492,8 +1492,8 @@ export default function AdminOrdersPage() {
                   </label>
                 </div>
 
-                {/* Endereço: obrigatório só para envio. Retirada usa endereço da loja. */}
-                {newOrderForm.deliveryMethod === 'shipping' && (
+                {/* Endereço: sempre no DOM, animado via max-height. Retirada usa endereço da loja. */}
+                <div className="admin-slide-field" data-open={String(newOrderForm.deliveryMethod === 'shipping')}>
                   <div className="admin-order-form-grid" style={{ marginTop: '16px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                       <Input label="CEP" value={newOrderForm.zipCode} onChange={(e) => setNewOrderForm({ ...newOrderForm, zipCode: e.target.value })} required placeholder="00000-000" style={{ flex: 1 }} />
@@ -1508,7 +1508,7 @@ export default function AdminOrdersPage() {
                     <Input label="Cidade" value={newOrderForm.city} onChange={(e) => setNewOrderForm({ ...newOrderForm, city: e.target.value })} required />
                     <Input label="Estado" value={newOrderForm.state} onChange={(e) => setNewOrderForm({ ...newOrderForm, state: e.target.value })} required placeholder="SP" />
                   </div>
-                )}
+                </div>
               </section>
             </div>
 

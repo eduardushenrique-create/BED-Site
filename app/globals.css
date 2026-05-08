@@ -332,3 +332,47 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ─── Admin transition utilities ─────────────────────────────────────────── */
+
+/* Modal entrance: scale up from 96% with fade */
+@keyframes admin-modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+@keyframes admin-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.admin-modal-backdrop {
+  animation: admin-backdrop-in 180ms ease-out forwards;
+}
+.admin-modal-panel {
+  animation: admin-modal-in 220ms cubic-bezier(0.34, 1.12, 0.64, 1) forwards;
+}
+
+/*
+ * Animated field group: always in the DOM, expands/collapses smoothly.
+ * Toggle `--field-visible: 1` vs `0` on the element via inline style.
+ * Usage: className="admin-slide-field" with style={{ '--field-visible': condition ? 1 : 0 }}
+ * The outer wrapper handles max-height + opacity; inner content is styled normally.
+ */
+.admin-slide-field {
+  overflow: hidden;
+  transition:
+    max-height 380ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity    260ms ease,
+    visibility 380ms linear;
+}
+.admin-slide-field[data-open="true"] {
+  max-height: 1000px;
+  opacity: 1;
+  visibility: visible;
+}
+.admin-slide-field[data-open="false"] {
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
