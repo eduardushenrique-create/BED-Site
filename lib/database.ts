@@ -53,6 +53,7 @@ import {
 import {
   autoTransitionOnPayment,
   getOrderType,
+  getOrderTypeFromOrder,
   withTimelineStamp,
   type DeliveryMethod,
   type FulfillmentStatus,
@@ -251,6 +252,7 @@ function serializeOrder(order: any): Order {
         }
       : null,
     deliveryMethod: (order.deliveryMethod === 'pickup' ? 'pickup' : 'shipping'),
+    orderType: (order.orderType === 'pronta_entrega' ? 'pronta_entrega' : 'sob_encomenda'),
     total: money(order.total),
     subtotal: money(order.subtotal),
     shippingCost: money(order.shippingTotal),
@@ -1592,6 +1594,22 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
         ? 'pickup'
         : 'shipping'
     const hasShippingAddress = Boolean(data.shippingAddress?.zipCode)
+
+    // Pipeline-redesign: deriva orderType (sob_encomenda x pronta_entrega)
+    // consultando os produtos diretamente. Persistir o resultado no Order
+    // garante que getNextStage acerte mesmo se o produto for editado depois.
+    // Default seguro 'sob_encomenda' (pipeline mais completo) quando a base
+    // de produtos nao traz informacao suficiente.
+    const productIds = data.items.map(item => item.productId).filter(Boolean)
+    const products = productIds.length > 0
+      ? await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, underOrder: true, isPersonalizable: true },
+        })
+      : []
+    const hasProducible = products.some(p => p.underOrder || p.isPersonalizable)
+    const orderType = hasProducible ? 'sob_encomenda' : 'pronta_entrega'
+
     const order = await prisma.order.create({
       data: {
         orderNumber: data.orderNumber,
@@ -1608,6 +1626,7 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
         fulfillmentStatus: data.fulfillmentStatus,
         trackingCode: data.trackingCode,
         deliveryMethod,
+        orderType,
         ...(hasShippingAddress
           ? {
               address: {
@@ -1694,7 +1713,7 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
       previous.paymentStatus !== 'paid' &&
       previous.fulfillmentStatus === 'aguardando_pagamento'
     ) {
-      const orderType = getOrderType((previous.items || []) as Parameters<typeof getOrderType>[0])
+      const orderType = getOrderTypeFromOrder(previous as Parameters<typeof getOrderTypeFromOrder>[0])
       const delivery = ((previous as unknown as { deliveryMethod?: string | null })
         .deliveryMethod || 'shipping') as DeliveryMethod
       const next = autoTransitionOnPayment(previous.fulfillmentStatus, {
@@ -1760,6 +1779,7 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
           fulfillmentStatus: true,
           productionTimeline: true,
           deliveryMethod: true,
+          orderType: true,
           items: { include: { product: { select: { underOrder: true, isPersonalizable: true } } } },
         },
       })
@@ -1769,7 +1789,7 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
         previous.paymentStatus !== 'paid' &&
         previous.fulfillmentStatus === 'aguardando_pagamento'
       ) {
-        const orderType = getOrderType(previous.items as Parameters<typeof getOrderType>[0])
+        const orderType = getOrderTypeFromOrder(previous as Parameters<typeof getOrderTypeFromOrder>[0])
         const delivery = (previous.deliveryMethod || 'shipping') as DeliveryMethod
         const next = autoTransitionOnPayment(previous.fulfillmentStatus, {
           type: orderType,
@@ -1866,7 +1886,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       previous.paymentStatus !== 'paid' &&
       previous.fulfillmentStatus === 'aguardando_pagamento'
     ) {
-      const orderType = getOrderType((previous.items || []) as Parameters<typeof getOrderType>[0])
+      const orderType = getOrderTypeFromOrder(previous as Parameters<typeof getOrderTypeFromOrder>[0])
       const delivery = ((previous as unknown as { deliveryMethod?: string | null })
         .deliveryMethod || 'shipping') as DeliveryMethod
       autoNext = autoTransitionOnPayment(previous.fulfillmentStatus, {
@@ -1910,6 +1930,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
         fulfillmentStatus: true,
         productionTimeline: true,
         deliveryMethod: true,
+        orderType: true,
         items: { include: { product: { select: { underOrder: true, isPersonalizable: true } } } },
       },
     })
@@ -1923,7 +1944,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       previous.paymentStatus !== 'paid' &&
       previous.fulfillmentStatus === 'aguardando_pagamento'
     ) {
-      const orderType = getOrderType(previous.items as Parameters<typeof getOrderType>[0])
+      const orderType = getOrderTypeFromOrder(previous as Parameters<typeof getOrderTypeFromOrder>[0])
       const delivery = (previous.deliveryMethod || 'shipping') as DeliveryMethod
       autoNext = autoTransitionOnPayment(previous.fulfillmentStatus, {
         type: orderType,

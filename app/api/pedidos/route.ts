@@ -13,7 +13,7 @@ import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
 import {
   getNextStage,
-  getOrderType,
+  getOrderTypeFromOrder,
   getPreviousStage,
   withTimelineStamp,
   type DeliveryMethod,
@@ -219,8 +219,10 @@ async function handleStageTransition(input: {
   // Pipeline depende do tipo de pedido (sob encomenda vs pronta entrega) e do
   // metodo de entrega (correio vs retirada). Os helpers retornam diferentes
   // proximas fases conforme essas dimensoes.
+  // getOrderTypeFromOrder le do campo persistido `Order.orderType` (preferido)
+  // e cai no fallback de derivar pelos items se o campo nao estiver populado.
   const stageOptions = {
-    type: getOrderType(before.items as Parameters<typeof getOrderType>[0]),
+    type: getOrderTypeFromOrder(before as Parameters<typeof getOrderTypeFromOrder>[0]),
     deliveryMethod: ((before as unknown as { deliveryMethod?: string | null })
       .deliveryMethod || 'shipping') as DeliveryMethod,
   }

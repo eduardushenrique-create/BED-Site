@@ -207,6 +207,12 @@ model Order {
   // de ready_to_pickup (cliente busca presencialmente). Default 'shipping' eh
   // seguro pra historico — pedidos antigos seguiam fluxo de envio.
   deliveryMethod     String    @default("shipping") // 'shipping' | 'pickup'
+  // orderType determina o pipeline aplicavel (10 fases vs 5). Persistir aqui
+  // (em vez de derivar dos items toda vez) torna a classificacao a prova de
+  // bugs de hidratacao do Prisma e garante consistencia mesmo se o produto
+  // for editado/excluido depois. Default 'sob_encomenda' eh o pipeline mais
+  // completo — seguro como fallback.
+  orderType          String    @default("sob_encomenda") // 'sob_encomenda' | 'pronta_entrega'
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)

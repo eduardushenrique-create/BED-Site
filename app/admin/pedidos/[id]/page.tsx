@@ -12,7 +12,7 @@ import {
   getEffectivePipeline,
   getFulfillmentInfo,
   getNextStage,
-  getOrderType,
+  getOrderTypeFromOrder,
   getPreviousStage,
   canAdvance,
   canRegress,
@@ -79,6 +79,9 @@ type Order = {
     zipCode: string
   } | null
   deliveryMethod?: 'shipping' | 'pickup' | null
+  // Persistido: 'sob_encomenda' | 'pronta_entrega'. Pode estar ausente em
+  // pedidos legados criados antes da migration.
+  orderType?: 'sob_encomenda' | 'pronta_entrega' | null
   total: number
   subtotal: number
   shippingCost: number
@@ -842,8 +845,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   // Pipeline aplicavel depende do tipo de pedido e metodo de entrega; passar
   // ao helper para que Avancar/Voltar levem para a fase correta de cada fluxo.
+  // getOrderTypeFromOrder le do campo persistido `Order.orderType` (preferido)
+  // e cai no fallback de derivar pelos items se o campo nao estiver populado.
   const stageOptions = {
-    type: getOrderType(order.items as Parameters<typeof getOrderType>[0]),
+    type: getOrderTypeFromOrder(order as Parameters<typeof getOrderTypeFromOrder>[0]),
     deliveryMethod: ((order as unknown as { deliveryMethod?: string | null })
       .deliveryMethod || 'shipping') as DeliveryMethod,
   }
