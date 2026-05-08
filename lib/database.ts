@@ -229,6 +229,31 @@ function serializeBanner(banner: any): Banner {
   }
 }
 
+/**
+ * Deriva orderType para serializacao com 3 niveis de defesa:
+ *  1. Campo persistido `Order.orderType` (caso normal pos-migration).
+ *  2. Inspecao das flags do produto em cada item hidratado (caso "pedido
+ *     criado antes da coluna existir" ou "INSERT caiu no fallback").
+ *  3. Default 'sob_encomenda' (pipeline mais completo, evita pular fases).
+ *
+ * Sempre retorna 'sob_encomenda' | 'pronta_entrega' — nunca null.
+ */
+function deriveOrderTypeForSerialization(order: any): 'sob_encomenda' | 'pronta_entrega' {
+  if (order?.orderType === 'pronta_entrega' || order?.orderType === 'sob_encomenda') {
+    return order.orderType
+  }
+  const items = Array.isArray(order?.items) ? order.items : []
+  for (const item of items) {
+    const underOrder = Boolean(item?.product?.underOrder)
+    const personalizable = Boolean(item?.product?.isPersonalizable)
+    if (underOrder || personalizable) return 'sob_encomenda'
+  }
+  // Sem flags positivas conhecidas: default seguro 'sob_encomenda' (pipeline
+  // completo). NUNCA cair em 'pronta_entrega' por inferencia negativa quando
+  // a hidratacao de produto pode ter falhado.
+  return items.length > 0 && items.every((it: any) => it?.product) ? 'pronta_entrega' : 'sob_encomenda'
+}
+
 function serializeOrder(order: any): Order {
   const paymentPayload = order.payment?.rawPayload && typeof order.payment.rawPayload === 'object'
     ? order.payment.rawPayload
@@ -252,7 +277,12 @@ function serializeOrder(order: any): Order {
         }
       : null,
     deliveryMethod: (order.deliveryMethod === 'pickup' ? 'pickup' : 'shipping'),
-    orderType: (order.orderType === 'pronta_entrega' ? 'pronta_entrega' : 'sob_encomenda'),
+    // orderType resiliente: prefere o campo persistido, senao deriva on-the-fly
+    // a partir das flags dos items hidratados (Prisma include traz product.
+    // underOrder e product.isPersonalizable). Cobre o cenario "pedido criado
+    // antes da migration" e tambem o cenario "INSERT falhou e caiu no fallback
+    // localDb sem orderType setado".
+    orderType: deriveOrderTypeForSerialization(order),
     total: money(order.total),
     subtotal: money(order.subtotal),
     shippingCost: money(order.shippingTotal),
@@ -1599,16 +1629,40 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
     // consultando os produtos diretamente. Persistir o resultado no Order
     // garante que getNextStage acerte mesmo se o produto for editado depois.
     // Default seguro 'sob_encomenda' (pipeline mais completo) quando a base
-    // de produtos nao traz informacao suficiente.
+    // de produtos nao traz informacao suficiente — JAMAIS cair em
+    // pronta_entrega por inferencia silenciosa.
     const productIds = data.items.map(item => item.productId).filter(Boolean)
     const products = productIds.length > 0
       ? await prisma.product.findMany({
           where: { id: { in: productIds } },
-          select: { id: true, underOrder: true, isPersonalizable: true },
+          select: { id: true, name: true, underOrder: true, isPersonalizable: true },
         })
       : []
     const hasProducible = products.some(p => p.underOrder || p.isPersonalizable)
-    const orderType = hasProducible ? 'sob_encomenda' : 'pronta_entrega'
+    // Se conseguimos buscar TODOS os produtos referenciados E nenhum tem
+    // flag, eh seguro classificar como pronta_entrega. Caso contrario
+    // (algum produto nao retornou da query, ou productIds vazio), default
+    // 'sob_encomenda'.
+    const allProductsFound = productIds.length > 0 && products.length === productIds.length
+    const orderType = hasProducible || !allProductsFound ? 'sob_encomenda' : 'pronta_entrega'
+
+    log.info(
+      {
+        orderNumber: data.orderNumber,
+        productIds,
+        productsFound: products.length,
+        productFlags: products.map(p => ({
+          id: p.id,
+          name: p.name,
+          underOrder: p.underOrder,
+          isPersonalizable: p.isPersonalizable,
+        })),
+        derivedOrderType: orderType,
+        hasProducible,
+        allProductsFound,
+      },
+      'createOrder: orderType derivation',
+    )
 
     const order = await prisma.order.create({
       data: {

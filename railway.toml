@@ -7,10 +7,11 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Apenas sobe o Next standalone. Migrations rodam manualmente via
-# `railway run npx prisma migrate deploy` — tentar rodar o CLI do Prisma
-# no container final do Next standalone falha porque o image não tem os
-# arquivos auxiliares (wasm) do CLI.
-startCommand = "node server.js"
+# Wrapper de startup: roda `prisma migrate deploy` automaticamente antes
+# de subir o Next. Schema, migrations e Prisma CLI agora ficam no container
+# final (Dockerfile copia explicitamente). Isso elimina a janela em que o
+# Prisma client esperava colunas que ainda nao existiam no banco — o
+# script idempotente garante que cada deploy tenha o schema correto.
+startCommand = "node scripts/start.mjs"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
