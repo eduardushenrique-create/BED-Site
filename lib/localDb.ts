@@ -49,6 +49,9 @@ export type Order = {
     zipCode: string
   } | null
   deliveryMethod?: 'shipping' | 'pickup'
+  // Persistido na criacao do pedido. Quando ausente, getOrderTypeFromOrder
+  // cai no fallback de derivar pelos items.
+  orderType?: 'sob_encomenda' | 'pronta_entrega'
   total: number
   subtotal: number
   shippingCost: number

@@ -210,7 +210,7 @@ export interface OrderItemForType {
 }
 
 /**
- * Determina o pipeline aplicavel ao pedido.
+ * Determina o pipeline aplicavel ao pedido a partir dos items.
  *
  * Regra: se ALGUM item do pedido for sob encomenda ou personalizavel, o
  * pedido inteiro segue o pipeline `sob_encomenda` (mais lento, com etapas
@@ -218,6 +218,11 @@ export interface OrderItemForType {
  *
  * Pedidos vazios ou sem informacao defaultam para `sob_encomenda` por seguranca
  * — eh o pipeline mais completo, evita "pular" fases caso a derivacao falhe.
+ *
+ * NOTA: a partir do redesign do pipeline, a forma preferida de descobrir o
+ * tipo eh ler o campo persistido `Order.orderType` (via `getOrderTypeFromOrder`).
+ * Esta funcao continua disponivel para fallback / cenarios em que so os items
+ * estao em maos.
  */
 export function getOrderType(items: OrderItemForType[] | null | undefined): OrderType {
   if (!items || items.length === 0) return 'sob_encomenda'
@@ -227,6 +232,27 @@ export function getOrderType(items: OrderItemForType[] | null | undefined): Orde
     if (underOrder || personalizable) return 'sob_encomenda'
   }
   return 'pronta_entrega'
+}
+
+/**
+ * Forma preferida de descobrir o pipeline de um pedido.
+ *
+ * 1. Le `order.orderType` quando ele tem um valor valido (sob_encomenda /
+ *    pronta_entrega) — campo persistido, definido na criacao do pedido.
+ * 2. Cai no fallback de derivar pelos items quando o campo nao estiver
+ *    populado (pedido pre-redesign sem migration aplicada, ou seed bruto).
+ */
+export function getOrderTypeFromOrder(
+  order: {
+    orderType?: string | null
+    items?: OrderItemForType[] | null
+  } | null | undefined,
+): OrderType {
+  if (!order) return 'sob_encomenda'
+  if (order.orderType === 'sob_encomenda' || order.orderType === 'pronta_entrega') {
+    return order.orderType
+  }
+  return getOrderType(order.items)
 }
 
 // ---------------------------------------------------------------------------
