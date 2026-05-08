@@ -1057,8 +1057,8 @@ export default function AdminOrdersPage() {
           <Button onClick={openCreateModal}>+ Criar Primeiro Pedido</Button>
         </div>
       ) : (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
             <thead>
               <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
                 <th style={{ padding: '16px 8px 16px 16px', textAlign: 'left', width: '36px' }}>
@@ -1126,9 +1126,24 @@ export default function AdminOrdersPage() {
                         ? new Date(order.expectedDeliveryAt).toLocaleDateString('pt-BR')
                         : '—'}
                     </td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Link href={`/admin/pedidos/${order.id}`} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: 'pointer', fontSize: '12px', textDecoration: 'none', color: 'inherit' }}>Ver</Link>
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                        <Link
+                          href={`/admin/pedidos/${order.id}`}
+                          style={{
+                            padding: '6px 11px',
+                            borderRadius: '6px',
+                            border: '1px solid #D8DCE8',
+                            backgroundColor: 'white',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            textDecoration: 'none',
+                            color: '#1D2235',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Ver
+                        </Link>
                         {regressEnabled && previous && (
                           <button
                             type="button"
@@ -1136,7 +1151,21 @@ export default function AdminOrdersPage() {
                             disabled={isPending}
                             aria-label={`Voltar para ${getFulfillmentInfo(previous)?.label || previous}`}
                             title={`Voltar para ${getFulfillmentInfo(previous)?.label || previous}`}
-                            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid #D8DCE8', backgroundColor: 'white', cursor: isPending ? 'not-allowed' : 'pointer', fontSize: '12px', color: '#6B7494', opacity: isPending ? 0.6 : 1 }}
+                            style={{
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '6px',
+                              border: '1px solid #D8DCE8',
+                              backgroundColor: 'white',
+                              cursor: isPending ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              color: '#6B7494',
+                              opacity: isPending ? 0.5 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
                           >
                             ←
                           </button>
@@ -1148,7 +1177,18 @@ export default function AdminOrdersPage() {
                             disabled={isPending}
                             aria-label={`Avançar para ${getFulfillmentInfo(next)?.label || next}`}
                             title={`Avançar para ${getFulfillmentInfo(next)?.label || next}`}
-                            style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', backgroundColor: '#1D2235', color: 'white', cursor: isPending ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, opacity: isPending ? 0.6 : 1 }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: '#1D2235',
+                              color: 'white',
+                              cursor: isPending ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              opacity: isPending ? 0.5 : 1,
+                              whiteSpace: 'nowrap',
+                            }}
                           >
                             Avançar →
                           </button>

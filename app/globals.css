@@ -333,6 +333,24 @@ button {
   }
 }
 
+/* ─── Admin dashboard cards ──────────────────────────────────────────────── */
+
+.admin-kpi-card {
+  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms ease;
+}
+.admin-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(29,34,53,0.10);
+}
+
+.admin-area-card {
+  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms ease, background-color 160ms ease;
+}
+.admin-area-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 44px rgba(29,34,53,0.13);
+}
+
 /* ─── Admin transition utilities ─────────────────────────────────────────── */
 
 /* Modal entrance: scale up from 96% with fade */
