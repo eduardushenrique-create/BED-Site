@@ -8,135 +8,113 @@ interface DashboardCard {
   href: string
   title: string
   description: string
-  cta: string
   accent: string
+  icon: string
 }
 
 const cards: DashboardCard[] = [
   {
     href: '/admin/pedidos',
     title: 'Pedidos',
-    description: 'Acompanhe pagamentos, fulfillment e crie pedidos manualmente.',
-    cta: 'Ver pedidos →',
+    description: 'Pagamentos, fulfillment e criação manual.',
     accent: '#1D2235',
+    icon: '📦',
   },
   {
     href: '/admin/producao',
     title: 'Produção',
-    description: 'Acompanhe itens sob encomenda, quantidades impressas e riscos de atraso.',
-    cta: 'Ver produção →',
+    description: 'Itens sob encomenda, impressões e riscos de atraso.',
     accent: '#2A4F8A',
+    icon: '⚙️',
   },
   {
     href: '/admin/impressoras',
     title: 'Impressoras',
-    description: 'Cadastre máquinas, capacidade e status. Atribua tarefas por impressora.',
-    cta: 'Ver impressoras →',
+    description: 'Máquinas, capacidade e tarefas por impressora.',
     accent: '#0EA5E9',
+    icon: '🖨️',
   },
   {
     href: '/admin/clientes',
     title: 'Clientes',
     description: 'Lista de compradores e cadastros.',
-    cta: 'Ver clientes →',
     accent: '#A36A1F',
+    icon: '👤',
   },
   {
     href: '/admin/produtos',
     title: 'Produtos',
-    description: 'Gerencie catálogo, fotos e personalizações.',
-    cta: 'Ver produtos →',
+    description: 'Catálogo, fotos e personalizações.',
     accent: '#1D7A72',
+    icon: '🏷️',
   },
   {
     href: '/admin/componentes',
     title: 'Componentes',
-    description: 'Gerencie insumos, estoque e alertas de baixa.',
-    cta: 'Ver componentes →',
+    description: 'Insumos, estoque e alertas de baixa.',
     accent: '#B42318',
+    icon: '🔩',
   },
   {
     href: '/admin/filamentos',
     title: 'Filamentos',
-    description: 'Cadastre filamentos, cores e consumo por impressora.',
-    cta: 'Ver filamentos →',
+    description: 'Cores e consumo por impressora.',
     accent: '#4A7AB5',
+    icon: '🧵',
   },
   {
     href: '/admin/categorias',
     title: 'Categorias',
-    description: 'Organize a vitrine.',
-    cta: 'Ver categorias →',
+    description: 'Organize a vitrine da loja.',
     accent: '#9A4F1A',
+    icon: '📂',
   },
   {
     href: '/admin/banners',
     title: 'Banners',
     description: 'Promoções e destaques na home.',
-    cta: 'Ver banners →',
     accent: '#A3526A',
+    icon: '🖼️',
   },
   {
     href: '/admin/cupons',
     title: 'Cupons',
-    description: 'Crie e gerencie cupons de desconto do checkout.',
-    cta: 'Ver cupons →',
+    description: 'Descontos do checkout.',
     accent: '#1D7A72',
+    icon: '🎟️',
   },
   {
     href: '/admin/despesas',
     title: 'Despesas',
-    description: 'Registre e acompanhe despesas operacionais, insumos e custos fixos.',
-    cta: 'Ver despesas →',
+    description: 'Despesas operacionais, insumos e custos fixos.',
     accent: '#B42318',
+    icon: '💰',
   },
   {
     href: '/admin/avaliacoes',
     title: 'Avaliações',
-    description: 'Modere as avaliações dos clientes antes de publicar.',
-    cta: 'Ver avaliações →',
+    description: 'Modere avaliações antes de publicar.',
     accent: '#F59E0B',
+    icon: '⭐',
   },
   {
     href: '/admin/emails',
     title: 'E-mails',
     description: 'Campanhas, templates e descadastros.',
-    cta: 'Ver e-mails →',
     accent: '#6B7494',
+    icon: '✉️',
   },
   {
     href: '/admin/auditoria',
     title: 'Auditoria',
-    description: 'Log de ações sensíveis (estornos, exclusões, alterações).',
-    cta: 'Ver auditoria →',
+    description: 'Log de estornos, exclusões e alterações sensíveis.',
     accent: '#6B7494',
+    icon: '🔍',
   },
 ]
 
 function formatBRL(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function KpiCard({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent: string }) {
-  return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        borderRadius: '14px',
-        padding: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        borderLeft: `4px solid ${accent}`,
-      }}
-    >
-      <p style={{ fontSize: '12px', fontWeight: 700, color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
-        {label}
-      </p>
-      <p style={{ fontSize: '26px', fontWeight: 700, color: '#1D2235', margin: '8px 0 4px', fontFamily: 'var(--font-mono)' }}>
-        {value}
-      </p>
-      {hint && <p style={{ fontSize: '13px', color: '#6B7494', margin: 0 }}>{hint}</p>}
-    </div>
-  )
 }
 
 function formatExpenseBRL(value: string): string {
@@ -145,10 +123,77 @@ function formatExpenseBRL(value: string): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 }
 
+function KpiCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string
+  value: string
+  hint?: string
+  accent: string
+}) {
+  return (
+    <div
+      className="admin-kpi-card"
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        padding: '20px 24px',
+        boxShadow: '0 1px 4px rgba(29,34,53,0.07)',
+        borderTop: `3px solid ${accent}`,
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 18,
+          right: 20,
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          backgroundColor: accent,
+          opacity: 0.45,
+          display: 'block',
+        }}
+      />
+      <p
+        style={{
+          fontSize: '10px',
+          fontWeight: 700,
+          color: '#9AA1B8',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          margin: 0,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontSize: '30px',
+          fontWeight: 700,
+          color: '#1D2235',
+          margin: '10px 0 6px',
+          fontFamily: 'var(--font-mono)',
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </p>
+      {hint && (
+        <p style={{ fontSize: '12px', color: '#9AA1B8', margin: 0 }}>{hint}</p>
+      )}
+    </div>
+  )
+}
+
 export default async function AdminIndexPage() {
   const metrics = await getAdminDashboardMetrics()
 
-  // Fetch expense report for the current month — silently suppressed on failure
   let expenseReport: Awaited<ReturnType<typeof generateExpenseReport>> | null = null
   try {
     const { startDate, endDate } = currentMonthRange('America/Sao_Paulo')
@@ -161,19 +206,62 @@ export default async function AdminIndexPage() {
 
   return (
     <div>
-      <header style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#1D2235', margin: 0 }}>Painel B&D</h1>
-        <p style={{ color: '#6B7494', marginTop: '6px' }}>
-          Visão geral em tempo real (apenas pedidos pagos).
-        </p>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header
+        style={{
+          marginBottom: '28px',
+          paddingBottom: '20px',
+          borderBottom: '1px solid #E3E9F4',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <p
+            style={{
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#9AA1B8',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              margin: '0 0 4px',
+            }}
+          >
+            Admin B&D
+          </p>
+          <h1
+            style={{
+              fontSize: '26px',
+              fontWeight: 700,
+              color: '#1D2235',
+              margin: 0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Painel
+          </h1>
+        </div>
+        <span
+          style={{
+            fontSize: '12px',
+            color: '#9AA1B8',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          apenas pedidos pagos
+        </span>
       </header>
 
-      <section style={{ marginBottom: '32px' }}>
+      {/* ── KPIs ───────────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: '36px' }}>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '14px',
           }}
         >
           <KpiCard
@@ -191,7 +279,7 @@ export default async function AdminIndexPage() {
           <KpiCard
             label="Ticket médio (mês)"
             value={formatBRL(metrics.monthAverageTicket)}
-            hint={metrics.monthPaidCount ? 'Por pedido pago' : 'Sem pedidos no mês ainda'}
+            hint={metrics.monthPaidCount ? 'Por pedido pago' : 'Sem pedidos no mês'}
             accent="#A36A1F"
           />
           <KpiCard
@@ -228,13 +316,16 @@ export default async function AdminIndexPage() {
           )}
         </div>
 
+        {/* Top produto */}
         {metrics.topProductThisMonth && (
           <div
             style={{
-              marginTop: '16px',
-              padding: '16px 20px',
-              background: '#F0F5FB',
-              borderRadius: '10px',
+              marginTop: '14px',
+              padding: '14px 20px',
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 1px 4px rgba(29,34,53,0.06)',
+              borderLeft: '3px solid #4A7AB5',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -242,55 +333,92 @@ export default async function AdminIndexPage() {
               gap: '12px',
             }}
           >
-            <div>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#4A7AB5', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
-                Top produto do mês
-              </p>
-              <p style={{ fontSize: '18px', fontWeight: 600, color: '#1D2235', margin: '4px 0 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#4A7AB5', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                🏆 Top produto do mês
+              </span>
+              <span style={{ fontSize: '15px', fontWeight: 600, color: '#1D2235' }}>
                 {metrics.topProductThisMonth.name}
-              </p>
+              </span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ margin: 0, color: '#6B7494', fontSize: '13px' }}>
-                {metrics.topProductThisMonth.quantity} {metrics.topProductThisMonth.quantity === 1 ? 'unidade vendida' : 'unidades vendidas'}
-              </p>
-              <p style={{ margin: '2px 0 0', color: '#1D2235', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ color: '#9AA1B8', fontSize: '12px' }}>
+                {metrics.topProductThisMonth.quantity}{' '}
+                {metrics.topProductThisMonth.quantity === 1 ? 'unidade' : 'unidades'}
+              </span>
+              <span style={{ color: '#1D2235', fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '15px' }}>
                 {formatBRL(metrics.topProductThisMonth.revenue)}
-              </p>
+              </span>
             </div>
           </div>
         )}
       </section>
 
-      <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1D2235', margin: '0 0 16px' }}>Áreas</h2>
+      {/* ── Áreas ──────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h2
+          style={{
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#9AA1B8',
+            textTransform: 'uppercase',
+            letterSpacing: '0.12em',
+            margin: 0,
+          }}
+        >
+          Áreas
+        </h2>
+        <span style={{ fontSize: '11px', color: '#C5CDE0' }}>
+          {cards.length} seções
+        </span>
+      </div>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '20px',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: '12px',
         }}
       >
         {cards.map((card) => (
           <Link
             key={card.href}
             href={card.href}
+            className="admin-area-card"
             style={{
               backgroundColor: 'white',
               borderRadius: '14px',
-              padding: '24px',
-              boxShadow: '0 8px 24px rgba(29,34,53,0.06)',
+              padding: '20px',
+              boxShadow: '0 1px 4px rgba(29,34,53,0.06)',
               textDecoration: 'none',
               color: '#1D2235',
-              borderTop: `4px solid ${card.accent}`,
+              borderTop: `3px solid ${card.accent}`,
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
+              gap: '0',
+              minHeight: '130px',
             }}
           >
-            <span style={{ fontSize: '18px', fontWeight: 700 }}>{card.title}</span>
-            <span style={{ fontSize: '14px', color: '#6B7494', flex: 1 }}>{card.description}</span>
-            <span style={{ fontSize: '14px', color: card.accent, fontWeight: 700 }}>{card.cta}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '26px', lineHeight: 1 }}>{card.icon}</span>
+              <span
+                style={{
+                  fontSize: '18px',
+                  color: card.accent,
+                  opacity: 0.35,
+                  lineHeight: 1,
+                  fontWeight: 300,
+                }}
+              >
+                →
+              </span>
+            </div>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: '#1D2235', lineHeight: 1.2, marginBottom: '6px' }}>
+              {card.title}
+            </span>
+            <span style={{ fontSize: '12px', color: '#9AA1B8', flex: 1, lineHeight: 1.5 }}>
+              {card.description}
+            </span>
           </Link>
         ))}
       </div>
