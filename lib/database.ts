@@ -2240,6 +2240,7 @@ function toTaskWithRelations(task: any) {
     startedAt: task.startedAt ?? null,
     completedAt: task.completedAt ?? null,
     notes: task.notes ?? null,
+    printerId: task.printerId ?? null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     order: {
