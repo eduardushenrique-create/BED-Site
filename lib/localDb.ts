@@ -441,9 +441,12 @@ function ensureDir() {
 }
 
 export function readDB(): Database {
-  ensureDir()
+  // Não chamar ensureDir nem writeDB aqui: writeDB lança em produção, e o
+  // build do Next prerendera páginas chamando readDB sem Postgres real, o
+  // que cairia no fallback. Em dev a primeira escrita real cria o arquivo
+  // naturalmente, e em prod não precisamos do JSON inicial (escritas
+  // vão para o Postgres ou lançam erro).
   if (!fs.existsSync(DB_PATH)) {
-    writeDB(defaultData)
     return defaultData
   }
   try {
