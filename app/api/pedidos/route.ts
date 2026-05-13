@@ -264,9 +264,23 @@ export async function PUT(request: NextRequest) {
   const itemsError = await validateOrderItems(data.items as Array<{ productId: string; variantId?: string | null }> | undefined)
   if (itemsError) return itemsError
 
-  const before = id ? await getOrderByIdOrNumber(id) : null
-
-  const order = await updateOrder(id || '', data)
+  // PR-4 do ADR-003 v2 / R2: updateOrder agora pode lançar
+  // DatabaseUnavailableError em produção (em vez de cair em fallback
+  // localDb volátil). Capturar aqui para retornar 503 em vez de 500.
+  let before: Awaited<ReturnType<typeof getOrderByIdOrNumber>> = null
+  let order: Awaited<ReturnType<typeof updateOrder>> = null
+  try {
+    before = id ? await getOrderByIdOrNumber(id) : null
+    order = await updateOrder(id || '', data)
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503, headers: { 'Retry-After': '30' } },
+      )
+    }
+    throw error
+  }
 
   if (!order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -395,11 +409,24 @@ async function handleStageTransition(input: {
     (before as unknown as { productionTimeline?: ProductionTimeline | null }).productionTimeline || null
   const nextTimeline = withTimelineStamp(currentTimeline, target as FulfillmentStatus)
 
-  const updated = await updateOrder(before.id, {
-    fulfillmentStatus: target,
-    productionTimeline: nextTimeline,
-    currentStageNote: currentStageNote ?? null,
-  } as Parameters<typeof updateOrder>[1])
+  // PR-4 do ADR-003 v2 / R2: updateOrder pode lançar
+  // DatabaseUnavailableError em produção. Capturar para 503.
+  let updated: Awaited<ReturnType<typeof updateOrder>> = null
+  try {
+    updated = await updateOrder(before.id, {
+      fulfillmentStatus: target,
+      productionTimeline: nextTimeline,
+      currentStageNote: currentStageNote ?? null,
+    } as Parameters<typeof updateOrder>[1])
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503, headers: { 'Retry-After': '30' } },
+      )
+    }
+    throw error
+  }
 
   if (!updated) {
     return NextResponse.json({ error: 'Falha ao atualizar pedido' }, { status: 500 })

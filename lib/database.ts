@@ -1921,6 +1921,18 @@ export async function createOrder(
     await hydrateOrderProducts([order])
     return serializeOrder(order)
   } catch (error) {
+    // PR-4 do ADR-003 v2 / R2: em produção, NUNCA cair no fallback
+    // localDb depois que Prisma estourou. Volta o que aconteceu na
+    // manhã de 2026-05-13 (4 pedidos gravados no JSON volátil + perdidos
+    // no próximo deploy do Railway). Lança DatabaseUnavailableError
+    // pra que o handler de API retorne 503 (não 500) e o cliente
+    // veja "indisponível, tente em 1 min" em vez de falsa confirmação.
+    if (FAIL_FAST_IN_PRODUCTION) {
+      reportDbError('createOrder Prisma failed in production, raising 503', error)
+      throw new DatabaseUnavailableError(
+        'Não foi possível registrar o pedido. Tente novamente em alguns instantes.',
+      )
+    }
     reportDbError('createOrder Prisma failed, using fallback', error)
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
@@ -1937,6 +1949,14 @@ type OrderUpdateData = Partial<Order> & {
 
 export async function updateOrder(id: string, data: OrderUpdateData) {
   if (!hasDatabase || !prisma?.order) {
+    // PR-4 do ADR-003 v2 / R2: mesmo motivo do createOrder. Em produção
+    // sem DB, lança 503 em vez de gravar update no JSON volátil que será
+    // descartado no próximo deploy.
+    if (FAIL_FAST_IN_PRODUCTION) {
+      throw new DatabaseUnavailableError(
+        'Não foi possível atualizar o pedido. Tente novamente em alguns instantes.',
+      )
+    }
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
     if (index === -1) return null
@@ -2089,6 +2109,14 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
     await hydrateOrderProducts([order])
     return serializeOrder(order)
   } catch (error) {
+    // PR-4 do ADR-003 v2 / R2: catch geral em prod NUNCA cai no fallback
+    // localDb. Lança 503 pra UI/cliente saber que falhou.
+    if (FAIL_FAST_IN_PRODUCTION) {
+      reportDbError('updateOrder Prisma failed in production, raising 503', error)
+      throw new DatabaseUnavailableError(
+        'Não foi possível atualizar o pedido. Tente novamente em alguns instantes.',
+      )
+    }
     reportDbError('updateOrder Prisma failed, using fallback', error)
     const db = readDB()
     const index = db.orders.findIndex(order => order.id === id)
