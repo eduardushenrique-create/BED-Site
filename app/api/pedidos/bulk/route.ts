@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  DatabaseUnavailableError,
   deleteOrder,
   getOrderByIdOrNumber,
   updateOrder,
@@ -242,6 +243,19 @@ export async function POST(request: NextRequest) {
           },
         ).catch(() => {})
       } catch (error) {
+        // PR-4 do ADR-003 v2 / R2: se o banco está fora, NÃO tentamos os
+        // próximos N pedidos do batch — abortamos com 503 imediato. Cada
+        // tentativa em DB indisponível é desperdício e pode amplificar
+        // problema (timeout em série).
+        if (error instanceof DatabaseUnavailableError) {
+          return NextResponse.json(
+            {
+              error: error.message,
+              partialSuccess: { succeeded, failed: failed.length },
+            },
+            { status: 503, headers: { 'Retry-After': '30' } },
+          )
+        }
         failed.push({ id, error: error instanceof Error ? error.message : 'Erro desconhecido.' })
       }
     }
