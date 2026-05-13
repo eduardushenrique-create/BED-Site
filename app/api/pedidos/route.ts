@@ -5,6 +5,7 @@ import {
   getOrderByIdOrNumber,
   listOrders,
   updateOrder,
+  DatabaseUnavailableError,
 } from '@/lib/database'
 import { requireApiAdmin } from '@/lib/api-auth'
 import { notifyOrderStatusChange } from '@/lib/order-notifications'
@@ -178,50 +179,64 @@ export async function POST(request: NextRequest) {
     Math.round((subtotal + shipping - discount.normalized.discountTotal) * 100) / 100,
   )
 
-  const newOrder = await createOrder({
-    ...body,
-    discountTotal: discount.normalized.discountTotal,
-    discountReason: discount.normalized.reason,
-    discountKind: discount.normalized.kind,
-    discountInput: discount.normalized.input,
-    discountAppliedBy: discount.normalized.discountTotal > 0 ? auth.user?.email || null : null,
-    total: authoritativeTotal,
-  })
-
-  // Audit log de criacao do pedido. Registrar mesmo quando nao tem desconto
-  // ajuda a fiscalizar quem criou cada pedido manual (resposta do stakeholder
-  // sobre rastreabilidade do atendimento).
-  recordAuditEntry({
-    actorEmail: auth.user!.email,
-    actorRole: auth.user!.role || null,
-    action: 'order.create',
-    targetType: 'Order',
-    targetId: newOrder.id,
-    summary:
-      discount.normalized.discountTotal > 0
-        ? `Pedido ${newOrder.orderNumber} criado com desconto manual de R$ ${discount.normalized.discountTotal.toFixed(2)}${discount.normalized.reason ? ` (${discount.normalized.reason})` : ''}`
-        : `Pedido ${newOrder.orderNumber} criado manualmente`,
-    metadata: {
-      orderNumber: newOrder.orderNumber,
-      customerEmail: newOrder.customerEmail,
-      subtotal,
-      shipping,
+  try {
+    const newOrder = await createOrder({
+      ...body,
+      discountTotal: discount.normalized.discountTotal,
+      discountReason: discount.normalized.reason,
+      discountKind: discount.normalized.kind,
+      discountInput: discount.normalized.input,
+      discountAppliedBy: discount.normalized.discountTotal > 0 ? auth.user?.email || null : null,
       total: authoritativeTotal,
-      ...(discount.normalized.discountTotal > 0
-        ? {
-            discount: {
-              total: discount.normalized.discountTotal,
-              kind: discount.normalized.kind,
-              input: discount.normalized.input,
-              reason: discount.normalized.reason,
-            },
-          }
-        : {}),
-    },
-    ip: getClientIp(request),
-  }).catch(() => {})
+    })
 
-  return NextResponse.json(newOrder, { status: 201 })
+    // Audit log de criacao do pedido. Registrar mesmo quando nao tem desconto
+    // ajuda a fiscalizar quem criou cada pedido manual (resposta do stakeholder
+    // sobre rastreabilidade do atendimento).
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: 'order.create',
+      targetType: 'Order',
+      targetId: newOrder.id,
+      summary:
+        discount.normalized.discountTotal > 0
+          ? `Pedido ${newOrder.orderNumber} criado com desconto manual de R$ ${discount.normalized.discountTotal.toFixed(2)}${discount.normalized.reason ? ` (${discount.normalized.reason})` : ''}`
+          : `Pedido ${newOrder.orderNumber} criado manualmente`,
+      metadata: {
+        orderNumber: newOrder.orderNumber,
+        customerEmail: newOrder.customerEmail,
+        subtotal,
+        shipping,
+        total: authoritativeTotal,
+        ...(discount.normalized.discountTotal > 0
+          ? {
+              discount: {
+                total: discount.normalized.discountTotal,
+                kind: discount.normalized.kind,
+                input: discount.normalized.input,
+                reason: discount.normalized.reason,
+              },
+            }
+          : {}),
+      },
+      ip: getClientIp(request),
+    }).catch(() => {})
+
+    return NextResponse.json(newOrder, { status: 201 })
+  } catch (error) {
+    // Quando o banco está fora em produção, createOrder lança em vez de
+    // gravar no fallback localDb volátil (vide incidente de 2026-05-13).
+    // Retornar 503 explícito faz o admin ver "tente de novo" em vez de
+    // uma falsa confirmação que some no próximo deploy.
+    if (error instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503, headers: { 'Retry-After': '30' } },
+      )
+    }
+    throw error
+  }
 }
 
 export async function PUT(request: NextRequest) {

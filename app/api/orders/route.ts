@@ -6,6 +6,7 @@ import {
   validateAndCalculateCoupon,
   incrementCouponUsage,
   decrementOrderStock,
+  DatabaseUnavailableError,
 } from '@/lib/database'
 import { requireApiUser } from '@/lib/api-auth'
 import { getLocalCatalogProducts } from '@/lib/catalog'
@@ -385,6 +386,13 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      captureException(error, { context: 'api.orders', detail: 'POST createOrder DB unavailable' })
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503, headers: { 'Retry-After': '30' } },
+      )
+    }
     captureException(error, { context: 'api.orders', detail: 'POST createOrder failed' })
     return NextResponse.json(
       { error: 'Erro ao criar pedido' },

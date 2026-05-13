@@ -97,6 +97,81 @@ async function persistImageIfDataUrl(
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
 
+/**
+ * Erro lançado quando o banco está indisponível em produção. Em vez de cair
+ * silenciosamente pro fallback localDb (que vive num container Docker
+ * efêmero e some no próximo deploy), criamos esse erro para que os route
+ * handlers retornem 503 explícito e o cliente veja uma falha real.
+ *
+ * Em dev/teste o fallback continua funcionando — é a única forma de rodar
+ * sem Postgres.
+ */
+export class DatabaseUnavailableError extends Error {
+  constructor(message = 'Banco de dados indisponível no momento. Tente novamente em alguns instantes.') {
+    super(message)
+    this.name = 'DatabaseUnavailableError'
+  }
+}
+
+/** True quando precisamos falhar visivelmente em vez de cair no localDb. */
+const FAIL_FAST_IN_PRODUCTION =
+  process.env.NODE_ENV === 'production' && Boolean(process.env.DATABASE_URL)
+
+/**
+ * Include "seguro" para listagens de Order: NÃO faz join com Product porque
+ * a relation OrderItem→Product é NOT NULL no schema (prisma/schema.prisma:236)
+ * mas registros órfãos existem em prod (produto deletado deixou OrderItem
+ * apontando pra id que não existe mais). Esse mismatch faz o Prisma jogar
+ * exceção no findMany inteiro, derrubando a tela de pedidos.
+ *
+ * Para hidratar `product.underOrder` / `product.isPersonalizable` que o
+ * serializeOrder precisa, chamar `hydrateOrderProducts(orders)` em seguida.
+ * Produtos não encontrados ficam como `null` no item — serializeOrder já
+ * tolera (`item.product?.underOrder ?? item.underOrder ?? false`).
+ */
+const ORDER_INCLUDE_SAFE = {
+  address: true,
+  payment: true,
+  items: { include: { variant: true } },
+} as const
+
+type OrderWithItems = {
+  items: Array<{ productId: string; product?: unknown }>
+}
+
+/**
+ * Hidrata `item.product` em uma lista de pedidos consultando Products
+ * separadamente. Anexa em memória, com tolerância a produto inexistente
+ * (item.product fica null em vez de derrubar o batch).
+ *
+ * Idempotente: se já houver `product`, sobrescreve com o snapshot atual.
+ */
+async function hydrateOrderProducts<T extends OrderWithItems>(orders: T[]): Promise<void> {
+  if (!prisma?.product || orders.length === 0) return
+
+  const productIds = Array.from(
+    new Set(orders.flatMap(order => order.items.map(item => item.productId).filter(Boolean))),
+  )
+  if (productIds.length === 0) return
+
+  try {
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, underOrder: true, isPersonalizable: true },
+    })
+    const productMap = new Map(products.map(p => [p.id, p]))
+    for (const order of orders) {
+      for (const item of order.items) {
+        ;(item as { product?: unknown }).product = productMap.get(item.productId) ?? null
+      }
+    }
+  } catch (error) {
+    // Hidratação é best-effort. Se falhar, items ficam sem product e o
+    // serializeOrder cai nos fallbacks (`?? false`).
+    reportDbError('hydrateOrderProducts failed', error)
+  }
+}
+
 type WebhookEventUpsert = {
   provider: string
   deliveryKey: string
@@ -1067,7 +1142,7 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+        include: ORDER_INCLUDE_SAFE,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
@@ -1075,6 +1150,7 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
       prisma.order.count({ where }),
     ])
 
+    await hydrateOrderProducts(orders)
     return {
       orders: orders.map(serializeOrder),
       total,
@@ -1382,9 +1458,10 @@ export async function listOrders() {
   if (!hasDatabase || !prisma?.order) return readDB().orders
   try {
     const orders = await prisma.order.findMany({
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
       orderBy: { createdAt: 'desc' },
     })
+    await hydrateOrderProducts(orders)
     return orders.map(serializeOrder)
   } catch (error) {
     reportDbError('listOrders Prisma failed, using fallback', error)
@@ -1400,9 +1477,11 @@ export async function getOrderByNumber(orderNumber: string) {
   try {
     const order = await prisma.order.findUnique({
       where: { orderNumber },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
-    return order ? serializeOrder(order) : null
+    if (!order) return null
+    await hydrateOrderProducts([order])
+    return serializeOrder(order)
   } catch (error) {
     reportDbError('getOrderByNumber Prisma failed, using fallback', error)
     return readDB().orders.find(order => order.orderNumber === orderNumber) || null
@@ -1420,9 +1499,11 @@ export async function getOrderByTrackingCode(trackingCode: string) {
   try {
     const order = await prisma.order.findFirst({
       where: { trackingCode: code },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
-    return order ? serializeOrder(order) : null
+    if (!order) return null
+    await hydrateOrderProducts([order])
+    return serializeOrder(order)
   } catch (error) {
     reportDbError('getOrderByTrackingCode Prisma failed, using fallback', error)
     return readDB().orders.find(order => order.trackingCode === code) || null
@@ -1593,9 +1674,11 @@ export async function getOrderByIdOrNumber(idOrNumber: string) {
   try {
     const order = await prisma.order.findFirst({
       where: { OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }] },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
-    return order ? serializeOrder(order) : null
+    if (!order) return null
+    await hydrateOrderProducts([order])
+    return serializeOrder(order)
   } catch (error) {
     reportDbError('getOrderByIdOrNumber Prisma failed, using fallback', error)
     const orders = readDB().orders
@@ -1621,6 +1704,19 @@ export async function createOrder(
   },
 ) {
   if (!hasDatabase || !prisma?.order) {
+    // Em produção com DATABASE_URL configurada, NUNCA cair pro fallback
+    // localDb. O container do Railway é efêmero — qualquer pedido gravado
+    // no JSON some no próximo deploy (vide incidente de 2026-05-13:
+    // 4 pedidos perdidos na publicação do PR #126). Em vez disso, lança
+    // erro 503 para que o cliente final veja "indisponível, tente em 1 min"
+    // e o pedido seja recriado via retry, ou que o admin recarregue a
+    // página e tente de novo — em ambos os casos o usuário vê a falha
+    // real em vez de receber uma falsa confirmação.
+    if (FAIL_FAST_IN_PRODUCTION) {
+      throw new DatabaseUnavailableError(
+        'Pedido não pôde ser registrado: banco de dados indisponível. Tente novamente em alguns instantes.',
+      )
+    }
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
     db.orders.unshift(newOrder)
@@ -1748,7 +1844,7 @@ export async function createOrder(
           })),
         },
       },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
 
     // Fase 4 SPEC-001: alerta proativo de componentes em falta.
@@ -1765,6 +1861,7 @@ export async function createOrder(
       }
     }).catch(() => {})
 
+    await hydrateOrderProducts([order])
     return serializeOrder(order)
   } catch (error) {
     reportDbError('createOrder Prisma failed, using fallback', error)
@@ -1909,7 +2006,7 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
         ...stageNotePatch,
         ...autoTransitionPatch,
       },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
 
     if (data.paymentStatus) {
@@ -1932,6 +2029,7 @@ export async function updateOrder(id: string, data: OrderUpdateData) {
       })
     }
 
+    await hydrateOrderProducts([order])
     return serializeOrder(order)
   } catch (error) {
     reportDbError('updateOrder Prisma failed, using fallback', error)
@@ -2077,7 +2175,7 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
           },
         },
       },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
+      include: ORDER_INCLUDE_SAFE,
     })
 
     if (data.rawPayload?.paidAt && order.payment?.id) {
@@ -2087,10 +2185,12 @@ export async function updateOrderPaymentByNumber(orderNumber: string, data: {
       })
     }
 
-    return serializeOrder(await prisma.order.findUniqueOrThrow({
+    const fresh = await prisma.order.findUniqueOrThrow({
       where: { orderNumber },
-      include: { address: true, payment: true, items: { include: { variant: true, product: { select: { underOrder: true, isPersonalizable: true } } } } },
-    }))
+      include: ORDER_INCLUDE_SAFE,
+    })
+    await hydrateOrderProducts([fresh])
+    return serializeOrder(fresh)
   } catch (error) {
     reportDbError('updateOrderPaymentByNumber Prisma failed', error)
     return null
