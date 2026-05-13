@@ -3,6 +3,26 @@ import path from 'path'
 
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json')
 
+/**
+ * Lançado quando alguma escrita seria silenciosamente persistida no
+ * fallback localDb durante produção. Em desenvolvimento o fallback
+ * continua funcionando (essencial para rodar sem Postgres). Em produção
+ * (NODE_ENV=production E DATABASE_URL configurado) qualquer tentativa
+ * de escrita no JSON local seria perda de dados — o container do
+ * Railway é efêmero. Daí lançamos pra que o route handler retorne 503
+ * e o cliente saiba que precisa retentar, em vez de receber uma falsa
+ * confirmação que sumirá no próximo deploy (incidente 2026-05-13).
+ */
+export class DatabaseUnavailableError extends Error {
+  constructor(message = 'Banco de dados indisponível. Tente novamente em alguns instantes.') {
+    super(message)
+    this.name = 'DatabaseUnavailableError'
+  }
+}
+
+const isProductionWithDb =
+  process.env.NODE_ENV === 'production' && Boolean(process.env.DATABASE_URL)
+
 export type Product = {
   id: string
   name: string
@@ -422,9 +442,12 @@ function ensureDir() {
 }
 
 export function readDB(): Database {
-  ensureDir()
+  // Não chamar ensureDir nem writeDB aqui: writeDB lança em produção (e
+  // o build do Next prerendera páginas chamando readDB com Postgres dummy,
+  // o que cairia no fallback durante o build). Em dev, a primeira escrita
+  // real cria o arquivo naturalmente. Em prod não precisamos do JSON
+  // inicial — escritas vão para o Postgres ou lançam erro visível.
   if (!fs.existsSync(DB_PATH)) {
-    writeDB(defaultData)
     return defaultData
   }
   try {
@@ -464,6 +487,15 @@ export function readDB(): Database {
 }
 
 export function writeDB(data: Database): void {
+  // Em produção com DATABASE_URL configurado, qualquer escrita no JSON
+  // local seria perda de dados — o container do Railway é descartado a
+  // cada deploy. Foi assim que os 4 pedidos do incidente de 2026-05-13
+  // sumiram. A partir daqui falhamos visivelmente em vez de mascarar.
+  if (isProductionWithDb) {
+    throw new DatabaseUnavailableError(
+      'Tentativa de gravar no fallback localDb em produção. Banco de dados está indisponível — pedido/dado NÃO foi salvo. Tente de novo em alguns instantes.',
+    )
+  }
   ensureDir()
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2))
 }
