@@ -1,0 +1,48 @@
+# Configuracao do GitHub action `actions/labeler@v5`. Aplica o label
+# `sensitive-area` automaticamente em PRs que tocam arquivos cuja
+# alteracao tem alto blast radius (causaram incidentes em prod no
+# passado, ou tem potencial de causar).
+#
+# Lista derivada do CR-1b do POSTMORTEM-2026-05-13-deploys.md +
+# expansoes do agente security-architect (auth, webhooks, segredos).
+#
+# Branch protection no GitHub Settings exige aprovacao humana explicita
+# em PRs com este label. Sem o label, PR pode ser auto-mergeado
+# normalmente (mudancas cosmeticas, docs etc.).
+
+sensitive-area:
+  - changed-files:
+      - any-glob-to-any-file:
+          # Boot e infra de deploy
+          - 'Dockerfile'
+          - 'railway.toml'
+          - 'next.config.*'
+          - 'tsconfig*.json'
+          - 'package.json'
+          - 'package-lock.json'
+          - 'scripts/**'
+          - '.github/workflows/**'
+          # Schema e migrations
+          - 'prisma/schema.prisma'
+          - 'prisma/migrations/**'
+          # Libs criticas (causaram incidentes ou tem alto blast radius)
+          - 'lib/prisma.ts'
+          - 'lib/database.ts'
+          - 'lib/api-auth.ts'
+          - 'lib/payment.ts'
+          - 'lib/order-notifications.ts'
+          - 'lib/order-production-bridge.ts'
+          - 'lib/webhook-signature*'
+          - 'lib/errors.ts'
+          # Auth e middleware
+          - 'middleware.ts'
+          # Endpoints de risco
+          - 'app/api/webhooks/**'
+          - 'app/api/admin/**'
+          - 'app/api/health/**'
+          - 'app/api/orders/**'
+          - 'app/api/pedidos/**'
+          # Segredos
+          - '.env.example'
+          - '**/*secret*'
+          - '**/*token*'
