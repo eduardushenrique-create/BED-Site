@@ -217,19 +217,6 @@ model Order {
   // for editado/excluido depois. Default 'sob_encomenda' eh o pipeline mais
   // completo — seguro como fallback.
   orderType          String    @default("sob_encomenda") // 'sob_encomenda' | 'pronta_entrega'
-  // SPEC-005 §9.1 — origem do pedido. 'site' = checkout publico (cliente
-  // cadastrado); 'admin' = criado no painel (loja fisica, WhatsApp, telefone).
-  // Pedidos 'admin' nao recebem email automatico e nao aparecem em
-  // /minha-conta/pedidos — comunicacao fica a cargo do admin fora do sistema.
-  createdVia         String    @default("site") // 'site' | 'admin'
-  // SPEC-005 §3.2.1 — totais agregados de pagamento. Persistidos (nao
-  // computed) pra permitir filtro/ordenacao na listagem do admin. Atualizados
-  // em transacao a cada PaymentInstallment criado/alterado/removido.
-  paidAmount         Decimal   @default(0) @db.Decimal(10, 2)
-  dueAmount          Decimal   @default(0) @db.Decimal(10, 2)
-  // SPEC-005 §9.5 — estado do estorno via Mercado Pago.
-  // null = sem estorno; 'pending' | 'requested' | 'refunded' | 'failed'
-  refundStatus       String?
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -239,14 +226,12 @@ model Order {
   payment         Payment?
   shipment        Shipment?
   productionTasks ProductionTask[]
-  installments    PaymentInstallment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([customerEmail])
   @@index([customerId])
-  @@index([createdVia])
 }
 
 model OrderItem {
@@ -264,12 +249,6 @@ model OrderItem {
   total               Decimal         @db.Decimal(10, 2)
   personalizationJson String?
   productionTask      ProductionTask?
-  // SPEC-005 §3.1.2 — soft-delete pra preservar historico ao remover item
-  // do pedido (modo ITEM_ONLY do DELETE de producao). Queries de listagem
-  // filtram deletedAt IS NULL.
-  deletedAt           DateTime?
-
-  @@index([deletedAt])
 }
 
 model Address {
@@ -299,59 +278,6 @@ model Payment {
   pixCopyPaste      String?
   paidAt            DateTime?
   rawPayload        Json?
-
-  // SPEC-005 §3.2.1 — installments linkados a este Payment quando o webhook
-  // do Mercado Pago materializa o pagamento como registro contabil. Pra
-  // pagamentos manuais (dinheiro/PIX direto) o installment nao tem paymentId.
-  installments      PaymentInstallment[]
-}
-
-// SPEC-005 §3.2.1 — registros individuais de recebimento por pedido.
-// Suporta pagamentos parciais (50% entrada + 50% retirada), estornos
-// (isRefund=true) e multiplos metodos por pedido. NAO substitui Payment;
-// coexiste com ele (Payment continua sendo a fonte do webhook MP, e
-// installments sao a soma materializada de tudo que entrou/saiu).
-//
-// Order.paidAmount = soma(amount onde !isRefund && deletedAt IS NULL)
-//                  - soma(amount onde  isRefund && deletedAt IS NULL)
-// Order.dueAmount  = Order.total - Order.paidAmount
-//
-// Atualizacao em transacao com lock pessimista no Order pra evitar race
-// entre dois admins registrando ao mesmo tempo.
-model PaymentInstallment {
-  id              String    @id @default(cuid())
-  orderId         String
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  // Ordem cronologica dentro do pedido (1, 2, 3...). Atribuida pela
-  // aplicacao em transacao — nao ha unique constraint pois resequenciar
-  // apos delete fica mais simples assim.
-  sequence        Int
-
-  amount          Decimal   @db.Decimal(10, 2)
-  // 'cash' | 'pix_manual' | 'bank_transfer' | 'mercadopago' | 'other'
-  // Texto livre validado na aplicacao (segue padrao das outras tabelas).
-  method          String
-  description     String?
-  receivedAt      DateTime
-  // Email do admin que registrou; 'system' quando vem do webhook MP.
-  receivedByEmail String
-  notes           String?
-  isRefund        Boolean   @default(false)
-  // Soft-delete pra auditoria (admin pode reverter um registro errado).
-  deletedAt       DateTime?
-
-  // Opcional: link com Payment quando o installment foi materializado a
-  // partir do webhook MP. Pagamentos manuais ficam com paymentId NULL.
-  paymentId       String?
-  payment         Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([orderId, sequence])
-  @@index([receivedAt])
-  @@index([deletedAt])
 }
 
 model Shipment {
