@@ -1456,15 +1456,72 @@ export async function deleteBanner(id: string) {
 
 export async function listOrders() {
   if (!hasDatabase || !prisma?.order) return readDB().orders
+
+  // Tenta o caminho otimista: 1 round-trip pra hidratar tudo. Se um pedido
+  // tiver dado corrompido (relation em estado inconsistente, payload JSON
+  // malformado, etc.) e derrubar o batch, cai pro modo resiliente.
   try {
     const orders = await prisma.order.findMany({
       include: ORDER_INCLUDE_SAFE,
       orderBy: { createdAt: 'desc' },
     })
     await hydrateOrderProducts(orders)
-    return orders.map(serializeOrder)
+
+    // Serialize com try/catch por pedido para que um registro malformado
+    // (data corrompida, payment.rawPayload inválido, etc.) não derrube
+    // toda a lista. Quem falha vira log e é omitido da resposta.
+    const serialized: Order[] = []
+    for (const order of orders) {
+      try {
+        serialized.push(serializeOrder(order))
+      } catch (serializeError) {
+        reportDbError(
+          `listOrders serializeOrder failed for ${(order as { orderNumber?: string }).orderNumber || '?'}`,
+          serializeError,
+        )
+      }
+    }
+    return serialized
   } catch (error) {
-    reportDbError('listOrders Prisma failed, using fallback', error)
+    // Bulk findMany falhou (algum pedido tem relation que o Prisma não
+    // consegue hidratar). Em vez de cair no localDb vazio, faz fetch
+    // pedido-por-pedido pulando os ruins. Mais lento mas resiliente —
+    // garante que pedidos saudáveis continuem visíveis enquanto a
+    // entrada problemática é investigada.
+    reportDbError('listOrders bulk findMany failed, switching to per-order fetch', error)
+    return listOrdersPerOrderFallback()
+  }
+}
+
+/**
+ * Fallback resiliente do listOrders. Busca IDs com uma query enxuta
+ * (sem includes), depois hidrata um por um em try/catch isolado.
+ * Pedidos com hidratação quebrada são pulados e logados.
+ */
+async function listOrdersPerOrderFallback(): Promise<Order[]> {
+  if (!prisma?.order) return readDB().orders
+  try {
+    const baseList = await prisma.order.findMany({
+      select: { id: true, orderNumber: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    const results: Order[] = []
+    for (const { id, orderNumber } of baseList) {
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id },
+          include: ORDER_INCLUDE_SAFE,
+        })
+        if (!order) continue
+        await hydrateOrderProducts([order])
+        results.push(serializeOrder(order))
+      } catch (perOrderError) {
+        reportDbError(`listOrdersPerOrderFallback failed for ${orderNumber}`, perOrderError)
+      }
+    }
+    return results
+  } catch (error) {
+    reportDbError('listOrdersPerOrderFallback could not even list IDs', error)
     return readDB().orders
   }
 }
