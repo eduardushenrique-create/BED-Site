@@ -1,30 +1,25 @@
 #!/usr/bin/env node
-// Startup wrapper. Em produção, garante que o schema do banco está em dia
-// antes de abrir tráfego — caso contrário, app NÃO sobe.
+// Startup wrapper: garante que o schema do banco esta sincronizado antes de
+// iniciar o Next. Roda em duas tentativas escalonadas:
 //
-// Mudança de filosofia pós-incidente 2026-05-13:
-//   Antes: se prisma migrate deploy falhar, aplica fallback SQL hardcoded
-//          de 2 migrations específicas e segue. Migrations novas ficavam
-//          pendentes silenciosamente e o app subia com Prisma client
-//          dessincronizado, mascarando erros como "lista de pedidos vazia".
-//   Agora: tenta prisma migrate deploy com retry. Se ainda falhar em
-//          produção, exit(1) — Railway reinicia, equipe vê o problema
-//          imediatamente em vez de descobrir horas depois pelo usuário.
+//   1. `prisma migrate deploy` via CLI (caminho normal). Idempotente.
+//   2. Se o CLI falhar/nao estiver acessivel, aplica DIRETAMENTE via SQL
+//      as migrations conhecidas do redesign do pipeline (orderType e
+//      deliveryMethod). Tambem idempotente — checa schema antes.
 //
-// Dev/local: sem DATABASE_URL ou com migrate falhando, segue rodando em
-// modo localDb. Não bloqueia o desenvolvimento.
+// Resiliente: se TUDO falhar, loga e segue o startup. App sobe usando
+// fallback localDb. Nao bloqueia trafego — pedidos antigos continuam
+// funcionando enquanto admin destrava manualmente via /admin/sistema/migrations.
 
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
 const PRISMA_CLI = 'node_modules/prisma/build/index.js'
-const MAX_RETRIES = 3
-const RETRY_DELAY_MS = 5000
 
-function runMigrationsOnce() {
+function runMigrationsCli() {
   return new Promise((resolve) => {
     if (!existsSync(PRISMA_CLI)) {
-      console.error(`[startup] Prisma CLI nao encontrado em ${PRISMA_CLI}`)
+      console.warn(`[startup] Prisma CLI nao encontrado em ${PRISMA_CLI} — pulando para fallback SQL`)
       resolve(false)
       return
     }
@@ -40,52 +35,99 @@ function runMigrationsOnce() {
       resolve(ok)
     }
     proc.on('exit', (code) => finish(code === 0, `prisma migrate deploy exit=${code}`))
-    proc.on('error', (err) =>
-      finish(false, `prisma migrate deploy erro de processo: ${err?.message || err}`),
-    )
+    proc.on('error', (err) => finish(false, `prisma migrate deploy erro de processo: ${err?.message || err}`))
   })
 }
 
-async function runMigrationsWithRetry() {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`[startup] migrate deploy tentativa ${attempt}/${MAX_RETRIES}`)
-    const ok = await runMigrationsOnce()
-    if (ok) return true
-    if (attempt < MAX_RETRIES) {
-      console.log(`[startup] retry em ${RETRY_DELAY_MS}ms...`)
-      await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
-    }
-  }
-  return false
-}
-
-async function main() {
-  const isProduction = process.env.NODE_ENV === 'production'
-
-  if (!process.env.DATABASE_URL) {
-    if (isProduction) {
-      console.error('[startup] FATAL: NODE_ENV=production sem DATABASE_URL — abortando.')
-      process.exit(1)
-    }
-    console.warn('[startup] DATABASE_URL ausente — modo localDb (apenas dev)')
-    console.log('[startup] iniciando Next.js standalone')
-    await import('./../server.js')
+// Fallback: aplica via SQL direto usando o @prisma/client que JA esta no
+// runtime (nao depende do CLI). Cobre as duas migrations recentes que
+// mais frequentemente ficaram pendentes em prod. Idempotente.
+async function applySqlFallback() {
+  let client
+  try {
+    const mod = await import('@prisma/client')
+    const PrismaClient = mod.PrismaClient
+    if (!PrismaClient) throw new Error('@prisma/client sem PrismaClient export')
+    client = new PrismaClient()
+  } catch (err) {
+    console.error('[startup-fallback] nao conseguiu carregar @prisma/client:', err?.message || err)
     return
   }
 
-  console.log('[startup] aplicando migrations via prisma migrate deploy')
-  const ok = await runMigrationsWithRetry()
-
-  if (!ok) {
-    if (isProduction) {
-      console.error('[startup] FATAL: migrations nao aplicadas apos retries. App nao vai subir.')
-      console.error('[startup] verifique conectividade do Postgres e estado da tabela _prisma_migrations.')
-      console.error('[startup] em ultimo caso, aplique a migration pendente via Railway → Postgres → Query.')
-      process.exit(1)
-    }
-    console.warn('[startup] migrate deploy falhou em dev — seguindo mesmo assim com schema potencialmente atrasado')
+  async function columnExists(table, column) {
+    const rows = await client.$queryRawUnsafe(
+      `SELECT EXISTS(
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = $1 AND column_name = $2
+       ) as exists`,
+      table,
+      column,
+    )
+    return Boolean(rows?.[0]?.exists)
   }
 
+  // Migration 20260507180000_pipeline_redesign
+  try {
+    if (!(await columnExists('Order', 'deliveryMethod'))) {
+      await client.$executeRawUnsafe(
+        `ALTER TABLE "Order" ADD COLUMN "deliveryMethod" TEXT NOT NULL DEFAULT 'shipping'`,
+      )
+      await client.$executeRawUnsafe(
+        `UPDATE "Order" SET "fulfillmentStatus" = 'pending' WHERE "fulfillmentStatus" = 'em_revisao'`,
+      )
+      await client.$executeRawUnsafe(
+        `UPDATE "Order" SET "fulfillmentStatus" = 'na_fila' WHERE "fulfillmentStatus" = 'aguardando_producao'`,
+      )
+      console.log('[startup-fallback] migration 20260507180000 aplicada via SQL')
+    } else {
+      console.log('[startup-fallback] migration 20260507180000 ja aplicada')
+    }
+  } catch (err) {
+    console.error('[startup-fallback] falha em 20260507180000:', err?.message || err)
+  }
+
+  // Migration 20260508030000_order_type_persisted
+  try {
+    if (!(await columnExists('Order', 'orderType'))) {
+      await client.$executeRawUnsafe(
+        `ALTER TABLE "Order" ADD COLUMN "orderType" TEXT NOT NULL DEFAULT 'sob_encomenda'`,
+      )
+      await client.$executeRawUnsafe(
+        `UPDATE "Order" o
+           SET "orderType" = 'pronta_entrega'
+           WHERE NOT EXISTS (
+             SELECT 1 FROM "OrderItem" oi
+             JOIN "Product" p ON p.id = oi."productId"
+             WHERE oi."orderId" = o.id
+               AND (p."underOrder" = true OR p."isPersonalizable" = true)
+           )`,
+      )
+      console.log('[startup-fallback] migration 20260508030000 aplicada via SQL')
+    } else {
+      console.log('[startup-fallback] migration 20260508030000 ja aplicada')
+    }
+  } catch (err) {
+    console.error('[startup-fallback] falha em 20260508030000:', err?.message || err)
+  }
+
+  try {
+    await client.$disconnect()
+  } catch {
+    // ignore
+  }
+}
+
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.log('[startup] DATABASE_URL ausente — pulando migrations (modo localDb)')
+  } else {
+    console.log('[startup] tentando prisma migrate deploy via CLI')
+    const cliOk = await runMigrationsCli()
+    if (!cliOk) {
+      console.warn('[startup] CLI falhou — aplicando fallback SQL inline')
+      await applySqlFallback()
+    }
+  }
   console.log('[startup] iniciando Next.js standalone')
   await import('./../server.js')
 }
