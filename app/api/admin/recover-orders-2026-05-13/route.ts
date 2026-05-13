@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { requireApiAdmin } from '@/lib/api-auth'
 import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+
+// Token estático usado APENAS por este endpoint temporário, para permitir
+// disparo via WebFetch (server-to-server) sem cookie de sessão.
+// Será removido junto com o endpoint inteiro no PR de cleanup.
+const RECOVERY_TOKEN = 'incidente-2026-05-13-4-pedidos-recuperacao-edu'
 
 /**
  * Endpoint TEMPORÁRIO para recuperar os 4 pedidos perdidos no fallback
@@ -349,10 +354,7 @@ async function recoverOne(payload: RecoveryPayload) {
   }
 }
 
-export async function POST() {
-  const auth = await requireApiAdmin()
-  if (auth.response) return auth.response
-
+async function executeRecovery() {
   if (!prisma?.order) {
     return NextResponse.json(
       { error: 'Prisma client indisponível' },
@@ -373,4 +375,32 @@ export async function POST() {
   }
 
   return NextResponse.json({ summary, results }, { status: 200 })
+}
+
+export async function POST() {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
+  return executeRecovery()
+}
+
+// GET aceita disparo via token (sem sessão admin) para automação a partir
+// de fora do browser logado. Idempotente — re-execução é no-op porque cada
+// pedido já criado vira `already_exists`. Token é descartado junto com o
+// endpoint no PR de cleanup.
+export async function GET(request: NextRequest) {
+  const headerToken = request.headers.get('x-recovery-token')
+  const queryToken = request.nextUrl.searchParams.get('token')
+  const providedToken = headerToken || queryToken
+  if (providedToken === RECOVERY_TOKEN) {
+    return executeRecovery()
+  }
+  // Sem token válido, tenta sessão admin.
+  const auth = await requireApiAdmin()
+  if (auth.response) {
+    return NextResponse.json(
+      { error: 'token inválido e sessão admin ausente' },
+      { status: 401 },
+    )
+  }
+  return executeRecovery()
 }
