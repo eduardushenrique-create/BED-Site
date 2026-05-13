@@ -46,6 +46,81 @@ function summarizeProductionTrigger(result: TriggerProductionResult) {
   return { responsePayload, auditMetadata }
 }
 
+/**
+ * Valida o desconto manual aplicado pelo admin na criacao do pedido.
+ * O backend e a fonte da verdade: recalcula a partir de kind+input e ignora
+ * o `discountTotal` cru do cliente quando dados suficientes vierem. Cap em
+ * subtotal+frete pra impedir total negativo.
+ *
+ * Retorna { error } com mensagem amigavel quando rejeita, ou
+ * { normalized } com os valores autoritativos pra persistir.
+ */
+function validateDiscount(body: {
+  subtotal?: unknown
+  shippingCost?: unknown
+  discountTotal?: unknown
+  discountKind?: unknown
+  discountInput?: unknown
+  discountReason?: unknown
+}): {
+  error?: string
+  normalized: {
+    discountTotal: number
+    reason: string | null
+    kind: 'fixed' | 'percentage' | null
+    input: number | null
+  }
+} {
+  const empty = {
+    normalized: { discountTotal: 0, reason: null, kind: null, input: null },
+  } as const
+
+  const subtotal = Number(body.subtotal) || 0
+  const shipping = Number(body.shippingCost) || 0
+  const requested = Number(body.discountTotal) || 0
+  if (requested === 0) return empty
+
+  if (requested < 0) {
+    return { error: 'Desconto nao pode ser negativo', ...empty }
+  }
+
+  const kind =
+    body.discountKind === 'percentage' || body.discountKind === 'fixed'
+      ? body.discountKind
+      : null
+  const input =
+    typeof body.discountInput === 'number' && Number.isFinite(body.discountInput)
+      ? body.discountInput
+      : null
+
+  let canonical = requested
+  if (kind === 'percentage' && input !== null) {
+    if (input < 0 || input > 100) {
+      return { error: 'Percentual de desconto deve estar entre 0 e 100', ...empty }
+    }
+    canonical = Math.min(subtotal, (subtotal * input) / 100)
+  } else if (kind === 'fixed' && input !== null) {
+    if (input < 0) {
+      return { error: 'Valor de desconto nao pode ser negativo', ...empty }
+    }
+    canonical = Math.min(subtotal + shipping, input)
+  }
+
+  if (canonical > subtotal + shipping) {
+    return { error: 'Desconto maior que subtotal + frete', ...empty }
+  }
+
+  const reasonRaw = typeof body.discountReason === 'string' ? body.discountReason.trim() : ''
+  return {
+    normalized: {
+      discountTotal: Math.round(Math.max(0, canonical) * 100) / 100,
+      reason: reasonRaw ? reasonRaw.slice(0, 200) : null,
+      kind,
+      input,
+    },
+  }
+}
+
 async function validateOrderItems(
   items: Array<{ productId: string; variantId?: string | null }> | undefined,
 ): Promise<NextResponse | null> {
@@ -88,7 +163,64 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const itemsError = await validateOrderItems(body.items)
   if (itemsError) return itemsError
-  const newOrder = await createOrder(body)
+
+  // Validacao de desconto manual. Server-side e a fonte da verdade — o cliente
+  // pode mandar `total` calculado, mas a gente recalcula a partir do subtotal
+  // e do desconto autoritativo pra impedir adulteracao.
+  const discount = validateDiscount(body)
+  if (discount.error) {
+    return NextResponse.json({ error: discount.error }, { status: 400 })
+  }
+  const subtotal = Number(body.subtotal) || 0
+  const shipping = Number(body.shippingCost) || 0
+  const authoritativeTotal = Math.max(
+    0,
+    Math.round((subtotal + shipping - discount.normalized.discountTotal) * 100) / 100,
+  )
+
+  const newOrder = await createOrder({
+    ...body,
+    discountTotal: discount.normalized.discountTotal,
+    discountReason: discount.normalized.reason,
+    discountKind: discount.normalized.kind,
+    discountInput: discount.normalized.input,
+    discountAppliedBy: discount.normalized.discountTotal > 0 ? auth.user?.email || null : null,
+    total: authoritativeTotal,
+  })
+
+  // Audit log de criacao do pedido. Registrar mesmo quando nao tem desconto
+  // ajuda a fiscalizar quem criou cada pedido manual (resposta do stakeholder
+  // sobre rastreabilidade do atendimento).
+  recordAuditEntry({
+    actorEmail: auth.user!.email,
+    actorRole: auth.user!.role || null,
+    action: 'order.create',
+    targetType: 'Order',
+    targetId: newOrder.id,
+    summary:
+      discount.normalized.discountTotal > 0
+        ? `Pedido ${newOrder.orderNumber} criado com desconto manual de R$ ${discount.normalized.discountTotal.toFixed(2)}${discount.normalized.reason ? ` (${discount.normalized.reason})` : ''}`
+        : `Pedido ${newOrder.orderNumber} criado manualmente`,
+    metadata: {
+      orderNumber: newOrder.orderNumber,
+      customerEmail: newOrder.customerEmail,
+      subtotal,
+      shipping,
+      total: authoritativeTotal,
+      ...(discount.normalized.discountTotal > 0
+        ? {
+            discount: {
+              total: discount.normalized.discountTotal,
+              kind: discount.normalized.kind,
+              input: discount.normalized.input,
+              reason: discount.normalized.reason,
+            },
+          }
+        : {}),
+    },
+    ip: getClientIp(request),
+  }).catch(() => {})
+
   return NextResponse.json(newOrder, { status: 201 })
 }
 

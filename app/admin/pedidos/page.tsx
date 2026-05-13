@@ -228,6 +228,11 @@ export default function AdminOrdersPage() {
     // Quando ligado, o admin nao precisa preencher dados de frete e o pedido
     // nasce com paymentMethod='manual', paymentStatus='pending'.
     paymentOnDelivery: false,
+    // Desconto manual aplicado pelo admin na criacao do pedido. O backend
+    // recalcula o total a partir destes campos — o front so renderiza preview.
+    discountKind: 'fixed' as 'fixed' | 'percentage',
+    discountInput: '',
+    discountReason: '',
   })
 
   useEffect(() => {
@@ -587,6 +592,21 @@ export default function AdminOrdersPage() {
     return newOrderItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
   }, [newOrderItems])
 
+  // Desconto manual: parse defensivo (input vazio = 0). Cap em subtotal pra
+  // nunca permitir total negativo no preview. Backend revalida e e a fonte
+  // da verdade — aqui e so feedback visual em tempo real.
+  const orderDiscount = useMemo(() => {
+    const raw = parseFloat((newOrderForm.discountInput || '').replace(',', '.'))
+    if (!Number.isFinite(raw) || raw <= 0) return 0
+    if (newOrderForm.discountKind === 'percentage') {
+      const pct = Math.min(100, Math.max(0, raw))
+      return Math.min(orderSubtotal, (orderSubtotal * pct) / 100)
+    }
+    return Math.min(orderSubtotal, raw)
+  }, [newOrderForm.discountInput, newOrderForm.discountKind, orderSubtotal])
+
+  const orderTotal = Math.max(0, orderSubtotal - orderDiscount)
+
   const handleViaCep = async () => {
     const cep = newOrderForm.zipCode.replace(/\D/g, '')
     if (cep.length !== 8) {
@@ -709,6 +729,16 @@ export default function AdminOrdersPage() {
       return
     }
 
+    // Confirmacao defensiva contra dedo gordo (digitar 100 no campo % sem querer).
+    // Cobre tambem total zerado, que pode ser intencional (cortesia) ou erro.
+    if (orderSubtotal > 0 && orderDiscount / orderSubtotal > 0.3) {
+      const pct = ((orderDiscount / orderSubtotal) * 100).toFixed(0)
+      const ok = window.confirm(
+        `Atencao: o desconto representa ${pct}% do subtotal (R$ ${orderDiscount.toFixed(2).replace('.', ',')}).\n\nConfirma a criacao do pedido?`,
+      )
+      if (!ok) return
+    }
+
     // Pipeline-redesign: quando admin marca "pagamento na entrega/retirada",
     // o pedido nasce em 'aguardando_pagamento' (resposta 4 do stakeholder
     // sobre criacao manual). Senao fica em 'pending' por default.
@@ -719,6 +749,13 @@ export default function AdminOrdersPage() {
     // Endereco fica vazio para retirada (nao precisa) — o cliente busca no
     // local. Para envio segue exigindo os campos preenchidos.
     const isPickup = newOrderForm.deliveryMethod === 'pickup'
+
+    // Valor numerico canonico do input de desconto (string -> number). Sem
+    // virgula nem espaco, na escala do tipo (% ou R$).
+    const rawDiscountInput = parseFloat(
+      (newOrderForm.discountInput || '').replace(',', '.'),
+    )
+    const hasDiscount = Number.isFinite(rawDiscountInput) && rawDiscountInput > 0 && orderDiscount > 0
 
     const orderData = {
       orderNumber: `BD-${Date.now().toString(36).toUpperCase()}`,
@@ -735,9 +772,19 @@ export default function AdminOrdersPage() {
         zipCode: newOrderForm.zipCode,
       },
       deliveryMethod: newOrderForm.deliveryMethod,
-      total: orderSubtotal,
+      total: orderTotal,
       subtotal: orderSubtotal,
       shippingCost: 0,
+      // Backend revalida (validateDiscount) e recalcula o total. Mandamos
+      // discountTotal pra UX consistente, mas a fonte da verdade e kind+input.
+      ...(hasDiscount
+        ? {
+            discountTotal: orderDiscount,
+            discountKind: newOrderForm.discountKind,
+            discountInput: rawDiscountInput,
+            discountReason: newOrderForm.discountReason.trim() || null,
+          }
+        : {}),
       status: 'pending',
       paymentStatus: 'pending',
       fulfillmentStatus: initialFulfillment,
@@ -774,7 +821,7 @@ export default function AdminOrdersPage() {
 
       setShowAddModal(false)
       setSearchCustomer('')
-      setNewOrderForm({ customerName: '', customerEmail: '', customerPhone: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '', deliveryMethod: 'shipping', paymentOnDelivery: false })
+      setNewOrderForm({ customerName: '', customerEmail: '', customerPhone: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '', deliveryMethod: 'shipping', paymentOnDelivery: false, discountKind: 'fixed', discountInput: '', discountReason: '' })
       setNewOrderItems([])
       loadOrders()
     } catch (e) {
@@ -1416,15 +1463,104 @@ export default function AdminOrdersPage() {
                     </div>
 
                     {newOrderItems.length > 0 && (
-                      <div style={{ padding: '14px 16px', borderTop: '1.5px solid #1D2235', backgroundColor: '#FAFCFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Subtotal</span>
-                        <span style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1D2235' }}>
-                          R$ {orderSubtotal.toFixed(2).replace('.', ',')}
-                        </span>
+                      <div style={{ padding: '14px 16px', borderTop: '1.5px solid #1D2235', backgroundColor: '#FAFCFE', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#6B7494', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Subtotal</span>
+                          <span style={{ fontSize: orderDiscount > 0 ? '14px' : '20px', fontWeight: orderDiscount > 0 ? 600 : 700, fontFamily: 'var(--font-mono)', color: orderDiscount > 0 ? '#6B7494' : '#1D2235' }}>
+                            R$ {orderSubtotal.toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
+                        {orderDiscount > 0 && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#1D7A72', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Desconto</span>
+                              <span style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: '#1D7A72' }}>
+                                − R$ {orderDiscount.toFixed(2).replace('.', ',')}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #D8DCE8', paddingTop: '6px', marginTop: '2px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#1D2235', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total</span>
+                              <span style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1D2235' }}>
+                                R$ {orderTotal.toFixed(2).replace('.', ',')}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
+              </section>
+
+
+              {/* Desconto manual: admin pode aplicar abatimento livre na criacao
+                  (brinde, troca, cortesia, fidelidade). Backend revalida via
+                  validateDiscount e e a fonte da verdade do total final. */}
+              <section>
+                <div style={{ marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1D2235' }}>
+                    Desconto (opcional)
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '2px' }}>
+                    Aplique abatimento manual por brinde, troca, cortesia ou fidelidade. Fica registrado no histórico do pedido.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', gap: '6px', background: '#F5F8FD', border: '1px solid #E3E9F4', borderRadius: '8px', padding: '4px' }}>
+                    {(['fixed', 'percentage'] as const).map(kind => {
+                      const active = newOrderForm.discountKind === kind
+                      const label = kind === 'fixed' ? 'R$' : '%'
+                      return (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => setNewOrderForm({ ...newOrderForm, discountKind: kind })}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: active ? '#1D2235' : 'transparent',
+                            color: active ? 'white' : '#1D2235',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            minWidth: '44px',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ flex: '0 0 140px' }}>
+                    <Input
+                      label={newOrderForm.discountKind === 'percentage' ? 'Percentual' : 'Valor (R$)'}
+                      type="number"
+                      min="0"
+                      step={newOrderForm.discountKind === 'percentage' ? '1' : '0.01'}
+                      max={newOrderForm.discountKind === 'percentage' ? '100' : undefined}
+                      value={newOrderForm.discountInput}
+                      onChange={(e) => setNewOrderForm({ ...newOrderForm, discountInput: e.target.value })}
+                      placeholder={newOrderForm.discountKind === 'percentage' ? '10' : '15,00'}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <Input
+                      label="Motivo (opcional)"
+                      value={newOrderForm.discountReason}
+                      onChange={(e) => setNewOrderForm({ ...newOrderForm, discountReason: e.target.value })}
+                      placeholder="ex.: brinde fidelidade, troca por defeito"
+                      maxLength={200}
+                    />
+                  </div>
+                </div>
+                {orderDiscount > 0 && orderSubtotal > 0 && (
+                  <p style={{ fontSize: '12px', color: orderDiscount / orderSubtotal > 0.3 ? '#B42318' : '#1D7A72', marginTop: '10px', fontWeight: 500 }}>
+                    {orderDiscount / orderSubtotal > 0.3 && '⚠ '}
+                    Desconto de R$ {orderDiscount.toFixed(2).replace('.', ',')} ({((orderDiscount / orderSubtotal) * 100).toFixed(0)}% do subtotal). Total: R$ {orderTotal.toFixed(2).replace('.', ',')}.
+                  </p>
+                )}
               </section>
 
 
@@ -1525,7 +1661,12 @@ export default function AdminOrdersPage() {
                   ? 'Adicione ao menos um item para criar o pedido'
                   : (
                     <>
-                      <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)' }}>R$ {orderSubtotal.toFixed(2).replace('.', ',')}</strong>
+                      <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)' }}>R$ {orderTotal.toFixed(2).replace('.', ',')}</strong>
+                      {orderDiscount > 0 && (
+                        <span style={{ color: '#1D7A72', fontFamily: 'var(--font-mono)' }}>
+                          {' '}(−R$ {orderDiscount.toFixed(2).replace('.', ',')})
+                        </span>
+                      )}
                       <span> · {newOrderItems.length} {newOrderItems.length === 1 ? 'produto' : 'produtos'}</span>
                     </>
                   )}
