@@ -30,7 +30,7 @@ export default function CookieBanner() {
 
   return (
     <div
-      role="dialog"
+      role="region"
       aria-label="Aviso de cookies"
       style={{
         position: 'fixed',
@@ -41,6 +41,7 @@ export default function CookieBanner() {
         background: 'white',
         borderTop: '1px solid #D8DCE8',
         padding: '16px 24px',
+        paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
         boxShadow: '0 -4px 16px rgba(29,34,53,0.08)',
       }}
     >
@@ -65,6 +66,7 @@ export default function CookieBanner() {
           <button
             type="button"
             onClick={() => decide('rejected')}
+            className="focus-ring"
             style={{
               padding: '10px 18px',
               borderRadius: '8px',
@@ -73,6 +75,7 @@ export default function CookieBanner() {
               color: '#1D2235',
               cursor: 'pointer',
               fontWeight: 600,
+              transition: 'background-color var(--transition-fast)',
             }}
           >
             Recusar opcionais
@@ -80,6 +83,7 @@ export default function CookieBanner() {
           <button
             type="button"
             onClick={() => decide('accepted')}
+            className="focus-ring"
             style={{
               padding: '10px 18px',
               borderRadius: '8px',
@@ -88,6 +92,7 @@ export default function CookieBanner() {
               color: 'white',
               cursor: 'pointer',
               fontWeight: 600,
+              transition: 'filter var(--transition-fast)',
             }}
           >
             Aceitar todos

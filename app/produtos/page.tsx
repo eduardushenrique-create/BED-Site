@@ -125,9 +125,12 @@ function ProductsContent() {
       )}
 
       <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div role="tablist" aria-label="Filtrar por categoria" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
+            type="button"
             onClick={() => setSelectedCategory(null)}
+            aria-pressed={selectedCategory === null}
+            className="ui-chip"
             style={{
               padding: '8px 16px',
               borderRadius: '999px',
@@ -136,6 +139,7 @@ function ProductsContent() {
               color: selectedCategory === null ? 'white' : '#1D2235',
               cursor: 'pointer',
               fontSize: '14px',
+              transition: 'background-color var(--transition-fast), color var(--transition-fast)',
             }}
           >
             Todos
@@ -143,7 +147,10 @@ function ProductsContent() {
           {categories.map(category => (
             <button
               key={category.id}
+              type="button"
               onClick={() => setSelectedCategory(category.slug)}
+              aria-pressed={selectedCategory === category.slug}
+              className="ui-chip"
               style={{
                 padding: '8px 16px',
                 borderRadius: '999px',
@@ -152,6 +159,7 @@ function ProductsContent() {
                 color: selectedCategory === category.slug ? 'white' : '#1D2235',
                 cursor: 'pointer',
                 fontSize: '14px',
+                transition: 'background-color var(--transition-fast), color var(--transition-fast)',
               }}
             >
               {category.name}
@@ -161,14 +169,14 @@ function ProductsContent() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '64px 0', color: '#6B7494' }}>
-          Carregando produtos...
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '64px 0', color: '#6B7494' }}>
+          Carregando produtos…
         </div>
       ) : products.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0' }}>
           <p style={{ color: '#6B7494', marginBottom: '16px' }}>
             {searchParam
-              ? `Nada encontrado para “${searchParam}”.`
+              ? <>Nada encontrado para <span translate="no">“{searchParam}”</span>.</>
               : 'Nenhum produto encontrado.'}
           </p>
           <p style={{ color: '#6B7494' }}>
@@ -178,7 +186,7 @@ function ProductsContent() {
           </p>
         </div>
       ) : (
-        <div style={{
+        <div aria-busy={loading} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '24px',
@@ -199,7 +207,7 @@ export default function ProductsPage() {
         Nossos produtos
       </h1>
 
-      <Suspense fallback={<div style={{ textAlign: 'center', padding: '64px 0', color: '#6B7494' }}>Carregando...</div>}>
+      <Suspense fallback={<div style={{ textAlign: 'center', padding: '64px 0', color: '#6B7494' }}>Carregando…</div>}>
         <ProductsContent />
       </Suspense>
     </main>

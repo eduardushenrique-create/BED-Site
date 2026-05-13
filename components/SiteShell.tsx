@@ -18,7 +18,9 @@ export default function SiteShell({ children }: { children: React.ReactNode }) {
       <WishlistProvider>
         <CartProvider>
           {!isAdmin && <Header />}
-          {children}
+          <div id="main-content" tabIndex={-1} style={{ outline: 'none' }}>
+            {children}
+          </div>
           {!isAdmin && <Footer />}
           {!isAdmin && <CartDrawer />}
           {!isAdmin && <CookieBanner />}

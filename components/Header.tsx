@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import BrandLogo from '@/components/BrandLogo'
@@ -20,10 +21,12 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const { itemCount, setIsOpen } = useCart()
   const { user, loading, logout } = useAuth()
+  const pathname = usePathname()
+  const isActive = (href: string) => href === '/' ? pathname === '/' : pathname?.startsWith(href)
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -84,6 +87,7 @@ export default function Header() {
         zIndex: 100,
         backdropFilter: 'blur(14px)',
         maxWidth: '100%',
+        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       <div
@@ -100,29 +104,35 @@ export default function Header() {
       >
         <BrandLogo size="md" />
 
-        <nav style={{ display: 'none', gap: '6px', alignItems: 'center' }} className="desktop-nav">
-          {navLinks.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              style={{
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#3D4460',
-                transition: 'background-color var(--transition-fast), color var(--transition-fast)',
-                padding: '8px 12px',
-                borderRadius: '8px',
-              }}
-            >
-              {link.label}
-            </Link>
-          ))}
+        <nav aria-label="Navegação principal" style={{ display: 'none', gap: '6px', alignItems: 'center' }} className="desktop-nav">
+          {navLinks.map(link => {
+            const active = isActive(link.href)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  fontSize: '14px',
+                  fontWeight: active ? 600 : 500,
+                  color: active ? '#1D2235' : '#3D4460',
+                  background: active ? '#F0F5FB' : 'transparent',
+                  transition: 'background-color var(--transition-fast), color var(--transition-fast)',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                }}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
 
         <div className="site-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
           <button
+            type="button"
             onClick={() => setSearchOpen(true)}
-            className="icon-btn"
+            className="icon-btn focus-ring"
             style={{
               background: 'none',
               border: 'none',
@@ -141,8 +151,9 @@ export default function Header() {
           </button>
 
           <button
+            type="button"
             onClick={() => setIsOpen(true)}
-            className="icon-btn"
+            className="icon-btn focus-ring"
             style={{
               background: 'none',
               border: 'none',
@@ -186,10 +197,12 @@ export default function Header() {
           {!loading && (user ? (
             <div ref={userMenuRef} style={{ position: 'relative', minWidth: 0 }}>
               <button
+                type="button"
                 onClick={() => setUserMenuOpen(prev => !prev)}
                 aria-label="Menu da conta"
                 aria-expanded={userMenuOpen}
-                className="user-menu-trigger icon-btn"
+                aria-haspopup="menu"
+                className="user-menu-trigger icon-btn focus-ring"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -231,7 +244,6 @@ export default function Header() {
 
               {userMenuOpen && (
                 <div
-                  role="menu"
                   style={{
                     position: 'absolute',
                     top: 'calc(100% + 8px)',
@@ -256,6 +268,7 @@ export default function Header() {
                     <Link href="/admin" onClick={() => setUserMenuOpen(false)} style={dropdownItemStyle}>Painel admin</Link>
                   )}
                   <button
+                    type="button"
                     onClick={() => { setUserMenuOpen(false); logout() }}
                     style={{ ...dropdownItemStyle, width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#A3526A' }}
                   >
@@ -290,6 +303,7 @@ export default function Header() {
           ))}
 
           <button
+            type="button"
             onClick={() => setMenuOpen(value => !value)}
             style={{
               display: 'none',
@@ -301,9 +315,10 @@ export default function Header() {
               borderRadius: '8px',
               flexShrink: 0,
             }}
-            className="mobile-menu-btn icon-btn"
+            className="mobile-menu-btn icon-btn focus-ring"
             aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
             aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
               {menuOpen ? <path d="M6 6l12 12M6 18L18 6" /> : <path d="M3 12h18M3 6h18M3 18h18" />}
@@ -314,6 +329,8 @@ export default function Header() {
 
       {menuOpen && (
         <nav
+          id="mobile-nav"
+          aria-label="Navegação móvel"
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -322,22 +339,26 @@ export default function Header() {
             borderTop: '1px solid #EEF1F8',
           }}
         >
-          {navLinks.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              style={{
-                padding: '14px 0',
-                fontSize: '15px',
-                fontWeight: 500,
-                color: '#1D2235',
-                borderBottom: '1px solid #EEF1F8',
-              }}
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map(link => {
+            const active = isActive(link.href)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  padding: '14px 0',
+                  fontSize: '15px',
+                  fontWeight: active ? 600 : 500,
+                  color: '#1D2235',
+                  borderBottom: '1px solid #EEF1F8',
+                }}
+                onClick={() => setMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
       )}
 
@@ -356,10 +377,6 @@ export default function Header() {
           .user-menu-chevron { display: none; }
           .user-menu-trigger { padding: 4px !important; gap: 0 !important; }
           .site-header-actions { gap: 0 !important; }
-        }
-        .desktop-nav a:hover {
-          background: #F0F5FB;
-          color: #1D2235;
         }
       `}</style>
     </header>

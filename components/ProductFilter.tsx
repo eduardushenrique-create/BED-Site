@@ -31,6 +31,8 @@ export default function ProductFilter({ categories, selectedCategory }: ProductF
     <div className="product-filter" style={{ marginBottom: '32px' }}>
       <div
         className="product-filter-track"
+        role="tablist"
+        aria-label="Filtrar por categoria"
         style={{
           display: 'flex',
           gap: '8px',
@@ -44,6 +46,8 @@ export default function ProductFilter({ categories, selectedCategory }: ProductF
         <button
           type="button"
           onClick={() => handleCategoryClick(null)}
+          aria-pressed={selectedCategory === null}
+          className="ui-chip"
           style={chipStyle(selectedCategory === null)}
         >
           Todos
@@ -53,6 +57,8 @@ export default function ProductFilter({ categories, selectedCategory }: ProductF
             key={cat.slug}
             type="button"
             onClick={() => handleCategoryClick(cat.slug)}
+            aria-pressed={selectedCategory === cat.slug}
+            className="ui-chip"
             style={chipStyle(selectedCategory === cat.slug)}
           >
             {cat.name}
@@ -73,12 +79,12 @@ function chipStyle(active: boolean): React.CSSProperties {
   return {
     padding: '8px 16px',
     borderRadius: '999px',
-    border: '1px solid #E8E2DA',
-    backgroundColor: active ? '#1C1917' : 'white',
-    color: active ? 'white' : '#1C1917',
+    border: '1px solid #D8DCE8',
+    backgroundColor: active ? '#1D2235' : 'white',
+    color: active ? 'white' : '#1D2235',
     cursor: 'pointer',
     fontSize: '14px',
-    transition: 'all 0.2s ease',
+    transition: 'background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast)',
     flexShrink: 0,
     scrollSnapAlign: 'start',
     whiteSpace: 'nowrap',
