@@ -22,11 +22,20 @@ export const dynamic = 'force-dynamic'
 // tabela "Order". Se alguma faltar, indica migration pendente — exatamente
 // o sintoma de "column X.discountReason does not exist" que derrubou tudo
 // em 2026-05-13.
+// IMPORTANTE: esta lista deve cobrir TODAS as colunas escalares declaradas
+// em `model Order` no schema.prisma. O CI valida isso via
+// ci/check-required-order-columns.sh (R13 do ADR-003 v2). Se o CI falhar
+// reclamando que esta lista esta incompleta apos uma migration nova, atualize
+// aqui — caso contrario o healthcheck nao detecta vazamento de coluna
+// (foi exatamente o que aconteceu em 2026-05-13 com createdVia/paidAmount).
 const REQUIRED_ORDER_COLUMNS = [
   'id',
   'orderNumber',
   'customerName',
   'customerEmail',
+  'customerPhone',
+  'customerCpf',
+  'customerId',
   'status',
   'paymentStatus',
   'fulfillmentStatus',
@@ -35,6 +44,10 @@ const REQUIRED_ORDER_COLUMNS = [
   'discountReason',
   'shippingTotal',
   'total',
+  'shippingMethod',
+  'trackingCode',
+  'productionDeadline',
+  'expectedDeliveryAt',
   'deliveryMethod',
   'orderType',
   'productionTimeline',

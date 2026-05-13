@@ -63,3 +63,65 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Forbidden patterns check (CR-8)
+        # Bloqueia padroes anti que ja causaram incidente (PrismaClient sem
+        # options, COPY node_modules inteiro, endpoints temp sem expiracao).
+        # Vide ci/forbidden-patterns.sh + POSTMORTEM-2026-05-13-deploys.md.
+        run: bash ci/forbidden-patterns.sh
+
+      - name: Required Order columns check (R13)
+        # Garante que REQUIRED_ORDER_COLUMNS no health route cobre todas
+        # as colunas escalares de model Order. Sem isso, vazamento de
+        # coluna nova passa despercebido pelo health (incidente PR #141).
+        run: bash ci/check-required-order-columns.sh
+
+  prisma-smoke:
+    name: Prisma client smoke (G4 partial)
+    runs-on: ubuntu-latest
+    needs: build
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: smoke
+          POSTGRES_PASSWORD: smoke
+          POSTGRES_DB: smoke
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U smoke"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://smoke:smoke@localhost:5432/smoke?schema=public
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Prisma client smoke (instancia + connect + query)
+        # Valida que o Prisma client compilado pelo build atual:
+        # 1. Instancia sem lancar (cobre o bug do PR #143 — `new
+        #    PrismaClient()` sem options)
+        # 2. Conecta ao Postgres real
+        # 3. Roda migrations idempotentes
+        # 4. Faz query simples em Order
+        # Detalhes: ci/prisma-smoke.sh
+        run: bash ci/prisma-smoke.sh
