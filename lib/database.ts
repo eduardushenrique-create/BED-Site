@@ -287,6 +287,7 @@ function serializeOrder(order: any): Order {
     subtotal: money(order.subtotal),
     shippingCost: money(order.shippingTotal),
     discountTotal: money(order.discountTotal ?? 0),
+    discountReason: order.discountReason ?? null,
     couponCode: typeof paymentPayload?.couponCode === 'string' ? paymentPayload.couponCode : null,
     status: order.status,
     paymentStatus: order.paymentStatus,
@@ -1606,7 +1607,19 @@ export async function getOrderByIdOrNumber(idOrNumber: string) {
   }
 }
 
-export async function createOrder(data: Order & { discountTotal?: number; couponCode?: string | null }) {
+export async function createOrder(
+  data: Order & {
+    discountTotal?: number
+    couponCode?: string | null
+    // Campos opcionais usados quando o admin aplica desconto manual no
+    // momento de criar o pedido (admin/pedidos modal). Cupom publico nao
+    // preenche estes — usa couponCode acima.
+    discountReason?: string | null
+    discountKind?: 'fixed' | 'percentage' | null
+    discountInput?: number | null
+    discountAppliedBy?: string | null
+  },
+) {
   if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     const newOrder: Order = { ...data, id: `order_${Date.now()}` }
@@ -1664,6 +1677,21 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
       'createOrder: orderType derivation',
     )
 
+    // Snapshot do desconto manual aplicado pelo admin. Vive em
+    // Payment.rawPayload (mesmo padrao do couponCode na rota publica), o que
+    // evita 1 migration extra de coluna. discountReason mora no Order para
+    // facilitar busca/filtro futuro pela razao.
+    const manualDiscountSnapshot =
+      typeof data.discountTotal === 'number' && data.discountTotal > 0 && data.discountKind
+        ? {
+            discountKind: data.discountKind,
+            discountInput: data.discountInput ?? data.discountTotal,
+            discountReason: data.discountReason ?? null,
+            discountAppliedBy: data.discountAppliedBy ?? null,
+            appliedAt: new Date().toISOString(),
+          }
+        : null
+
     const order = await prisma.order.create({
       data: {
         orderNumber: data.orderNumber,
@@ -1673,6 +1701,7 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
         customerCpf: data.customerCpf,
         subtotal: data.subtotal,
         discountTotal: typeof data.discountTotal === 'number' ? data.discountTotal : 0,
+        discountReason: data.discountReason ?? null,
         shippingTotal: data.shippingCost,
         total: data.total,
         status: data.status,
@@ -1702,6 +1731,9 @@ export async function createOrder(data: Order & { discountTotal?: number; coupon
             method: data.paymentMethod || 'manual',
             status: data.paymentStatus,
             amount: data.total,
+            ...(manualDiscountSnapshot
+              ? { rawPayload: { manualDiscount: manualDiscountSnapshot } }
+              : {}),
           },
         },
         items: {

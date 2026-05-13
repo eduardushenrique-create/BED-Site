@@ -56,6 +56,10 @@ export type Order = {
   subtotal: number
   shippingCost: number
   discountTotal?: number
+  // Motivo livre do desconto manual aplicado pelo admin (ex.: "brinde",
+  // "troca defeito"). Preenchido apenas para descontos manuais criados pelo
+  // admin; descontos via cupom publico ficam em couponCode.
+  discountReason?: string | null
   couponCode?: string | null
   status: string
   paymentStatus: string
