@@ -31,19 +31,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Schema + migrations: o startup wrapper (start.mjs) le `prisma/migrations/`
-# para conferir se o banco esta sincronizado. Migrations sao APLICADAS por
-# .github/workflows/migrate.yml (ADR-002), nao mais no startup do container.
+# Prisma CLI + schema + migrations ficam disponiveis no container final
+# para o startup wrapper rodar `prisma migrate deploy` automaticamente. Sem
+# isso, cada deploy exigia rodar migrations manualmente, abrindo janelas
+# em que o Prisma client esperava colunas que ainda nao existiam no banco.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
-# @prisma/* fica disponivel pro Prisma client em runtime (adapter-pg,
-# engine etc.). O CLI (node_modules/prisma) NAO e mais copiado: ele
-# exigia effect/c12/deepmerge-ts/empathic que nao estao no runner, e seu
-# unico uso era `prisma migrate deploy` no startup — agora movido pro
-# GitHub Action.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# Wrapper de startup: valida schema (sem aplicar) e sobe o Next.
+# Wrapper de startup: roda migrations e depois sobe o Next.
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start.mjs ./scripts/start.mjs
 
 # Diretório para o fallback JSON (quando DATABASE_URL não está configurado)
@@ -53,7 +49,6 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Startup: valida que todas as migrations locais estao no banco; aborta
-# (fail-fast) em producao se houver atraso. Migrations aplicadas pelo
-# .github/workflows/migrate.yml antes do deploy.
+# Startup auto-migrate: chama prisma migrate deploy antes de subir o Next.
+# Migrations sao idempotentes; se DATABASE_URL nao existir, pula com aviso.
 CMD ["node", "scripts/start.mjs"]
