@@ -36,15 +36,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # isso, cada deploy exigia rodar migrations manualmente, abrindo janelas
 # em que o Prisma client esperava colunas que ainda nao existiam no banco.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-# Antes copiavamos apenas node_modules/prisma e node_modules/@prisma. O
-# Prisma 7 CLI passou a depender de @prisma/config que por sua vez require
-# `effect`, `tinyexec`, e outras transitive deps que ficam soltas em
-# /app/node_modules. Sem elas, o CLI explode com
-# "Cannot find module 'effect'" e exit=1. Solucao mais simples e robusta:
-# trazer o node_modules inteiro do builder. Custo de imagem +500MB, mas
-# elimina classe de bug "transitive dep do Prisma CLI faltando". Detectado
-# nos logs do Railway pos-incidente 2026-05-13.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
 # Wrapper de startup: roda migrations e depois sobe o Next.
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start.mjs ./scripts/start.mjs
