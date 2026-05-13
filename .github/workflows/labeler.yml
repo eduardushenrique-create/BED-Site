@@ -1,0 +1,33 @@
+name: Apply labels
+
+# Aplica labels automaticamente em PRs com base em paths modificados,
+# conforme `.github/labeler.yml`. O label `sensitive-area` (definido
+# por path filter) eh consumido pela branch protection rule do main:
+# PRs com esse label exigem aprovacao humana explicita antes de merge.
+#
+# Por que `pull_request_target` em vez de `pull_request`:
+# - `pull_request` roda no contexto do PR (sem permissao de write
+#   se vier de fork).
+# - `pull_request_target` roda no contexto da base branch (com permissao
+#   de escrever labels). Seguro para labeler porque ele so olha a lista
+#   de arquivos modificados — nao executa codigo do PR.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Apply path-based labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels from .github/labeler.yml
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          sync-labels: true
