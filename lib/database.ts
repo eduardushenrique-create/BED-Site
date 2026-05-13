@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import {
   readDB,
   writeDB,
+  DatabaseUnavailableError,
   Product,
   Category,
   Order,
@@ -97,21 +98,10 @@ async function persistImageIfDataUrl(
 const databaseUrl = process.env.DATABASE_URL || ''
 export const hasDatabase = Boolean(databaseUrl && !databaseUrl.includes('johndoe:randompassword'))
 
-/**
- * Erro lançado quando o banco está indisponível em produção. Em vez de cair
- * silenciosamente pro fallback localDb (que vive num container Docker
- * efêmero e some no próximo deploy), criamos esse erro para que os route
- * handlers retornem 503 explícito e o cliente veja uma falha real.
- *
- * Em dev/teste o fallback continua funcionando — é a única forma de rodar
- * sem Postgres.
- */
-export class DatabaseUnavailableError extends Error {
-  constructor(message = 'Banco de dados indisponível no momento. Tente novamente em alguns instantes.') {
-    super(message)
-    this.name = 'DatabaseUnavailableError'
-  }
-}
+// DatabaseUnavailableError vive em lib/localDb.ts (writeDB lança direto).
+// Aqui re-exportamos para que os route handlers que já importam dessa
+// origem continuem funcionando sem mudança.
+export { DatabaseUnavailableError }
 
 /** True quando precisamos falhar visivelmente em vez de cair no localDb. */
 const FAIL_FAST_IN_PRODUCTION =
