@@ -74,7 +74,7 @@ export default function MeusPedidosPage() {
   if (authLoading || !user) {
     return (
       <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', textAlign: 'center', color: '#6B7494' }}>
-        Carregando...
+        Carregando…
       </main>
     )
   }
@@ -88,9 +88,10 @@ export default function MeusPedidosPage() {
           <p style={{ color: '#6B7494', marginTop: '6px' }}>{total} {total === 1 ? 'pedido' : 'pedidos'}</p>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#1D2235' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#1D2235' }} htmlFor="orders-status-filter">
           Filtrar:
           <select
+            id="orders-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235' }}
@@ -103,7 +104,7 @@ export default function MeusPedidosPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: '#6B7494', textAlign: 'center', padding: '48px 0' }}>Carregando pedidos...</p>
+        <p role="status" aria-live="polite" style={{ color: '#6B7494', textAlign: 'center', padding: '48px 0' }}>Carregando pedidos…</p>
       ) : orders.length === 0 ? (
         <div style={{ background: 'white', borderRadius: '16px', padding: '48px 32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ fontSize: '17px', color: '#1D2235', marginBottom: '12px' }}>
@@ -131,14 +132,14 @@ export default function MeusPedidosPage() {
               >
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: '#6B7494' }}>{order.orderNumber}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#6B7494' }} translate="no">{order.orderNumber}</div>
                     <div style={{ marginTop: '4px', fontSize: '13px', color: '#6B7494' }}>
                       {formatDate(order.createdAt)} · {order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <StatusBadge status={order.status} paymentStatus={order.paymentStatus} />
-                    <strong style={{ fontSize: '17px' }}>R$ {order.total.toFixed(2).replace('.', ',')}</strong>
+                    <strong style={{ fontSize: '17px', fontVariantNumeric: 'tabular-nums' }}>R$ {order.total.toFixed(2).replace('.', ',')}</strong>
                   </div>
                 </div>
                 {order.trackingCode && (

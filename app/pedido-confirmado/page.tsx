@@ -5,6 +5,40 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
 
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard API may be unavailable on older browsers
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="focus-ring"
+      style={{
+        marginTop: '8px',
+        padding: '10px 16px',
+        borderRadius: '8px',
+        border: '1px solid #1D2235',
+        background: copied ? '#1D7A72' : '#1D2235',
+        color: 'white',
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'background-color var(--transition-fast)',
+      }}
+      aria-live="polite"
+    >
+      {copied ? 'Código copiado!' : 'Copiar código Pix'}
+    </button>
+  )
+}
+
 type OrderData = {
   orderNumber: string
   status: string
@@ -78,7 +112,7 @@ function OrderConfirmationContent() {
 
   const description =
     order?.paymentStatus === 'paid'
-      ? 'Pagamento aprovado. Agora seguimos com a producao e atualizacoes do seu pedido.'
+      ? 'Pagamento aprovado. Agora seguimos com a produção e atualizações do seu pedido.'
       : order?.paymentMethod === 'pix'
         ? 'Seu pedido foi registrado. Finalize o Pix abaixo para confirmar o pagamento.'
         : 'Seu pedido foi criado. Conclua o pagamento no checkout seguro para confirmar.'
@@ -106,12 +140,12 @@ function OrderConfirmationContent() {
 
         {orderNumber && (
           <div style={{ backgroundColor: '#F5F2EE', padding: '16px 24px', borderRadius: '8px', marginBottom: '32px' }}>
-            <p style={{ fontSize: '14px', color: '#78716C', marginBottom: '4px' }}>Numero do pedido</p>
-            <p style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{orderNumber}</p>
+            <p style={{ fontSize: '14px', color: '#78716C', marginBottom: '4px' }}>Número do pedido</p>
+            <p style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }} translate="no">{orderNumber}</p>
           </div>
         )}
 
-        {loading && <p style={{ color: '#78716C' }}>Carregando status do pedido...</p>}
+        {loading && <p role="status" aria-live="polite" style={{ color: '#78716C' }}>Carregando status do pedido…</p>}
 
         {!loading && isPixPending && !hasPixData && (
           <div style={{ textAlign: 'left', backgroundColor: '#FEF3C7', padding: '20px 24px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #F5D58F' }}>
@@ -122,7 +156,7 @@ function OrderConfirmationContent() {
               Houve uma falha ao gerar o código Pix automaticamente quando você finalizou o pedido. Clique abaixo para tentar de novo — o pedido continua válido.
             </p>
             <Button onClick={handleGeneratePix} disabled={generating}>
-              {generating ? 'Gerando...' : 'Gerar QR Code agora'}
+              {generating ? 'Gerando…' : 'Gerar QR Code agora'}
             </Button>
             {generateError && (
               <p role="alert" style={{ color: '#B42318', fontSize: '13px', marginTop: '12px' }}>
@@ -136,18 +170,25 @@ function OrderConfirmationContent() {
           <div style={{ textAlign: 'left', backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Pague com Pix</h2>
             {order.paymentDetails.pixQrCodeBase64 && (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={`data:image/png;base64,${order.paymentDetails.pixQrCodeBase64}`}
-                alt="QR Code Pix"
+                alt="QR Code para pagamento via Pix"
+                width={220}
+                height={220}
                 style={{ width: '220px', height: '220px', display: 'block', margin: '0 auto 16px' }}
               />
             )}
-            <p style={{ color: '#78716C', fontSize: '14px', marginBottom: '8px' }}>Codigo copia e cola</p>
+            <label htmlFor="pix-copy-paste" style={{ display: 'block', color: '#78716C', fontSize: '14px', marginBottom: '8px' }}>Código copia e cola</label>
             <textarea
+              id="pix-copy-paste"
               readOnly
               value={order.paymentDetails.pixCopyPaste}
-              style={{ width: '100%', minHeight: '120px', padding: '12px', borderRadius: '8px', border: '1px solid #BBCFEB', resize: 'vertical' }}
+              translate="no"
+              onFocus={e => e.currentTarget.select()}
+              style={{ width: '100%', minHeight: '120px', padding: '12px', borderRadius: '8px', border: '1px solid #BBCFEB', resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: '13px' }}
             />
+            <CopyButton value={order.paymentDetails.pixCopyPaste} />
           </div>
         )}
 
@@ -170,7 +211,7 @@ function OrderConfirmationContent() {
 
 export default function OrderConfirmationPage() {
   return (
-    <Suspense fallback={<div style={{ textAlign: 'center', padding: '64px' }}>Carregando...</div>}>
+    <Suspense fallback={<div style={{ textAlign: 'center', padding: '64px' }}>Carregando…</div>}>
       <OrderConfirmationContent />
     </Suspense>
   )

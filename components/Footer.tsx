@@ -135,7 +135,7 @@ export default function Footer() {
             gap: '16px',
           }}
         >
-          <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px' }}>© {year} B&D Artes & Impressões. Todos os direitos reservados.</p>
+          <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px' }}>©&nbsp;{year} <span translate="no">B&amp;D Artes &amp; Impressões</span>. Todos os direitos reservados.</p>
           <div style={{ display: 'flex', gap: '16px' }}>
             <a
               href="https://www.instagram.com/beddesings/"

@@ -12,11 +12,13 @@ type Props = {
   sizes?: string
   /** marca como prioritária — usar só na imagem hero acima da dobra. */
   priority?: boolean
+  /** loading hint para imagens abaixo da dobra (default: lazy). */
+  loading?: 'eager' | 'lazy'
 }
 
 const DEFAULT_SIZES = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
 
-export default function SafeImage({ src, alt, className, style, sizes, priority }: Props) {
+export default function SafeImage({ src, alt, className, style, sizes, priority, loading }: Props) {
   const [broken, setBroken] = useState(false)
   const hasSrc = Boolean(src && src.length > 0)
 
@@ -55,11 +57,13 @@ export default function SafeImage({ src, alt, className, style, sizes, priority 
       <img
         src={src!}
         alt={alt}
+        width={800}
+        height={600}
         loading="lazy"
         decoding="async"
         onError={() => setBroken(true)}
         className={className}
-        style={style}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }}
       />
     )
   }
@@ -86,6 +90,7 @@ export default function SafeImage({ src, alt, className, style, sizes, priority 
         fill
         sizes={sizes || DEFAULT_SIZES}
         priority={priority}
+        loading={priority ? undefined : loading}
         onError={() => setBroken(true)}
         style={{ objectFit }}
       />

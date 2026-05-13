@@ -50,7 +50,7 @@ const baseStyle: CSSProperties = {
   fontWeight: 600,
   borderRadius: '10px',
   cursor: 'pointer',
-  transition: 'all var(--transition-fast)',
+  transition: 'background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -58,11 +58,14 @@ const baseStyle: CSSProperties = {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', fullWidth = false, style, children, disabled, ...props }, ref) => {
+  ({ variant = 'primary', size = 'md', fullWidth = false, style, children, disabled, type, className, ...props }, ref) => {
+    const classes = ['ui-button', `ui-button--${variant}`, className].filter(Boolean).join(' ')
     return (
       <button
         ref={ref}
+        type={type ?? 'button'}
         disabled={disabled}
+        className={classes}
         style={{
           ...baseStyle,
           ...variantStyles[variant],

@@ -409,10 +409,10 @@ export default function CheckoutPage() {
               <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
                 <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '20px', color: '#1D2235' }}>Seus dados</h2>
                 <div style={{ display: 'grid', gap: '16px' }}>
-                  <Input label="Nome completo *" name="customerName" value={formData.customerName} onChange={handleInputChange} error={errors.customerName} required aria-required="true" />
-                  <Input label="E-mail *" name="customerEmail" type="email" value={formData.customerEmail} onChange={handleInputChange} error={errors.customerEmail} required aria-required="true" />
-                  <Input label="Telefone *" name="customerPhone" type="tel" value={formData.customerPhone} onChange={handleInputChange} error={errors.customerPhone} placeholder="(11) 99999-9999" required aria-required="true" />
-                  <Input label="CPF *" name="customerCpf" value={formData.customerCpf} onChange={handleInputChange} error={errors.customerCpf} placeholder="000.000.000-00" required aria-required="true" />
+                  <Input label="Nome completo *" name="customerName" autoComplete="name" value={formData.customerName} onChange={handleInputChange} error={errors.customerName} required aria-required="true" />
+                  <Input label="E-mail *" name="customerEmail" type="email" autoComplete="email" inputMode="email" value={formData.customerEmail} onChange={handleInputChange} error={errors.customerEmail} required aria-required="true" spellCheck={false} />
+                  <Input label="Telefone *" name="customerPhone" type="tel" autoComplete="tel" inputMode="tel" value={formData.customerPhone} onChange={handleInputChange} error={errors.customerPhone} placeholder="(11) 99999-9999" required aria-required="true" />
+                  <Input label="CPF *" name="customerCpf" inputMode="numeric" autoComplete="off" value={formData.customerCpf} onChange={handleInputChange} error={errors.customerCpf} placeholder="000.000.000-00" required aria-required="true" />
                 </div>
               </section>
 
@@ -420,8 +420,9 @@ export default function CheckoutPage() {
                 <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '20px', color: '#1D2235' }}>Endereço de entrega</h2>
                 {savedAddresses.length > 0 && (
                   <div style={{ display: 'grid', gap: '8px', marginBottom: '20px', padding: '14px', background: '#F0F5FB', borderRadius: '10px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>Usar endereço salvo</label>
+                    <label htmlFor="saved-address-select" style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>Usar endereço salvo</label>
                     <select
+                      id="saved-address-select"
                       value={selectedAddressId}
                       onChange={(e) => handleAddressSelect(e.target.value)}
                       style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235' }}
@@ -436,16 +437,23 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div style={{ display: 'grid', gap: '16px' }}>
-                  <Input label={cepLoading ? 'CEP * (consultando...)' : 'CEP *'} name="zipCode" value={formData.zipCode} onChange={handleInputChange} error={errors.zipCode} placeholder="00000-000" required aria-required="true" />
-                  <Input label="Rua/Avenida *" name="street" value={formData.street} onChange={handleInputChange} error={errors.street} required aria-required="true" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
-                    <Input label="Número *" name="number" value={formData.number} onChange={handleInputChange} error={errors.number} required aria-required="true" />
-                    <Input label="Complemento" name="complement" value={formData.complement} onChange={handleInputChange} />
+                  <div>
+                    <Input label="CEP *" name="zipCode" inputMode="numeric" autoComplete="postal-code" value={formData.zipCode} onChange={handleInputChange} error={errors.zipCode} placeholder="00000-000" required aria-required="true" />
+                    {cepLoading && (
+                      <p role="status" aria-live="polite" style={{ fontSize: '13px', color: '#6B7494', marginTop: '6px' }}>
+                        Consultando CEP…
+                      </p>
+                    )}
                   </div>
-                  <Input label="Bairro *" name="neighborhood" value={formData.neighborhood} onChange={handleInputChange} error={errors.neighborhood} required aria-required="true" />
+                  <Input label="Rua/Avenida *" name="street" autoComplete="address-line1" value={formData.street} onChange={handleInputChange} error={errors.street} required aria-required="true" />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                    <Input label="Número *" name="number" inputMode="numeric" autoComplete="address-line2" value={formData.number} onChange={handleInputChange} error={errors.number} required aria-required="true" />
+                    <Input label="Complemento" name="complement" autoComplete="address-line3" value={formData.complement} onChange={handleInputChange} />
+                  </div>
+                  <Input label="Bairro *" name="neighborhood" autoComplete="address-level3" value={formData.neighborhood} onChange={handleInputChange} error={errors.neighborhood} required aria-required="true" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(90px, 1fr)', gap: '16px' }}>
-                    <Input label="Cidade *" name="city" value={formData.city} onChange={handleInputChange} error={errors.city} required aria-required="true" />
-                    <Input label="Estado *" name="state" value={formData.state} onChange={handleInputChange} error={errors.state} placeholder="SP" required aria-required="true" />
+                    <Input label="Cidade *" name="city" autoComplete="address-level2" value={formData.city} onChange={handleInputChange} error={errors.city} required aria-required="true" />
+                    <Input label="Estado *" name="state" autoComplete="address-level1" value={formData.state} onChange={handleInputChange} error={errors.state} placeholder="SP" required aria-required="true" maxLength={2} />
                   </div>
                 </div>
               </section>
@@ -453,9 +461,9 @@ export default function CheckoutPage() {
               <section style={{ background: 'white', borderRadius: '18px', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
                 <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>Frete</h2>
                 {!validateCEP(formData.zipCode) && <p style={{ color: '#6B7494' }}>Informe seu CEP para calcular o frete.</p>}
-                {shippingLoading && <p style={{ color: '#6B7494' }}>Calculando frete...</p>}
+                {shippingLoading && <p role="status" aria-live="polite" style={{ color: '#6B7494' }}>Calculando frete…</p>}
                 {errors.shipping && <p role="alert" style={{ color: '#A3526A' }}>{errors.shipping}</p>}
-                <div style={{ display: 'grid', gap: '12px' }}>
+                <div role="radiogroup" aria-label="Opções de frete" style={{ display: 'grid', gap: '12px' }}>
                   {shippingOptions.map(option => (
                     <label
                       key={option.id}
@@ -468,6 +476,7 @@ export default function CheckoutPage() {
                         border: selectedShipping === option.id ? '2px solid #BBCFEB' : '1px solid #D8DCE8',
                         backgroundColor: selectedShipping === option.id ? '#FAFCFE' : 'white',
                         cursor: 'pointer',
+                        transition: 'background-color var(--transition-fast), border-color var(--transition-fast)',
                       }}
                     >
                       <input type="radio" name="shipping" value={option.id} checked={selectedShipping === option.id} onChange={() => setSelectedShipping(option.id)} style={{ accentColor: '#1D2235' }} />
@@ -475,7 +484,7 @@ export default function CheckoutPage() {
                         <div style={{ fontWeight: 700, color: '#1D2235' }}>{option.name}</div>
                         <div style={{ fontSize: '14px', color: '#6B7494' }}>{option.company.name} • prazo estimado: {option.deliveryTime.days} dias</div>
                       </div>
-                      <strong style={{ color: '#1D2235' }}>R$ {option.price.toFixed(2).replace('.', ',')}</strong>
+                      <strong style={{ color: '#1D2235', fontVariantNumeric: 'tabular-nums' }}>R$ {option.price.toFixed(2).replace('.', ',')}</strong>
                     </label>
                   ))}
                 </div>
@@ -487,7 +496,7 @@ export default function CheckoutPage() {
                   Escolha como deseja pagar. Pix gera QR no próximo passo; cartão abre o checkout seguro do Mercado Pago.
                 </p>
                 {errors.paymentMethod && <p role="alert" style={{ color: '#A3526A', marginBottom: '12px' }}>{errors.paymentMethod}</p>}
-                <div style={{ display: 'grid', gap: '12px' }}>
+                <div role="radiogroup" aria-label="Forma de pagamento" style={{ display: 'grid', gap: '12px' }}>
                   {[
                     { id: 'pix', label: 'Pix' },
                     { id: 'card', label: 'Cartão pelo checkout seguro' },
@@ -503,6 +512,8 @@ export default function CheckoutPage() {
                         borderRadius: '12px',
                         background: paymentMethod === method.id ? '#FAFCFE' : 'white',
                         color: '#1D2235',
+                        cursor: 'pointer',
+                        transition: 'background-color var(--transition-fast), border-color var(--transition-fast)',
                       }}
                     >
                       <input type="radio" name="paymentMethod" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} style={{ accentColor: '#1D2235' }} />
@@ -528,13 +539,13 @@ export default function CheckoutPage() {
                     </li>
                   ))}
                 </ul>
-                <div style={{ display: 'grid', gap: '12px' }}>
+                <div style={{ display: 'grid', gap: '12px', fontVariantNumeric: 'tabular-nums' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Subtotal</span><span style={{ color: '#1D2235' }}>R$ {subtotal.toFixed(2).replace('.', ',')}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Frete</span><span style={{ color: '#1D2235' }}>{selectedShipping ? `R$ ${shippingTotal.toFixed(2).replace('.', ',')}` : '-'}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6B7494' }}>Frete</span><span style={{ color: '#1D2235' }}>{selectedShipping ? `R$ ${shippingTotal.toFixed(2).replace('.', ',')}` : '—'}</span></div>
                   {couponData && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#1D7A72' }}>Desconto ({couponData.code})</span>
-                      <span style={{ color: '#1D7A72' }}>-R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
+                      <span style={{ color: '#1D7A72' }}>Desconto (<span translate="no">{couponData.code}</span>)</span>
+                      <span style={{ color: '#1D7A72' }}>−R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 700, paddingTop: '12px', borderTop: '1px solid #E3E9F4', color: '#1D2235' }}>
@@ -544,13 +555,13 @@ export default function CheckoutPage() {
                 </div>
 
                 <div style={{ marginTop: '20px', padding: '14px', background: '#F0F5FB', borderRadius: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1D2235', marginBottom: '8px' }}>
+                  <label htmlFor="coupon-input" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1D2235', marginBottom: '8px' }}>
                     Cupom de desconto
                   </label>
                   {couponData ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ fontSize: '14px', color: '#1D7A72', fontWeight: 600 }}>
-                        {couponData.code} aplicado
+                        <span translate="no">{couponData.code}</span> aplicado
                         <div style={{ fontSize: '12px', color: '#6B7494', fontWeight: 400 }}>
                           {couponData.type === 'percentage'
                             ? `${couponData.value}% de desconto`
@@ -560,6 +571,7 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         onClick={removeCoupon}
+                        className="focus-ring"
                         style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235', cursor: 'pointer', fontSize: '13px' }}
                       >
                         Remover
@@ -568,19 +580,25 @@ export default function CheckoutPage() {
                   ) : (
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input
+                        id="coupon-input"
                         type="text"
                         value={couponInput}
-                        onChange={(e) => { setCouponInput(e.target.value); if (couponError) setCouponError('') }}
-                        placeholder="Ex: BEMVINDO10"
-                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235', textTransform: 'uppercase' }}
+                        onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); if (couponError) setCouponError('') }}
+                        placeholder="Ex.: BEMVINDO10"
+                        autoComplete="off"
+                        spellCheck={false}
+                        translate="no"
+                        className="ui-input"
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', background: 'white', color: '#1D2235' }}
                       />
                       <button
                         type="button"
                         onClick={applyCoupon}
                         disabled={couponLoading}
+                        className="focus-ring"
                         style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #1D2235', background: '#1D2235', color: 'white', cursor: couponLoading ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, opacity: couponLoading ? 0.7 : 1 }}
                       >
-                        {couponLoading ? '...' : 'Aplicar'}
+                        {couponLoading ? 'Validando…' : 'Aplicar'}
                       </button>
                     </div>
                   )}
@@ -591,8 +609,8 @@ export default function CheckoutPage() {
 
                 {errors.submit && <p role="alert" style={{ color: '#A3526A', marginTop: '16px' }}>{errors.submit}</p>}
                 <div style={{ marginTop: '24px' }}>
-                  <Button type="submit" fullWidth disabled={loading || shippingLoading}>
-                    {loading ? 'Processando...' : `Concluir compra • R$ ${total.toFixed(2).replace('.', ',')}`}
+                  <Button type="submit" fullWidth disabled={loading}>
+                    {loading ? 'Processando…' : `Concluir compra • R$ ${total.toFixed(2).replace('.', ',')}`}
                   </Button>
                 </div>
               </section>

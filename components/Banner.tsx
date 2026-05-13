@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export interface Banner {
   id: string
@@ -8,6 +8,18 @@ export interface Banner {
   htmlContent: string  // HTML completo do banner
   isActive: boolean
   displayDurationSeconds?: number
+}
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReduced(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return reduced
 }
 
 const defaultBanners: Banner[] = [
@@ -27,6 +39,9 @@ interface BannerProps {
 export default function Banner({ banners = defaultBanners }: BannerProps) {
   const activeBanners = banners.filter(b => b.isActive)
   const [index, setIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const regionRef = useRef<HTMLElement | null>(null)
+  const reducedMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     if (index > activeBanners.length - 1) {
@@ -39,11 +54,13 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
   useEffect(() => {
     if (activeBanners.length <= 1) return
+    if (reducedMotion) return
+    if (paused) return
     const timer = window.setTimeout(() => {
       setIndex(prev => (prev + 1) % activeBanners.length)
     }, duration)
     return () => window.clearTimeout(timer)
-  }, [index, activeBanners.length, duration])
+  }, [index, activeBanners.length, duration, paused, reducedMotion])
 
   if (!current) return null
 
@@ -57,7 +74,13 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
 
   return (
     <section
+      ref={regionRef}
       aria-roledescription="carousel"
+      aria-label="Banners promocionais"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
       style={{
         position: 'relative',
         minHeight: 'clamp(420px, 56vh, 560px)',
@@ -66,6 +89,9 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
         overflow: 'hidden',
       }}
     >
+      <div aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+        Slide {index + 1} de {activeBanners.length}
+      </div>
       <iframe
         key={current.id}
         srcDoc={current.htmlContent}
@@ -83,10 +109,10 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
               .banner-arrow-right { right: 8px !important; }
             }
           `}</style>
-          <button type="button" aria-label="Banner anterior" onClick={goPrev} className="banner-arrow banner-arrow-left" style={arrowStyle('left')}>
+          <button type="button" aria-label="Banner anterior" onClick={goPrev} className="banner-arrow banner-arrow-left focus-ring" style={arrowStyle('left')}>
             <ArrowIcon direction="left" />
           </button>
-          <button type="button" aria-label="Próximo banner" onClick={goNext} className="banner-arrow banner-arrow-right" style={arrowStyle('right')}>
+          <button type="button" aria-label="Próximo banner" onClick={goNext} className="banner-arrow banner-arrow-right focus-ring" style={arrowStyle('right')}>
             <ArrowIcon direction="right" />
           </button>
           <div
@@ -104,8 +130,10 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
               <button
                 key={dotIndex}
                 type="button"
-                aria-label={`Ir para banner ${dotIndex + 1}`}
+                aria-label={`Ir para banner ${dotIndex + 1} de ${activeBanners.length}`}
+                aria-current={dotIndex === index ? 'true' : undefined}
                 onClick={() => setIndex(dotIndex)}
+                className="focus-ring"
                 style={{
                   width: dotIndex === index ? '28px' : '10px',
                   height: '10px',
@@ -113,7 +141,7 @@ export default function Banner({ banners = defaultBanners }: BannerProps) {
                   border: 'none',
                   background: dotIndex === index ? '#BBCFEB' : 'rgba(240,245,251,0.45)',
                   cursor: 'pointer',
-                  transition: 'width 0.25s ease',
+                  transition: 'width var(--transition-normal)',
                 }}
               />
             ))}

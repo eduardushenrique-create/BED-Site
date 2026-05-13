@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import SafeImage from './SafeImage'
 
@@ -24,6 +24,8 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const titleId = useId()
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchProduct[]>([])
@@ -31,10 +33,10 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [error, setError] = useState<string | null>(null)
   const [searchedQuery, setSearchedQuery] = useState('')
 
-  // Autofocus when opening
+  // Autofocus when opening + restore focus on close
   useEffect(() => {
     if (isOpen) {
-      // small timeout to ensure the input exists when triggered
+      previousFocusRef.current = document.activeElement as HTMLElement | null
       const id = window.setTimeout(() => {
         inputRef.current?.focus()
       }, 30)
@@ -45,6 +47,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       setError(null)
       setSearchedQuery('')
       setLoading(false)
+      previousFocusRef.current?.focus?.()
     }
   }, [isOpen])
 
@@ -151,7 +154,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       }}
       role="dialog"
       aria-modal="true"
-      aria-label="Busca de produtos"
+      aria-labelledby={titleId}
     >
       <div
         ref={containerRef}
@@ -171,7 +174,11 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             gap: '14px',
           }}
         >
+          <h2 id={titleId} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+            Busca de produtos
+          </h2>
           <div
+            className="search-overlay-input"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -188,12 +195,15 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             </svg>
             <input
               ref={inputRef}
-              type="text"
+              type="search"
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="O que você procura?"
+              placeholder="Ex.: caneca personalizada…"
               aria-label="Buscar produtos"
+              autoComplete="off"
+              spellCheck={false}
+              enterKeyHint="search"
               style={{
                 flex: 1,
                 border: 'none',
@@ -208,6 +218,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               type="button"
               onClick={onClose}
               aria-label="Fechar busca"
+              className="focus-ring"
               style={{
                 background: 'none',
                 border: 'none',
@@ -240,9 +251,16 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 gap: '8px',
               }}
             >
+              <div role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+                {loading
+                  ? 'Buscando…'
+                  : results.length > 0
+                    ? `${results.length} ${results.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}`
+                    : ''}
+              </div>
               {loading && (
                 <div style={{ padding: '16px 4px', color: '#6B7494', fontSize: '14px' }}>
-                  Buscando...
+                  Buscando…
                 </div>
               )}
 
@@ -271,6 +289,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           <button
                             type="button"
                             onClick={() => selectSuggestion(product.slug)}
+                            className="search-overlay-result focus-ring"
                             style={{
                               width: '100%',
                               display: 'flex',
@@ -283,12 +302,6 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                               cursor: 'pointer',
                               textAlign: 'left',
                               transition: 'background-color var(--transition-fast)',
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.backgroundColor = '#F0F5FB'
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.backgroundColor = 'white'
                             }}
                           >
                             <div
@@ -329,6 +342,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                                   fontSize: '13px',
                                   color: '#6B7494',
                                   fontFamily: 'var(--font-mono)',
+                                  fontVariantNumeric: 'tabular-nums',
                                   marginTop: '2px',
                                 }}
                               >
@@ -347,6 +361,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   <button
                     type="button"
                     onClick={goToFullResults}
+                    className="focus-ring"
                     style={{
                       marginTop: '4px',
                       padding: '12px',
@@ -359,7 +374,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                       cursor: 'pointer',
                     }}
                   >
-                    Ver todos os resultados para “{trimmed}”
+                    Ver todos os resultados para <span translate="no">“{trimmed}”</span>
                   </button>
                 </>
               )}
@@ -375,7 +390,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     borderRadius: '10px',
                   }}
                 >
-                  Nada encontrado para “{trimmed}”.
+                  Nada encontrado para <span translate="no">“{trimmed}”</span>. Tente outras palavras-chave.
                 </div>
               )}
             </div>

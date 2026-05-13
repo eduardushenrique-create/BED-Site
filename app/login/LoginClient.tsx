@@ -194,11 +194,11 @@ export default function LoginClient() {
     <main className="container" style={{ paddingTop: '112px', paddingBottom: '64px', maxWidth: '640px' }}>
       <Link href="/" style={{ color: '#1D2235', fontWeight: 600 }}>← Voltar para a loja</Link>
       <section style={{ marginTop: '24px', backgroundColor: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 12px 30px rgba(29,34,53,0.08)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #E3E9F4', marginBottom: '24px' }}>
-          <button type="button" onClick={() => switchTab('login')} style={tabStyle(tab === 'login')}>
+        <div role="tablist" aria-label="Acesso à conta" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #E3E9F4', marginBottom: '24px' }}>
+          <button type="button" role="tab" aria-selected={tab === 'login'} onClick={() => switchTab('login')} className="focus-ring" style={tabStyle(tab === 'login')}>
             Entrar
           </button>
-          <button type="button" onClick={() => switchTab('signup')} style={tabStyle(tab === 'signup')}>
+          <button type="button" role="tab" aria-selected={tab === 'signup'} onClick={() => switchTab('signup')} className="focus-ring" style={tabStyle(tab === 'signup')}>
             Criar conta
           </button>
         </div>
@@ -213,11 +213,11 @@ export default function LoginClient() {
         </p>
 
         {tab === 'login' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-            <button type="button" onClick={() => { setMode('code'); resetMessages() }} style={modeBtnStyle(mode === 'code')}>
+          <div role="tablist" aria-label="Método de login" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+            <button type="button" role="tab" aria-selected={mode === 'code'} onClick={() => { setMode('code'); resetMessages() }} className="focus-ring" style={modeBtnStyle(mode === 'code')}>
               Código por e-mail
             </button>
-            <button type="button" onClick={() => { setMode('password'); resetMessages() }} style={modeBtnStyle(mode === 'password')}>
+            <button type="button" role="tab" aria-selected={mode === 'password'} onClick={() => { setMode('password'); resetMessages() }} className="focus-ring" style={modeBtnStyle(mode === 'password')}>
               E-mail e senha
             </button>
           </div>
@@ -231,14 +231,14 @@ export default function LoginClient() {
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={submitDisabled}>
               {loading
-                ? 'Entrando...'
+                ? 'Entrando…'
                 : isCoolingDown
                   ? formatCooldown(cooldownSeconds)
                   : 'Entrar com senha'}
             </Button>
-            <a href="/login/esqueci-senha" style={{ color: '#4A7AB5', fontSize: '14px', textAlign: 'center', textDecoration: 'none' }}>
+            <Link href="/login/esqueci-senha" style={{ color: '#4A7AB5', fontSize: '14px', textAlign: 'center', textDecoration: 'none' }}>
               Esqueceu a senha?
-            </a>
+            </Link>
           </form>
         ) : step === 'email' ? (
           <form onSubmit={requestCode} style={{ display: 'grid', gap: '16px' }}>
@@ -253,7 +253,7 @@ export default function LoginClient() {
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={submitDisabled}>
               {loading
-                ? 'Enviando...'
+                ? 'Enviando…'
                 : isCoolingDown
                   ? formatCooldown(cooldownSeconds)
                   : tab === 'signup'
@@ -276,12 +276,12 @@ export default function LoginClient() {
             {error && <p role="alert" style={{ color: '#B42318', margin: 0 }}>{error}</p>}
             <Button type="submit" fullWidth disabled={submitDisabled}>
               {loading
-                ? 'Validando...'
+                ? 'Validando…'
                 : isCoolingDown
                   ? formatCooldown(cooldownSeconds)
                   : 'Entrar'}
             </Button>
-            <button type="button" onClick={() => setStep('email')} style={{ border: 'none', background: 'transparent', color: '#1D2235', cursor: 'pointer', fontWeight: 600 }}>
+            <button type="button" onClick={() => setStep('email')} className="focus-ring" style={{ border: 'none', background: 'transparent', color: '#1D2235', cursor: 'pointer', fontWeight: 600, padding: '8px 0' }}>
               Usar outro e-mail
             </button>
           </form>

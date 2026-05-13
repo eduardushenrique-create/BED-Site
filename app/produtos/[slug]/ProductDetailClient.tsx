@@ -41,6 +41,8 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [personalization, setPersonalization] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string>('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const { addItem } = useCart()
 
   const selectedVariant: ProductVariant | null = useMemo(() => {
@@ -64,8 +66,8 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   if (!product) {
     return (
       <main className="container" style={{ paddingTop: '96px', paddingBottom: '64px', textAlign: 'center' }}>
-        <h1 style={{ color: '#1D2235' }}>Produto nao encontrado</h1>
-        <p style={{ color: '#6B7494' }}>Este produto nao esta disponivel.</p>
+        <h1 style={{ color: '#1D2235' }}>Produto não encontrado</h1>
+        <p style={{ color: '#6B7494' }}>Este produto não está disponível.</p>
       </main>
     )
   }
@@ -90,15 +92,21 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
 
   const handleAddToCart = () => {
     if (outOfStockForVariant) return
+    setFormError('')
+    setFieldErrors({})
+
     if (hasVariants && !selectedVariant) {
-      alert('Selecione uma variacao.')
+      setFormError('Selecione uma variação antes de adicionar ao carrinho.')
       return
     }
 
     const requiredFields = product.personalizationFields.filter(f => f.isRequired)
     const missingRequired = requiredFields.find(f => !personalization[f.id])
     if (missingRequired) {
-      alert(`Por favor, preencha o campo: ${missingRequired.label}`)
+      setFieldErrors({ [missingRequired.id]: 'Campo obrigatório.' })
+      setFormError(`Preencha o campo "${missingRequired.label}" para continuar.`)
+      const el = document.getElementById(`personalization-${missingRequired.id}`)
+      el?.focus?.()
       return
     }
 
@@ -140,31 +148,41 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             <SafeImage
               src={heroImage?.url}
               alt={heroImage?.alt || product.name}
+              priority
+              sizes="(max-width: 768px) 100vw, 50vw"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
 
           {visibleImages.length > 1 && (
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
-              {visibleImages.map((img, idx) => (
-                <button
-                  key={img.id}
-                  onClick={() => setSelectedImageIndex(idx)}
-                  style={{
-                    width: '84px',
-                    height: '84px',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    border: safeImageIndex === idx ? '2px solid #BBCFEB' : '2px solid transparent',
-                    padding: 0,
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    background: '#E4EDF8',
-                  }}
-                >
-                  <SafeImage src={img.url} alt={img.alt || `${product.name} - ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </button>
-              ))}
+            <div role="tablist" aria-label="Galeria de imagens do produto" style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
+              {visibleImages.map((img, idx) => {
+                const isActive = safeImageIndex === idx
+                return (
+                  <button
+                    key={img.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={`Ver imagem ${idx + 1} de ${visibleImages.length}`}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className="focus-ring"
+                    style={{
+                      width: '84px',
+                      height: '84px',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      border: isActive ? '2px solid #BBCFEB' : '2px solid transparent',
+                      padding: 0,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      background: '#E4EDF8',
+                    }}
+                  >
+                    <SafeImage src={img.url} alt={img.alt || `${product.name} — imagem ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -187,12 +205,12 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </div>
           )}
 
-          <h1 style={{ fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 700, marginBottom: '10px', color: '#1D2235', marginTop: '8px' }}>
+          <h1 style={{ fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 700, marginBottom: '10px', color: '#1D2235', marginTop: '8px', textWrap: 'balance' as React.CSSProperties['textWrap'] }}>
             {product.name}
           </h1>
 
           {product.sku && (
-            <p style={{ color: '#6B7494', fontSize: '14px', fontFamily: 'var(--font-mono)', marginBottom: '18px' }}>
+            <p style={{ color: '#6B7494', fontSize: '14px', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', marginBottom: '18px' }}>
               SKU: {selectedVariant?.sku || product.sku}
             </p>
           )}
@@ -201,6 +219,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
+                fontVariantNumeric: 'tabular-nums',
                 fontSize: '30px',
                 fontWeight: 600,
                 color: '#1D2235',
@@ -212,6 +231,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
+                  fontVariantNumeric: 'tabular-nums',
                   fontSize: '18px',
                   color: '#A8AFCA',
                   textDecoration: 'line-through',
@@ -229,11 +249,11 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           )}
 
           {hasVariants && (
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: '#1D2235' }}>
-                Variacao
-              </label>
-              <div style={{ display: 'grid', gap: '8px' }}>
+            <fieldset style={{ marginBottom: '24px', border: 'none', padding: 0 }}>
+              <legend style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: '#1D2235' }}>
+                Variação
+              </legend>
+              <div role="radiogroup" aria-label="Variação do produto" style={{ display: 'grid', gap: '8px' }}>
                 {product.variants.map(variant => {
                   const label = describeVariant(variant)
                   const price = variantEffectivePrice(product.price, variant)
@@ -244,9 +264,12 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   return (
                     <button
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
                       key={variant.id}
                       onClick={() => handleSelectVariant(variant.id)}
                       disabled={isSoldOut}
+                      className="focus-ring"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -260,6 +283,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                         opacity: isSoldOut ? 0.55 : 1,
                         textAlign: 'left',
                         color: '#1D2235',
+                        transition: 'background-color var(--transition-fast), border-color var(--transition-fast)',
                       }}
                     >
                       <span style={{ fontWeight: 600 }}>{label}</span>
@@ -271,7 +295,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                         ) : (
                           <span>{stock} em estoque</span>
                         )}
-                        <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)' }}>
+                        <strong style={{ color: '#1D2235', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
                           R$ {price.toFixed(2).replace('.', ',')}
                         </strong>
                       </span>
@@ -279,65 +303,82 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   )
                 })}
               </div>
-            </div>
+            </fieldset>
           )}
 
           {product.personalizationFields.length > 0 && (
             <div style={{ marginBottom: '24px', padding: '18px', backgroundColor: '#FAFCFE', borderRadius: '14px', border: '1px solid #E3E9F4' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>
-                Personalizacao
+                Personalização
               </h3>
-              {product.personalizationFields.map(field => (
-                <div key={field.id} style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#1D2235' }}>
-                    {field.label}
-                    {field.isRequired && <span style={{ color: '#A3526A' }}> *</span>}
-                  </label>
-                  {field.fieldType === 'textarea' ? (
-                    <textarea
-                      placeholder={field.placeholder || ''}
-                      required={field.isRequired}
-                      minLength={field.minLength || undefined}
-                      maxLength={field.maxLength || undefined}
-                      value={personalization[field.id] || ''}
-                      onChange={e => setPersonalization({ ...personalization, [field.id]: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        borderRadius: '10px',
-                        border: '1px solid #D8DCE8',
-                        fontSize: '16px',
-                        fontFamily: 'var(--font-body)',
-                        minHeight: '100px',
-                        resize: 'vertical',
-                        color: '#1D2235',
-                      }}
-                    />
-                  ) : (
-                    <Input
-                      type={field.fieldType === 'number' ? 'number' : 'text'}
-                      placeholder={field.placeholder || ''}
-                      required={field.isRequired}
-                      minLength={field.minLength || undefined}
-                      maxLength={field.maxLength || undefined}
-                      value={personalization[field.id] || ''}
-                      onChange={e => setPersonalization({ ...personalization, [field.id]: e.target.value })}
-                    />
-                  )}
-                  {field.helpText && (
-                    <p style={{ fontSize: '12px', color: '#6B7494', marginTop: '4px' }}>
-                      {field.helpText}
-                    </p>
-                  )}
-                </div>
-              ))}
+              {product.personalizationFields.map(field => {
+                const fieldId = `personalization-${field.id}`
+                const helpId = field.helpText ? `${fieldId}-help` : undefined
+                const errorId = fieldErrors[field.id] ? `${fieldId}-error` : undefined
+                const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined
+                return (
+                  <div key={field.id} style={{ marginBottom: '16px' }}>
+                    <label htmlFor={fieldId} style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#1D2235' }}>
+                      {field.label}
+                      {field.isRequired && <span style={{ color: '#A3526A' }} aria-hidden="true"> *</span>}
+                      {field.isRequired && <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}> (obrigatório)</span>}
+                    </label>
+                    {field.fieldType === 'textarea' ? (
+                      <textarea
+                        id={fieldId}
+                        className="ui-input"
+                        placeholder={field.placeholder || ''}
+                        required={field.isRequired}
+                        minLength={field.minLength || undefined}
+                        maxLength={field.maxLength || undefined}
+                        value={personalization[field.id] || ''}
+                        aria-invalid={fieldErrors[field.id] ? 'true' : undefined}
+                        aria-describedby={describedBy}
+                        onChange={e => setPersonalization({ ...personalization, [field.id]: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          borderRadius: '10px',
+                          border: fieldErrors[field.id] ? '1px solid #D4849A' : '1px solid #D8DCE8',
+                          fontSize: '16px',
+                          fontFamily: 'var(--font-body)',
+                          minHeight: '100px',
+                          resize: 'vertical',
+                          color: '#1D2235',
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        id={fieldId}
+                        type={field.fieldType === 'number' ? 'number' : 'text'}
+                        placeholder={field.placeholder || ''}
+                        required={field.isRequired}
+                        minLength={field.minLength || undefined}
+                        maxLength={field.maxLength || undefined}
+                        value={personalization[field.id] || ''}
+                        error={fieldErrors[field.id]}
+                        aria-describedby={helpId}
+                        onChange={e => setPersonalization({ ...personalization, [field.id]: e.target.value })}
+                      />
+                    )}
+                    {field.helpText && (
+                      <p id={helpId} style={{ fontSize: '12px', color: '#6B7494', marginTop: '4px' }}>
+                        {field.helpText}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div role="group" aria-label="Quantidade" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
+                type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                aria-label="Diminuir quantidade"
+                className="focus-ring"
                 style={{
                   width: '36px',
                   height: '36px',
@@ -346,13 +387,17 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   backgroundColor: 'white',
                   cursor: 'pointer',
                   fontSize: '18px',
+                  lineHeight: 1,
                 }}
               >
-                -
+                −
               </button>
-              <span style={{ minWidth: '40px', textAlign: 'center', fontSize: '16px', color: '#1D2235' }}>{quantity}</span>
+              <span aria-live="polite" aria-label={`Quantidade: ${quantity}`} style={{ minWidth: '40px', textAlign: 'center', fontSize: '16px', color: '#1D2235', fontVariantNumeric: 'tabular-nums' }}>{quantity}</span>
               <button
+                type="button"
                 onClick={() => setQuantity(quantity + 1)}
+                aria-label="Aumentar quantidade"
+                className="focus-ring"
                 style={{
                   width: '36px',
                   height: '36px',
@@ -361,6 +406,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   backgroundColor: 'white',
                   cursor: 'pointer',
                   fontSize: '18px',
+                  lineHeight: 1,
                 }}
               >
                 +
@@ -368,16 +414,22 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </div>
 
             <p style={{ color: '#6B7494', fontSize: '14px' }}>
-              Prazo de producao: {product.productionTimeMinDays}-{product.productionTimeMaxDays} dias uteis
+              Prazo de produção: {product.productionTimeMinDays}–{product.productionTimeMaxDays} dias úteis
             </p>
           </div>
+
+          {formError && (
+            <p role="alert" style={{ color: '#A3526A', fontSize: '14px', marginBottom: '12px' }}>
+              {formError}
+            </p>
+          )}
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
             <Button onClick={handleAddToCart} fullWidth disabled={outOfStockForVariant}>
               {outOfStockForVariant ? 'Esgotado' : 'Adicionar ao carrinho'}
             </Button>
-            <Button variant="outline" style={{ padding: '12px 14px' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <Button variant="outline" aria-label="Adicionar aos favoritos" style={{ padding: '12px 14px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
             </Button>
@@ -390,7 +442,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           {product.description && (
             <div style={{ borderTop: '1px solid #E3E9F4', paddingTop: '24px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '16px', color: '#1D2235' }}>
-                Descricao
+                Descrição
               </h3>
               <div style={{ color: '#6B7494', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: product.description }} />
             </div>
@@ -500,7 +552,7 @@ function ReviewsSection({ productId }: { productId: string }) {
       <ReviewForm productId={productId} onSubmitted={load} />
 
       {loading ? (
-        <p style={{ color: '#6B7494', marginTop: '20px' }}>Carregando avaliações...</p>
+        <p style={{ color: '#6B7494', marginTop: '20px' }}>Carregando avaliações…</p>
       ) : reviews.length > 0 ? (
         <ul style={{ listStyle: 'none', padding: 0, marginTop: '24px', display: 'grid', gap: '16px' }}>
           {reviews.map(review => (
@@ -614,29 +666,40 @@ function ReviewForm({ productId, onSubmitted }: { productId: string; onSubmitted
       </p>
       <StarsInput value={rating} onChange={setRating} />
       <div style={{ display: 'grid', gap: '10px', marginTop: '12px' }}>
+        <label htmlFor="review-title" style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>
+          Título <span style={{ color: '#6B7494', fontWeight: 400 }}>(opcional)</span>
+        </label>
         <input
+          id="review-title"
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
-          placeholder="Título (opcional)"
+          placeholder="Ex.: superou a expectativa"
           maxLength={120}
+          className="ui-input"
           style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
         />
+        <label htmlFor="review-body" style={{ fontSize: '13px', fontWeight: 600, color: '#1D2235' }}>
+          Comentário <span style={{ color: '#6B7494', fontWeight: 400 }}>(opcional)</span>
+        </label>
         <textarea
+          id="review-body"
           value={body}
           onChange={e => setBody(e.target.value)}
-          placeholder="Conte como foi sua experiência (opcional)"
+          placeholder="Conte como foi sua experiência…"
           maxLength={2000}
           rows={4}
+          className="ui-input"
           style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8', resize: 'vertical', fontFamily: 'inherit' }}
         />
         {error && <p role="alert" style={{ margin: 0, color: '#B42318', fontSize: '13px' }}>{error}</p>}
         <button
           type="submit"
           disabled={submitting}
+          className="focus-ring"
           style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#1D2235', color: 'white', fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', justifySelf: 'start', opacity: submitting ? 0.7 : 1 }}
         >
-          {submitting ? 'Enviando...' : 'Enviar avaliação'}
+          {submitting ? 'Enviando…' : 'Enviar avaliação'}
         </button>
       </div>
     </form>
@@ -695,23 +758,30 @@ function RestockAlertForm({ productId, variantId }: { productId: string; variant
       </p>
 
       {submitted ? (
-        <p style={{ margin: 0, color: '#1D7A72', fontSize: '14px', fontWeight: 600 }}>
+        <p role="status" style={{ margin: 0, color: '#1D7A72', fontSize: '14px', fontWeight: 600 }}>
           Pronto! Vamos te avisar.
         </p>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '8px' }}>
+          <label htmlFor="restock-email" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+            E-mail para aviso de reposição
+          </label>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <input
+              id="restock-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="seu@email.com"
+              autoComplete="email"
               required
+              className="ui-input"
               style={{ flex: 1, minWidth: '200px', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8DCE8' }}
             />
             <button
               type="submit"
               disabled={loading}
+              className="focus-ring"
               style={{
                 padding: '10px 16px',
                 borderRadius: '8px',
@@ -723,7 +793,7 @@ function RestockAlertForm({ productId, variantId }: { productId: string; variant
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? 'Salvando...' : 'Avise-me'}
+              {loading ? 'Salvando…' : 'Avise-me'}
             </button>
           </div>
           <TurnstileWidget onToken={setTurnstileToken} />
