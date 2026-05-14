@@ -52,6 +52,10 @@ const REQUIRED_ORDER_COLUMNS = [
   'orderType',
   'productionTimeline',
   'currentStageNote',
+  'createdVia',
+  'paidAmount',
+  'dueAmount',
+  'refundStatus',
   'createdAt',
   'updatedAt',
 ] as const
