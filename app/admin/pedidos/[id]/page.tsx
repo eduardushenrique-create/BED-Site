@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import OrderMaterialsCard from '@/components/admin/OrderMaterialsCard'
+import OrderPaymentsSection from './_components/OrderPaymentsSection'
 import { variantEffectivePrice, describeVariant } from '@/lib/products/variant-pricing'
 import {
   FULFILLMENT_STATUSES,
@@ -97,6 +98,11 @@ type Order = {
   expectedDeliveryAt?: string | null
   productionTimeline?: ProductionTimeline | null
   currentStageNote?: string | null
+  // SPEC-005 §3.2.1 — totais de pagamento agregados (PR-6 schema)
+  paidAmount?: number
+  dueAmount?: number
+  refundStatus?: string | null
+  createdVia?: 'site' | 'admin' | null
 }
 
 function itemKey(productId: string, variantId: string | null): string {
@@ -988,6 +994,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           </Card>
+
+          {/* SPEC-005 §3.2.4 — Pagamentos parciais (installments) */}
+          <OrderPaymentsSection
+            orderId={order.id}
+            orderTotal={order.total}
+            initialPaidAmount={order.paidAmount ?? (order.paymentStatus === 'paid' ? order.total : 0)}
+            initialDueAmount={order.dueAmount ?? (order.paymentStatus === 'paid' ? 0 : order.total)}
+            refundStatus={order.refundStatus ?? null}
+          />
 
           <Card title="Linha do Tempo">
             {timelineEntries.length === 0 ? (
