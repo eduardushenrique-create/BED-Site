@@ -97,7 +97,16 @@ function getPrisma(): NonNullable<typeof prisma> {
   return prisma!
 }
 
-function validateInput(input: InstallmentInput): { ok: true; data: Required<InstallmentInput> } | { ok: false; error: string } {
+type ValidatedInstallment = {
+  amount: number
+  method: string
+  description: string | null
+  receivedAt: string  // sempre ISO string apos validacao
+  notes: string | null
+  isRefund: boolean
+}
+
+function validateInput(input: InstallmentInput): { ok: true; data: ValidatedInstallment } | { ok: false; error: string } {
   // R17 do ADR-003 v2: amount deve estar em (0, 100000]. CHECK constraint
   // tambem valida no banco, mas falhar cedo eh melhor (mensagem clara).
   if (typeof input.amount !== 'number' || !Number.isFinite(input.amount)) {
