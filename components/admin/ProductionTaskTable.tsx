@@ -46,6 +46,9 @@ interface ProductionTaskTableProps {
   onIncrement: (task: ProductionTaskRow, delta: number) => void
   printers?: PrinterOption[]
   onAssign?: (task: ProductionTaskRow, printerId: string | null) => void
+  // SPEC-005 §3.1.3: opcional. Se passado, exibe botao "Excluir" que
+  // abre modal com 3 modos (TASK_ONLY/ITEM_ONLY/ORDER).
+  onDelete?: (task: ProductionTaskRow) => void
 }
 
 function formatDateTime(iso: string | null): string {
@@ -105,7 +108,7 @@ const actionBtn: React.CSSProperties = {
   color: '#1D2235',
 }
 
-export default function ProductionTaskTable({ items, busyId, onIncrement, printers = [], onAssign }: ProductionTaskTableProps) {
+export default function ProductionTaskTable({ items, busyId, onIncrement, printers = [], onAssign, onDelete }: ProductionTaskTableProps) {
   return (
     <div
       style={{
@@ -246,6 +249,22 @@ export default function ProductionTaskTable({ items, busyId, onIncrement, printe
                       >
                         Pedido
                       </Link>
+                      {onDelete && (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(task)}
+                          disabled={busyId === task.id}
+                          style={{
+                            ...actionBtn,
+                            backgroundColor: '#FEE',
+                            color: '#A00',
+                            cursor: busyId === task.id ? 'not-allowed' : 'pointer',
+                          }}
+                          aria-label={`Excluir tarefa de produção do pedido ${task.order.orderNumber}`}
+                        >
+                          Excluir
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import ProductionSummaryCards, { ProductionSummary } from '@/components/admin/ProductionSummaryCards'
 import ProductionTaskFilters, { ProductionFiltersState } from '@/components/admin/ProductionTaskFilters'
 import ProductionTaskTable, { ProductionTaskRow, PrinterOption } from '@/components/admin/ProductionTaskTable'
+import DeleteProductionTaskModal from './_components/DeleteProductionTaskModal'
 
 interface ProductionListResponse {
   items: ProductionTaskRow[]
@@ -46,6 +47,8 @@ export default function AdminProducaoPage() {
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null)
+  // SPEC-005 §3.1.3: modal de exclusao de tarefa em 3 modos.
+  const [taskToDelete, setTaskToDelete] = useState<ProductionTaskRow | null>(null)
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -379,7 +382,27 @@ export default function AdminProducaoPage() {
         </div>
       ) : (
         <>
-          <ProductionTaskTable items={items} busyId={busyId} onIncrement={handleIncrement} printers={printers} onAssign={handleAssign} />
+          <ProductionTaskTable
+            items={items}
+            busyId={busyId}
+            onIncrement={handleIncrement}
+            printers={printers}
+            onAssign={handleAssign}
+            onDelete={(task) => setTaskToDelete(task)}
+          />
+
+          {taskToDelete && (
+            <DeleteProductionTaskModal
+              productionTaskId={taskToDelete.id}
+              orderNumber={taskToDelete.order.orderNumber || ''}
+              itemName={taskToDelete.item.productNameSnapshot || 'Item'}
+              onClose={() => setTaskToDelete(null)}
+              onSuccess={() => {
+                setTaskToDelete(null)
+                void loadTasks()
+              }}
+            />
+          )}
 
           <div
             style={{
