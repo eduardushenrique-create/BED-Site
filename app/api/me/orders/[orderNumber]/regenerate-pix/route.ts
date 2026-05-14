@@ -28,6 +28,12 @@ export async function POST(
       return NextResponse.json({ error: 'Pedido não pertence ao cliente logado.' }, { status: 403 })
     }
 
+    // SPEC-005 §9.3: pedido criado pelo admin nao tem auto-servico
+    // (regenerar PIX, etc). Se cliente tenta, retorna 404.
+    if ((order as { createdVia?: string }).createdVia === 'admin') {
+      return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 })
+    }
+
     if (order.paymentStatus !== 'pending') {
       return NextResponse.json(
         { error: 'Só é possível gerar novo Pix para pedidos com pagamento pendente.' },
