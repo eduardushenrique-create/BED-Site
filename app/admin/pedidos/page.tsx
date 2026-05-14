@@ -1104,8 +1104,8 @@ export default function AdminOrdersPage() {
           <Button onClick={openCreateModal}>+ Criar Primeiro Pedido</Button>
         </div>
       ) : (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{ backgroundColor: '#F0F5FB', borderBottom: '1px solid #D8DCE8' }}>
                 <th style={{ padding: '16px 8px 16px 16px', textAlign: 'left', width: '36px' }}>
@@ -1151,10 +1151,10 @@ export default function AdminOrdersPage() {
                         style={{ width: '16px', height: '16px', cursor: bulkLoading ? 'not-allowed' : 'pointer' }}
                       />
                     </td>
-                    <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px' }}>{order.orderNumber}</td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontWeight: 500 }}>{order.customerName}</div>
-                      <div style={{ fontSize: '12px', color: '#6B7494' }}>{order.customerEmail}</div>
+                    <td style={{ padding: '16px', fontFamily: 'var(--font-mono)', fontSize: '14px', whiteSpace: 'nowrap' }}>{order.orderNumber}</td>
+                    <td style={{ padding: '16px', maxWidth: '260px' }}>
+                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.customerName}>{order.customerName}</div>
+                      <div style={{ fontSize: '12px', color: '#6B7494', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.customerEmail}>{order.customerEmail}</div>
                     </td>
                     <td style={{ padding: '16px', fontWeight: 600 }}>R$ {order.total.toFixed(2).replace('.', ',')}</td>
                     <td style={{ padding: '16px' }}>

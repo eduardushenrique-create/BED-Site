@@ -105,8 +105,8 @@ export default function AuditoriaPage() {
         {loading ? 'Carregando...' : `${items.length} de ${total} registro(s)`}
       </p>
 
-      <div style={{ background: 'white', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
+      <div style={{ background: 'white', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
           <thead>
             <tr style={{ background: '#F0F5FB', textAlign: 'left', fontSize: '13px', color: '#6B7494' }}>
               <th style={th}>Quando</th>
@@ -127,19 +127,19 @@ export default function AuditoriaPage() {
                     <div style={{ fontSize: '13px' }}>{new Date(item.createdAt).toLocaleDateString('pt-BR')}</div>
                     <div style={{ fontSize: '12px', color: '#6B7494' }}>{new Date(item.createdAt).toLocaleTimeString('pt-BR')}</div>
                   </td>
-                  <td style={td}>
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{item.actorEmail}</div>
+                  <td style={{ ...td, maxWidth: '220px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.actorEmail}>{item.actorEmail}</div>
                     {item.actorRole && <div style={{ fontSize: '11px', color: '#6B7494' }}>{item.actorRole}</div>}
                   </td>
                   <td style={td}>
-                    <code style={{ fontSize: '12px', background: '#F0F5FB', padding: '2px 6px', borderRadius: '4px' }}>{item.action}</code>
+                    <code style={{ fontSize: '12px', background: '#F0F5FB', padding: '2px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>{item.action}</code>
                   </td>
-                  <td style={td}>
-                    <div style={{ fontSize: '13px' }}>{item.targetType}</div>
-                    {item.targetId && <div style={{ fontSize: '11px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>{item.targetId}</div>}
+                  <td style={{ ...td, maxWidth: '180px' }}>
+                    <div style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.targetType}>{item.targetType}</div>
+                    {item.targetId && <div style={{ fontSize: '11px', color: '#6B7494', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.targetId}>{item.targetId}</div>}
                   </td>
-                  <td style={td}>
-                    <div style={{ fontSize: '13px', color: '#1D2235' }}>{item.summary || '—'}</div>
+                  <td style={{ ...td, maxWidth: '320px' }}>
+                    <div style={{ fontSize: '13px', color: '#1D2235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.summary || ''}>{item.summary || '—'}</div>
                   </td>
                   <td style={td}>
                     <span style={{ fontSize: '12px', color: '#6B7494', fontFamily: 'var(--font-mono)' }}>{item.ip || '—'}</span>
