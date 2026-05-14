@@ -78,27 +78,47 @@ jobs:
           SHORT: ${{ steps.resolve.outputs.short }}
         run: |
           set -euo pipefail
-          # Lista check_runs deste SHA cujo nome bate com o JOB do
-          # smoke-staging.yml (`Playwright smoke`). Olhamos conclusion.
-          # Se nao existir nenhum, ou se nenhum for success, bloqueia.
+          # Em vez de checar `check-runs` por SHA, checamos workflow_runs
+          # do migrate-staging.yml com head_sha = $SHA. Por que:
+          #
+          # check_runs sao gravados pelo GITHUB_SHA do contexto que produz
+          # o run. Em workflows disparados via workflow_run, isso eh o HEAD
+          # do branch no momento — nao o SHA do upstream. Resultado: em
+          # rajadas de push, o check_run "Playwright smoke" ficava anexado
+          # num SHA diferente do que foi testado, e o gate aceitava
+          # promocoes de commits "validados" sob o SHA de outro commit
+          # (descoberta documentada em ADR-004, atualizacao pos-teste 3).
+          #
+          # A solucao mais segura ja foi mover smoke pra dentro de
+          # migrate-staging.yml como job dependente (PR #168 / fix do gate).
+          # Mas o check_run-fantasma de ciclos anteriores nao pode ser
+          # apagado e contamina commits passados.
+          #
+          # workflow_runs ficam atrelados ao head_sha do PUSH real (nao do
+          # contexto). Tambem nao tem fantasma — workflow_run so existe
+          # se o workflow foi efetivamente disparado. O conclusion success
+          # exige que TODOS os jobs (migrate + smoke) ficaram verdes —
+          # falha de smoke arrasta o run inteiro pra failure.
+
           RESPONSE="$(gh api \
-            "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=Playwright%20smoke&per_page=20")"
+            "repos/$GITHUB_REPOSITORY/actions/workflows/migrate-staging.yml/runs?head_sha=$SHA&per_page=20")"
 
           TOTAL="$(echo "$RESPONSE" | jq '.total_count')"
-          SUCCESSES="$(echo "$RESPONSE" | jq '[.check_runs[] | select(.conclusion=="success")] | length')"
+          SUCCESSES="$(echo "$RESPONSE" | jq '[.workflow_runs[] | select(.conclusion=="success")] | length')"
 
-          echo "Total smoke check-runs no commit $SHORT: $TOTAL"
-          echo "Sucesso: $SUCCESSES"
+          echo "Total migrate-staging runs no commit $SHORT: $TOTAL"
+          echo "Sucesso (migrate + smoke verde no mesmo SHA): $SUCCESSES"
 
           if [ "$SUCCESSES" -lt 1 ]; then
             echo ""
             echo "::error::Staging nao foi validado para o commit $SHORT."
-            echo "::error::Verifique em Actions -> Smoke — Staging se rodou e ficou verde."
-            echo "::error::Se nao rodou, dispare manualmente: Actions -> Smoke — Staging -> Run workflow."
+            echo "::error::Verifique em Actions -> Database Migrations — Staging se rodou e ficou verde nesse SHA."
+            echo "::error::Se o commit so tocou em docs (paths-ignore), nao houve smoke automatico."
+            echo "::error::Disparar smoke manual: Actions -> Smoke — Staging (manual) -> Run workflow com ref=$SHORT"
             exit 1
           fi
 
-          echo "::notice::Smoke staging verde no commit $SHORT — gate liberado."
+          echo "::notice::migrate-staging + smoke verde no commit $SHORT — gate liberado."
 
       - name: Compute next tag (vYYYY.MM.DD-N)
         id: tag
