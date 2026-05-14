@@ -1,50 +1,50 @@
-name: Smoke — Staging
+name: Smoke — Staging (manual)
 
-# Roda smoke Playwright contra Railway staging (STAGING_BASE_URL).
+# Smoke Playwright manual contra Railway staging.
 #
-# Dispara apos o `Database Migrations — Staging` (migrate-staging.yml)
-# completar verde, garantindo que: (1) migrations aplicaram, (2) o build
-# do Railway terminou de fato — o smoke tenta uma navegacao real.
+# Por que existe um workflow separado para isso:
+# O smoke automatico (que dispara apos cada migrate-staging) vive DENTRO
+# de migrate-staging.yml como job dependente — vide comentario daquele
+# arquivo sobre correcao do gate. Este arquivo continua existindo apenas
+# para casos manuais:
+#   - testar staging com um SHA/branch/tag arbitrario sem precisar de push
+#   - re-rodar smoke depois que Railway estava em cold start
+#   - validar staging apos popular dados a mao
 #
-# Tambem aceita disparo manual (workflow_dispatch) para investigar staging
-# sem precisar de novo commit.
+# O check_run produzido aqui NAO eh confiavel para o promote.yml — ele
+# fica anexado ao SHA do ref escolhido, que pode nao coincidir com main.
+# Para gate de release real, o caminho eh migrate-staging.yml (que roda
+# smoke automaticamente em todo push em main).
 #
-# PR-staging-B da Onda 1 (HANDOFF-SPEC-007.md §4). Pre-requisito: PR-staging-A
-# mergeado (este workflow_run aponta pelo nome do workflow gatilhador).
 # Pre-requisitos de secrets: STAGING_BASE_URL.
 
 on:
-  workflow_run:
-    workflows: ['Database Migrations — Staging']
-    types:
-      - completed
-    branches: [main]
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Branch, tag ou SHA para testar (default: main)'
+        required: false
+        default: 'main'
       reason:
-        description: 'Motivo do disparo manual (auditoria)'
+        description: 'Motivo do disparo (auditoria)'
         required: false
         default: 'Manual smoke'
 
 concurrency:
-  group: smoke-staging
+  group: smoke-staging-manual
   cancel-in-progress: false
 
 jobs:
   smoke:
-    name: Playwright smoke
+    name: Playwright smoke (manual)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Quando dispara via workflow_run, so segue se o anterior foi success.
-    # Para workflow_dispatch, github.event.workflow_run e undefined e a
-    # condicao vira true por curto-circuito.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -59,9 +59,14 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Show staging target
-        run: echo "Smoking $STAGING_BASE_URL"
+        run: |
+          echo "Smoking $STAGING_BASE_URL"
+          echo "Ref: $REF (resolvido para SHA $GITHUB_SHA)"
+          echo "Reason: $REASON"
         env:
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          REF: ${{ github.event.inputs.ref }}
+          REASON: ${{ github.event.inputs.reason }}
 
       - name: Run smoke tests
         run: npx playwright test --config=playwright.staging.config.ts

@@ -1,23 +1,30 @@
 name: Database Migrations — Staging
 
-# Aplica `prisma migrate deploy` contra o Postgres de STAGING via runner
-# GitHub. Espelho do migrate-prd.yml, mas usa DATABASE_URL_STAGING e roda
-# em todo push pra `main` (o gate de release).
+# Aplica `prisma migrate deploy` contra o Postgres de STAGING e em seguida
+# roda o smoke Playwright contra a URL de staging. Os dois jobs vivem aqui
+# (em vez de smoke-staging.yml separado) por correcao do gate de release:
 #
-# Pre-requisito: secret DATABASE_URL_STAGING com a URL PUBLICA do
-# Railway (formato `<host>.proxy.rlwy.net:<port>`). A URL interna
-# (`postgres.railway.internal`) NAO funciona aqui.
+# Por que smoke esta aqui e nao em workflow separado:
+# Workflows disparados via `workflow_run` rodam com `GITHUB_SHA = HEAD
+# do branch no momento do evento`, NAO com o SHA que disparou o upstream.
+# Em rajadas de push (que aconteceram no merge da Onda 1), isso fazia o
+# smoke testar HEAD de main e registrar o check_run num SHA diferente do
+# que o migrate-staging acabou de aplicar. promote.yml usa check_runs por
+# SHA, entao o gate ficava furado: aceitava um SHA cuja "validacao" havia
+# acontecido em outro commit. Mantendo migrate + smoke no mesmo workflow,
+# ambos rodam no mesmo contexto e o check_run "Playwright smoke" fica
+# anexado ao SHA correto.
+# Vide PR de fix do gate (fix/staging-smoke-gate-correctness, 2026-05-14).
+#
+# Pre-requisitos:
+# - secret DATABASE_URL_STAGING (URL publica Railway, *.proxy.rlwy.net)
+# - secret STAGING_BASE_URL (https://bed-site-staging.up.railway.app)
 # Memoria: feedback_railway_db_url_publica.md
-#
-# Este eh o PR-staging-A da Onda 1 (vide HANDOFF-SPEC-007.md §4).
-# Fluxo esperado:
-#   push em main -> migrate-staging.yml (este) -> smoke-staging.yml -> QA manual
-#   -> promote.yml (cria tag v*) -> migrate-prd.yml (em outra branch)
 
 on:
   push:
     branches: [main]
-    # Pular se push so afeta documentacao/configuracao sem schema
+    # Pular se push so afeta documentacao/configuracao sem schema/codigo
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -69,3 +76,48 @@ jobs:
         run: npx prisma migrate status
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+  smoke:
+    name: Playwright smoke
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Roda apenas se migrate ficou verde. Falha de migration NAO precisa
+    # arrastar smoke vermelho — esperamos o operador olhar a causa primeiro.
+    if: needs.migrate.result == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Install Playwright browser (chromium only)
+        run: npx playwright install --with-deps chromium
+
+      - name: Show staging target
+        run: echo "Smoking $STAGING_BASE_URL contra SHA $GITHUB_SHA"
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+
+      - name: Run smoke tests
+        run: npx playwright test --config=playwright.staging.config.ts
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-staging-report
+          path: |
+            playwright-report-staging/
+            test-results/
+          retention-days: 14
