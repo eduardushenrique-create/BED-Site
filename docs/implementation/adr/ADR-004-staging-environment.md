@@ -21,14 +21,16 @@ push em main  ──►  Railway staging (auto-deploy)
                           ▼   (QA manual valida)
               Actions → Promote staging → prd
                           │   (gate: smoke verde + reason obrigatório)
-                          ▼
-                    tag v2026.05.14-N
+                          ├─►  cria tag v2026.05.14-N
+                          │     └─►  migrate-prd.yml (aplica migrations em prd-db)
                           │
-                          ├─►  migrate-prd.yml     (aplica migrations em prd-db)
-                          └─►  Railway prd         (deploy da tag)
+                          └─►  push em branch `production` (--force-with-lease)
+                                └─►  Railway prd detecta push e deploya o commit
 ```
 
 **Custo:** 1 ambiente Railway extra (~US$ 5/mês com free tier), 5 PRs (~1 dia útil), ~2 min adicionais por release. **Benefício:** zero deploy em prd sem validação automática + humana primeiro.
+
+> **Atualização 2026-05-14 (pós-implementação):** descobrimos que [Railway não suporta deploy em push de tag](https://docs.railway.com/deployments/github-autodeploys) — só de branch. Por isso o gate de Railway prd é fechado via branch dedicada **`production`** (atualizada pelo `promote.yml` em conjunto com a tag), e não pela tag direta. A tag `v*` mantém seu papel como audit trail + gatilho do `migrate-prd.yml`. Detalhes em §"Decisão" item 2.
 
 ---
 
@@ -69,12 +71,19 @@ Implementar ambiente de staging com **4 elementos**:
 - Mesma `NEXTAUTH_SECRET` distinta (segurança).
 - Demais env vars (MP, Resend, Sentry, R2, OAuth, Turnstile, Upstash) **propositalmente vazias** — cada feature degrada com fallback seguro. Adicionar caso a caso quando o teste exigir.
 
-### 2. Branching: `main` = staging, tag `v*` = prd
+### 2. Branching: `main` = staging, `production` + tag `v*` = prd
 
-- `main` continua sendo a única branch de longa duração.
+- `main` continua sendo a única branch de feature/integração.
 - **Push em main:** Railway staging faz auto-deploy + `migrate-staging.yml` aplica migrations em staging-db.
-- **Push de tag `v*`:** `migrate-prd.yml` aplica migrations em prd-db + Railway prd faz deploy.
-- Tags `v*` só são criadas pelo workflow `promote.yml` (manual, com validação).
+- **Promote (manual, com validação):**
+  - **Cria tag `v*`** → `migrate-prd.yml` aplica migrations em prd-db.
+  - **Push em branch `production`** (`--force-with-lease`) → Railway prd detecta push e deploya o commit.
+- Branch `production` é **exclusivamente atualizada pelo `promote.yml`**. Recomenda-se proteção (no commit direto, no push manual).
+
+**Por que duas coisas (tag + branch) em vez de só uma?**
+- Tag é **imutável**: serve de audit trail e referência histórica do que foi promovido.
+- Branch `production` é **móvel**: Railway só sabe escutar branch, não tag — limitação documentada em [Railway docs](https://docs.railway.com/deployments/github-autodeploys) (não há previsão de suporte a tag nos triggers).
+- Os dois mecanismos sempre apontam pro mesmo SHA quando o promote completa com sucesso. Se divergirem, é sinal de incidente.
 
 ### 3. Workflows GHA split
 
@@ -144,7 +153,9 @@ A decisão D foi a mais próxima da escolhida — `promote.yml` essencialmente �
    - `DATABASE_URL_STAGING` (URL pública staging-db)
    - `STAGING_BASE_URL` (URL Railway staging)
    - **JÁ FEITO** (handoff §3.3).
-3. **Reconfigurar Railway prd para escutar tags `v*` em vez de `main`** — **PENDENTE.** Sem isso, prd continua deployando todo push em main. Stakeholder faz manualmente no painel Railway → Service → Settings → Source/Triggers, depois que PR-staging-C+D mergear.
+3. **Criar branch `production`** apontando para HEAD de `main` no momento da virada — **JÁ FEITO** em 2026-05-14 (push direto, primeira e única vez fora do `promote.yml`).
+4. **Reconfigurar Railway prd para escutar a branch `production` em vez de `main`** — **PENDENTE.** Sem isso, prd continua deployando todo push em main. Stakeholder faz manualmente no painel Railway → Service → Settings → Source/Branch.
+5. **(Opcional, recomendado)** Adicionar regra de proteção em `production` no GitHub Settings → Branches → "Restrict who can push" para impedir commits diretos. Apenas o `promote.yml` (via `GITHUB_TOKEN`) deve poder atualizar essa branch.
 
 ### Estimativa de esforço
 
@@ -199,6 +210,17 @@ A decisão D foi a mais próxima da escolhida — `promote.yml` essencialmente �
 - O campo `reason` obrigatório no Promote força reflexão mínima ("estou promovendo X porque…").
 
 **Severidade:** baixa. Cultura, não automatização.
+
+### R5-bis — Branch `production` divergir do que está rodando em prd
+
+**Cenário:** alguém faz `git push --force production <sha>` manualmente, ou Railway prd está pinado num deploy antigo. HEAD de `production` deixa de refletir o que realmente está em prd → audit trail fica enganoso.
+
+**Mitigação:**
+- Proteção da branch `production` (item 5 das ações manuais) restringe push a Actions.
+- `--force-with-lease` no `promote.yml` falha se a branch tiver avançado fora do controle (sinal de manipulação).
+- Railway prd sempre exibe o SHA do deploy ativo — comparar com HEAD de `production` quando houver dúvida.
+
+**Severidade:** baixa-média. Detectável visualmente. Não compromete o gate, só polui audit.
 
 ### R5 — Staging com dados reais (LGPD)
 

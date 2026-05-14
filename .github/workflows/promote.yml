@@ -134,6 +134,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Tag anotada (carrega autor + motivo no audit trail).
+          # A tag dispara `migrate-prd.yml` (Prisma migrate deploy em prd-db).
           git tag -a "$TAG" "$SHA" -m "Promote staging -> prd
 
           Commit: $SHORT
@@ -141,6 +142,41 @@ jobs:
           Reason: $REASON"
           git push origin "$TAG"
           echo "::notice::Tag $TAG criada e enviada."
+
+      - name: Fast-forward branch `production` (Railway prd deploy trigger)
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          SHORT: ${{ steps.resolve.outputs.short }}
+        run: |
+          set -euo pipefail
+          # Por que esse step existe (resumido — completo em ADR-004):
+          # Railway nao suporta deploy em push de tag, so de branch. Para
+          # fechar o gate do lado de Railway prd, mantemos uma branch
+          # dedicada `production` cujo HEAD eh sempre o SHA validado pelo
+          # smoke + promovido aqui. Railway prd escuta `production` (vide
+          # configuracao manual no painel — runbook §3-bis).
+          #
+          # Usar `--force-with-lease` evita overwrite acidental se um
+          # promote concorrente atualizar production entre nosso fetch e
+          # push (cancel-in-progress: false no concurrency group ja
+          # serializa os promotes, mas --force-with-lease eh defense in
+          # depth contra alguem pushando manual na branch).
+          git fetch origin production || true
+          if git rev-parse --verify --quiet origin/production >/dev/null; then
+            PROD_SHA="$(git rev-parse origin/production)"
+            echo "production HEAD atual: ${PROD_SHA:0:7}"
+            # Sanity: nao avancar se for mesmo SHA (no-op explicito).
+            if [ "$PROD_SHA" = "$SHA" ]; then
+              echo "::notice::production ja aponta para $SHORT — nada a fazer."
+              exit 0
+            fi
+            git push origin "$SHA:refs/heads/production" \
+              --force-with-lease="refs/heads/production:$PROD_SHA"
+          else
+            # Primeira vez (branch nao existe no remoto) — push simples.
+            git push origin "$SHA:refs/heads/production"
+          fi
+          echo "::notice::production atualizada para $SHORT — Railway prd vai deployar."
 
       - name: Summary
         env:
@@ -162,8 +198,12 @@ jobs:
             echo "| Reason | $REASON |"
             echo ""
             echo "**Proximos passos automaticos:**"
-            echo "- \`Database Migrations — Production\` vai aplicar migrations em prd"
-            echo "- Railway prd vai fazer deploy da tag (apos reconfiguracao manual de triggers — vide ADR-004)"
+            echo "- \`Database Migrations — Production\` aplica migrations em prd-db (via tag)"
+            echo "- Railway prd detecta push em branch \`production\` e faz deploy do commit \`$SHORT\`"
+            echo ""
+            echo "**Como verificar:**"
+            echo "- \`git fetch && git log production --oneline -5\` mostra o HEAD atual de production"
+            echo "- Railway painel -> Deployments mostra o deploy em andamento"
             echo ""
             echo "[Ver Actions](https://github.com/${GITHUB_REPOSITORY}/actions)"
           } >> "$GITHUB_STEP_SUMMARY"

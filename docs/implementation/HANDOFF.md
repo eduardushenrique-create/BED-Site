@@ -144,17 +144,20 @@ Adotado a partir de 2026-05-14 (Onda 1 do plano SPEC-007). Decisão completa em 
    - `commit_sha`: vazio (usa HEAD de main) ou SHA específico
    - `reason`: obrigatório, ex: `"release SPEC-007 fase 1"`
    - Click "Run"
-8. **Promote valida e cria tag:** confere que smoke ficou verde naquele commit, calcula próxima tag `vYYYY.MM.DD-N`, cria tag anotada com motivo.
-9. **Tag dispara automaticamente:**
-   - `migrate-prd.yml` aplica migrations em prd
-   - Railway prd faz deploy da tag (requer reconfiguração manual prévia — vide [ADR-004 §Ações manuais](adr/ADR-004-staging-environment.md))
+8. **Promote valida, cria tag e atualiza `production`:**
+   - Confere que smoke ficou verde naquele commit (gate de release)
+   - Calcula próxima tag `vYYYY.MM.DD-N`, cria tag anotada com motivo
+   - Faz `git push --force-with-lease` na branch `production` apontando pro SHA
+9. **Dois efeitos automáticos:**
+   - **Tag** dispara `migrate-prd.yml` → aplica migrations em prd-db
+   - **Branch `production`** dispara deploy do Railway prd (Railway escuta essa branch — reconfiguração manual prévia, vide [ADR-004 §Ações manuais](adr/ADR-004-staging-environment.md))
 
 ### Como fazer rollback
 
 | Situação | Caminho |
 |---|---|
 | **PR ruim já mergeado em main, ainda não promovido** | `git revert <sha>` na main + nova PR + smoke verde + Promote novamente. Prd não foi afetado. |
-| **Tag promovida tem bug em prd** | Em Railway prd → **Deployments** → encontrar deploy da tag anterior → **Redeploy**. Migration de prd permanece aplicada (Prisma migrations não voltam sozinhas — apenas o código volta). |
+| **Promote subiu commit com bug em prd** | Caminho mais rápido: Railway prd → **Deployments** → encontrar deploy anterior → **Redeploy**. Em paralelo, alguém faz `git push --force-with-lease origin <sha-bom>:production` apontando pro commit anterior, para o HEAD de `production` voltar a refletir o que está em prd. Migration de prd permanece aplicada (Prisma migrations não voltam sozinhas — apenas o código volta). |
 | **Migration aplicada em prd é destrutiva** | Ação manual: `npx prisma migrate resolve --rolled-back <migration_name>` apontando para o Postgres prd, **só depois de aprovação explícita**. NUNCA apagar linha de `_prisma_migrations` direto no SQL. |
 | **Schema mudou e Prisma client espera coluna que não existe** | Sintoma é health 503 com `missingColumns`. Aplicar migration pendente via `migrate-prd.yml` (workflow_dispatch). Se a migration em si está errada, criar nova migration corretiva — não editar a falha. |
 
@@ -170,15 +173,21 @@ gh workflow run promote.yml -f reason="motivo aqui"
 # Promover SHA específico
 gh workflow run promote.yml -f commit_sha=<sha> -f reason="motivo"
 
+# Ver o que esta rodando em prd agora
+git fetch origin production
+git log origin/production --oneline -5
+
 # Listar tags do dia (para conferir N atual)
 git tag --list "v$(date -u +%Y.%m.%d)-*"
 ```
 
 ### ⚠️ Pendência operacional (uma vez só)
 
-Após mergear PR #165 (PR-staging-C+D), **reconfigurar Railway prd para escutar tags `v*` em vez de pushes em `main`**. Sem isso, prd continua subindo todo push em main e o gate de smoke é ignorado.
+Após o `promote.yml` passar a empurrar pra branch `production` (já está em código), **reconfigurar Railway prd para escutar a branch `production` em vez de `main`**. Sem isso, prd continua subindo todo push em main e o gate de smoke é ignorado.
 
-Caminho: painel Railway → projeto BED-Site → Service → Settings → Source/Triggers → mudar para "Deploy on tag push" (ou `railway.toml` com `[deploy].source = "tag:v*"`). Stakeholder faz isso manualmente.
+Caminho: painel Railway → projeto **BED-Site** (produção) → Service → **Settings** → **Source** (ou **Service Source**) → mudar branch de `main` para `production` → Salvar. Stakeholder faz isso manualmente uma vez só.
+
+(Tag `v*` não pode ser usada como trigger no Railway — limitação documentada da Railway, vide ADR-004 §Decisão item 2.)
 
 ---
 
