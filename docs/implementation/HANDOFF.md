@@ -2,7 +2,33 @@
 
 > **Como usar este documento:** abra uma nova sessão do Claude Code no diretório `C:\PROJETOS\BED-Site` e cole o conteúdo abaixo na primeira mensagem (ou referencie o arquivo `docs/implementation/HANDOFF.md`). O assistente terá contexto completo para continuar de onde paramos.
 >
-> **Última sessão:** 2026-05-02 (sessão de fechamento massivo do backlog — 13 PRs entregues)
+> **Última atualização:** 2026-05-14 — SPEC-005 fechada em produção (pagamentos parciais + exclusão de produção em 3 modos + design polish).
+
+---
+
+## 0-bis. Atividade recente (2026-05-13 → 2026-05-14)
+
+**Ciclo SPEC-005 — Edição/Exclusão na Produção + Pagamentos Parciais — ✅ ENTREGUE.**
+
+Spec completa em [`spec/SPEC-005-edicao-producao-pagamentos-parciais.md`](spec/SPEC-005-edicao-producao-pagamentos-parciais.md) (status detalhado na §0 do próprio doc).
+
+| Fase | PRs | Resumo |
+|---|---|---|
+| Infra de migration (gates ADR-003 v2) | [#146](https://github.com/eduardushenrique-create/BED-Site/pull/146) [#147](https://github.com/eduardushenrique-create/BED-Site/pull/147) [#148](https://github.com/eduardushenrique-create/BED-Site/pull/148) [#149](https://github.com/eduardushenrique-create/BED-Site/pull/149) [#152](https://github.com/eduardushenrique-create/BED-Site/pull/152) [#155](https://github.com/eduardushenrique-create/BED-Site/pull/155) | GitHub Action que aplica migrations, `start.mjs` valida `_prisma_migrations` direto via `pg`, boot smoke no CI, forbidden-patterns CI, REQUIRED_ORDER_COLUMNS no health |
+| Fase 1 — Schema | [#156](https://github.com/eduardushenrique-create/BED-Site/pull/156) | `PaymentInstallment`, `Order.paidAmount/dueAmount/createdVia/refundStatus`, `OrderItem.deletedAt` |
+| Fase 2a — Backend installments CRUD | [#157](https://github.com/eduardushenrique-create/BED-Site/pull/157) | `lib/installments.ts` + `/api/pedidos/[id]/installments[/[id]]` com lock pessimista |
+| Fase 2b — Backend DELETE produção 3 modos | [#158](https://github.com/eduardushenrique-create/BED-Site/pull/158) | TASK_ONLY / ITEM_ONLY / ORDER, soft-delete sincronizado, reason obrigatório |
+| Fase 3a — Admin UI | [#159](https://github.com/eduardushenrique-create/BED-Site/pull/159) | Seção "Pagamentos" + modal + zona de perigo de exclusão |
+| Fase 3b — Cliente UI + isolamento | [#160](https://github.com/eduardushenrique-create/BED-Site/pull/160) | Pedidos `createdVia='admin'` invisíveis em `/minha-conta` e silenciosos em email |
+| Polish — Alinhamento visual | [#161](https://github.com/eduardushenrique-create/BED-Site/pull/161) | `OrderPaymentsSection` + `RegisterInstallmentModal` reescritas no tema admin claro, scroll horizontal removido em `/admin/pedidos` e `/admin/auditoria` |
+
+**Cortado para SPEC-006 futura:** refund automático via API do Mercado Pago (volume zero justifica risco baixo de adiar).
+
+**Lições mecanizadas em CI/docs nesta sessão:**
+1. Tema admin é claro inline — não importar Tailwind dark (`zinc-*`, `emerald-*`). Documentado em [`coding-standards.md` §Design tokens do admin](coding-standards.md#design-tokens-do-admin-tema-claro).
+2. `minWidth` fixo grande em tabela força scroll lateral mesmo em viewport ampla. Preferir truncar célula variável (ellipsis + `title=`).
+3. `DATABASE_URL_PRODUCTION` em GitHub Action precisa URL pública (`*.proxy.rlwy.net`), não interna `postgres.railway.internal`.
+4. Migration `rolled_back` no Postgres do Railway é informativo, NÃO é erro — boot não deve abortar.
 
 ---
 

@@ -1,11 +1,44 @@
 # SPEC-005 — Edição/Exclusão na Lista de Produção + Pagamentos Parciais
 
-> Versão: 1.1 | Data: 2026-05-13 | Status: Aprovado para implementação
+> Versão: 1.2 | Data: 2026-05-14 | Status: **✅ ENTREGUE em produção**
 >
-> **Changelog 1.0 → 1.1:** Stakeholder aprovou as 4 decisões pendentes da seção 9.
-> Adicionado conceito de `Order.createdVia` (origem do pedido) que governa
-> notificações ao cliente e visibilidade na conta. Estorno automático via MP
-> definido para pedidos 100% MP cancelados.
+> **Changelog 1.1 → 1.2 (2026-05-14):** SPEC fechada após merge do PR #161
+> (design polish da seção de pagamentos). Status de entrega consolidado abaixo.
+>
+> **Changelog 1.0 → 1.1 (2026-05-13):** Stakeholder aprovou as 4 decisões
+> pendentes da seção 9. Adicionado conceito de `Order.createdVia` (origem do
+> pedido) que governa notificações ao cliente e visibilidade na conta. Estorno
+> automático via MP definido para pedidos 100% MP cancelados.
+
+## 0. Status de entrega (2026-05-14)
+
+| Fase | PRs | Em prod |
+|---|---|---|
+| Infra de migration (gates ADR-003 v2) | [#146](https://github.com/eduardushenrique-create/BED-Site/pull/146) · [#147](https://github.com/eduardushenrique-create/BED-Site/pull/147) · [#148](https://github.com/eduardushenrique-create/BED-Site/pull/148) · [#149](https://github.com/eduardushenrique-create/BED-Site/pull/149) · [#152](https://github.com/eduardushenrique-create/BED-Site/pull/152) · [#155](https://github.com/eduardushenrique-create/BED-Site/pull/155) | ✅ |
+| Fase 1 — Schema (PaymentInstallment, paidAmount/dueAmount, createdVia, deletedAt) | [#156](https://github.com/eduardushenrique-create/BED-Site/pull/156) | ✅ |
+| Fase 2a — Backend installments CRUD + createdVia guard | [#157](https://github.com/eduardushenrique-create/BED-Site/pull/157) | ✅ |
+| Fase 2b — Backend DELETE produção 3 modos + sync OrderItem soft-delete | [#158](https://github.com/eduardushenrique-create/BED-Site/pull/158) | ✅ |
+| Fase 3a — Admin UI (pagamentos + exclusão de produção) | [#159](https://github.com/eduardushenrique-create/BED-Site/pull/159) | ✅ |
+| Fase 3b — Cliente UI + filtro createdVia (pedidos admin não aparecem em /minha-conta) | [#160](https://github.com/eduardushenrique-create/BED-Site/pull/160) | ✅ |
+| Polish — Alinhamento visual `OrderPaymentsSection` + `RegisterInstallmentModal` ao tema admin claro + remoção de scroll horizontal em /admin/pedidos e /admin/auditoria | [#161](https://github.com/eduardushenrique-create/BED-Site/pull/161) | ✅ |
+
+**Cortado do escopo (vai para SPEC-006 futura):** Refund automático via API do
+Mercado Pago (R6 do ADR-003 v2). Volume zero de cancelamentos com MP nos
+últimos meses tornou o risco financeiro (idempotency, janela 90d, replay)
+desproporcional. Mantido apenas o campo `Order.refundStatus` no schema + botão
+"Marcar como estornado" manual no admin.
+
+**Decisões de produto pendentes (não bloqueiam funcionamento):**
+1. **LGPD R15/R22** — política de portabilidade/esquecimento para pedidos
+   `createdVia='admin'` (PII de loja física/WhatsApp).
+2. **F1** — checkbox "Confirmo que comuniquei o cliente fora do sistema" antes
+   de cancelar pedido admin.
+3. **F3** — limite de 3 exceções/mês de "Confirmar retirada com saldo aberto".
+
+**Como aplicar isto em trabalho futuro:** SPEC-005 está fechada. Qualquer PR
+que precise mexer em `paidAmount`/`dueAmount` deve passar exclusivamente por
+`lib/installments.ts::recalculatePaidAmount` (transação com `SELECT ... FOR
+UPDATE`, R3 do ADR-003 v2).
 
 ## 1. Resumo executivo (linguagem do dono do negócio)
 
