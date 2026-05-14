@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiAdmin } from '@/lib/api-auth'
-import { getProductionTask, updateProductionTask } from '@/lib/database'
+import {
+  getProductionTask,
+  updateProductionTask,
+  DatabaseUnavailableError,
+} from '@/lib/database'
 import { captureException } from '@/lib/observability'
+import { recordAuditEntry } from '@/lib/audit-log'
+import { getClientIp } from '@/lib/rate-limit'
+import {
+  cancelProductionTaskOnly,
+  cancelOrderItemViaProduction,
+  cancelEntireOrderViaProduction,
+  type CancelMode,
+} from '@/lib/production-cancel'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,5 +163,102 @@ export async function PATCH(
   } catch (error) {
     captureException(error, { context: 'api.producao.[id]', detail: 'PATCH updateProductionTask failed' })
     return NextResponse.json({ error: 'Erro ao atualizar tarefa de produção.' }, { status: 500 })
+  }
+}
+
+/**
+ * SPEC-005 Fase 2b — DELETE /api/producao/[id]?mode=TASK_ONLY|ITEM_ONLY|ORDER
+ *
+ * 3 modos de remocao com semanticas diferentes:
+ * - TASK_ONLY: cancela apenas a ProductionTask. OrderItem e Order intactos.
+ * - ITEM_ONLY: + soft-deleta OrderItem + recalcula Order.total + paidAmount.
+ *              Se virou refundDue > 0, marca Order.refundStatus='manual_required'.
+ * - ORDER: + soft-deleta TODOS os items + cancela TODAS as tasks +
+ *          Order.status='cancelled'. Refund manual se pago > 0.
+ *
+ * Sempre exige `?reason=...` (min 5 chars). AuditLog grava modo + reason +
+ * snapshot dos totals.
+ */
+const VALID_MODES: CancelMode[] = ['TASK_ONLY', 'ITEM_ONLY', 'ORDER']
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireApiAdmin()
+  if (auth.response) return auth.response
+
+  const { id } = await context.params
+  if (!id) {
+    return NextResponse.json({ error: 'ID da tarefa é obrigatório.' }, { status: 400 })
+  }
+
+  const url = new URL(request.url)
+  const modeParam = url.searchParams.get('mode') || ''
+  if (!VALID_MODES.includes(modeParam as CancelMode)) {
+    return NextResponse.json(
+      { error: `mode obrigatorio (${VALID_MODES.join(' | ')})` },
+      { status: 400 },
+    )
+  }
+  const mode = modeParam as CancelMode
+
+  let reason = url.searchParams.get('reason') || ''
+  if (!reason) {
+    const body = await request.json().catch(() => null)
+    if (body && typeof body.reason === 'string') {
+      reason = body.reason
+    }
+  }
+  if (!reason || reason.trim().length < 5) {
+    return NextResponse.json(
+      { error: 'reason obrigatorio (minimo 5 caracteres)' },
+      { status: 400 },
+    )
+  }
+
+  try {
+    let result
+    if (mode === 'TASK_ONLY') {
+      result = await cancelProductionTaskOnly(id)
+    } else if (mode === 'ITEM_ONLY') {
+      result = await cancelOrderItemViaProduction(id)
+    } else {
+      result = await cancelEntireOrderViaProduction(id)
+    }
+
+    recordAuditEntry({
+      actorEmail: auth.user!.email,
+      actorRole: auth.user!.role || null,
+      action: `production.cancel.${mode.toLowerCase()}`,
+      targetType: 'ProductionTask',
+      targetId: id,
+      summary: `Pedido ${result.orderNumber}: cancelamento via producao (${mode}) — ${reason.slice(0, 100)}`,
+      metadata: {
+        mode,
+        reason: reason.slice(0, 500),
+        orderId: result.orderId,
+        orderNumber: result.orderNumber,
+        productionTaskId: id,
+        itemsCancelled: result.itemsCancelled,
+        ...(result.refundDue ? { refundDue: result.refundDue } : {}),
+      },
+      ip: getClientIp(request),
+    }).catch(() => {})
+
+    return NextResponse.json({ ok: true, ...result })
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503, headers: { 'Retry-After': '30' } },
+      )
+    }
+    if (error instanceof Error) {
+      const status = /nao encontrada|não encontrada/i.test(error.message) ? 404 : 400
+      return NextResponse.json({ error: error.message }, { status })
+    }
+    captureException(error, { context: 'api.producao.[id]', detail: 'DELETE cancel failed' })
+    return NextResponse.json({ error: 'Erro ao cancelar.' }, { status: 500 })
   }
 }

@@ -132,7 +132,14 @@ const FAIL_FAST_IN_PRODUCTION =
 const ORDER_INCLUDE_SAFE = {
   address: true,
   payment: true,
-  items: { include: { variant: true } },
+  // SPEC-005 §3.1.2: items soft-deletados (deletedAt != null) NAO devem
+  // aparecer em listagens. Filtra pra fora pra manter compatibilidade
+  // com os calculos atuais (subtotal/total ja foram ajustados quando o
+  // item foi soft-deleted via DELETE de producao mode=ITEM_ONLY).
+  items: {
+    where: { deletedAt: null },
+    include: { variant: true },
+  },
 } as const
 
 type OrderWithItems = {
