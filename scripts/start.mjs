@@ -1,133 +1,154 @@
 #!/usr/bin/env node
-// Startup wrapper: garante que o schema do banco esta sincronizado antes de
-// iniciar o Next. Roda em duas tentativas escalonadas:
 //
-//   1. `prisma migrate deploy` via CLI (caminho normal). Idempotente.
-//   2. Se o CLI falhar/nao estiver acessivel, aplica DIRETAMENTE via SQL
-//      as migrations conhecidas do redesign do pipeline (orderType e
-//      deliveryMethod). Tambem idempotente — checa schema antes.
+// Startup wrapper. APENAS valida sincronização entre as migrations do
+// repositorio e o estado do Postgres. NAO aplica migrations (isso eh
+// feito por .github/workflows/migrate.yml, conforme ADR-002).
 //
-// Resiliente: se TUDO falhar, loga e segue o startup. App sobe usando
-// fallback localDb. Nao bloqueia trafego — pedidos antigos continuam
-// funcionando enquanto admin destrava manualmente via /admin/sistema/migrations.
+// Implementacao usa `pg` direto em vez de PrismaClient porque o
+// PrismaClient do Prisma 7 exige `adapter: new PrismaPg(...)` e introduz
+// uma camada extra de coisas que podem dar errado no boot. `pg` eh
+// minimal, dependencia direta, validado por boot smoke test em CI.
+//
+// Comportamento por ambiente:
+//
+//   - Producao (NODE_ENV=production + DATABASE_URL real):
+//       Le _prisma_migrations no banco e compara com prisma/migrations/.
+//       Se houver migration faltando ou em estado invalido (rolled_back,
+//       unfinished), FAIL-FAST (exit 1). Container sera reiniciado pelo
+//       Railway. Eventualmente o GitHub Action de migrations termina ou
+//       admin aplica via SQL — proximo restart sobe.
+//
+//   - Build do Docker (DATABASE_URL = dummy):
+//       Pula validacao silenciosamente. So `next build` roda.
+//
+//   - Dev/CI/sem DATABASE_URL:
+//       Pula validacao. Modo localDb continua funcionando.
 
-import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { readdirSync, existsSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const PRISMA_CLI = 'node_modules/prisma/build/index.js'
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const MIGRATIONS_DIR = join(__dirname, '..', 'prisma', 'migrations')
 
-function runMigrationsCli() {
-  return new Promise((resolve) => {
-    if (!existsSync(PRISMA_CLI)) {
-      console.warn(`[startup] Prisma CLI nao encontrado em ${PRISMA_CLI} — pulando para fallback SQL`)
-      resolve(false)
-      return
-    }
-    const proc = spawn('node', [PRISMA_CLI, 'migrate', 'deploy'], {
-      stdio: 'inherit',
-      env: process.env,
-    })
-    let resolved = false
-    const finish = (ok, label) => {
-      if (resolved) return
-      resolved = true
-      console.log(`[startup] ${label}`)
-      resolve(ok)
-    }
-    proc.on('exit', (code) => finish(code === 0, `prisma migrate deploy exit=${code}`))
-    proc.on('error', (err) => finish(false, `prisma migrate deploy erro de processo: ${err?.message || err}`))
-  })
+// Dummies conhecidos: builder do Dockerfile e CI do GitHub.
+// Listados explicitamente — adicionar aqui se introduzir outro padrão.
+const DUMMY_DB_PATTERNS = [
+  /:\/\/dummy:dummy@/i,
+  /:\/\/johndoe:randompassword@/i,
+  /:\/\/smoke:smoke@/i,
+]
+
+function isDummyDatabaseUrl(url) {
+  if (!url) return true
+  return DUMMY_DB_PATTERNS.some((re) => re.test(url))
 }
 
-// Fallback: aplica via SQL direto usando o @prisma/client que JA esta no
-// runtime (nao depende do CLI). Cobre as duas migrations recentes que
-// mais frequentemente ficaram pendentes em prod. Idempotente.
-async function applySqlFallback() {
-  let client
-  try {
-    const mod = await import('@prisma/client')
-    const PrismaClient = mod.PrismaClient
-    if (!PrismaClient) throw new Error('@prisma/client sem PrismaClient export')
-    client = new PrismaClient()
-  } catch (err) {
-    console.error('[startup-fallback] nao conseguiu carregar @prisma/client:', err?.message || err)
-    return
-  }
+function listLocalMigrations() {
+  if (!existsSync(MIGRATIONS_DIR)) return []
+  return readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort()
+}
 
-  async function columnExists(table, column) {
-    const rows = await client.$queryRawUnsafe(
-      `SELECT EXISTS(
-         SELECT 1 FROM information_schema.columns
-         WHERE table_name = $1 AND column_name = $2
-       ) as exists`,
-      table,
-      column,
+async function loadPgClient() {
+  // `pg` eh dep direta (vide package.json). Importacao dinamica para nao
+  // quebrar o boot em ambientes que nao tem pg instalado (improvavel mas
+  // defensivo).
+  try {
+    const mod = await import('pg')
+    return mod.default?.Client || mod.Client
+  } catch (err) {
+    throw new Error(
+      `nao foi possivel carregar 'pg': ${err?.message || err}. ` +
+        'Confirme que node_modules/pg foi copiado pro runner image.',
     )
-    return Boolean(rows?.[0]?.exists)
   }
+}
 
-  // Migration 20260507180000_pipeline_redesign
-  try {
-    if (!(await columnExists('Order', 'deliveryMethod'))) {
-      await client.$executeRawUnsafe(
-        `ALTER TABLE "Order" ADD COLUMN "deliveryMethod" TEXT NOT NULL DEFAULT 'shipping'`,
-      )
-      await client.$executeRawUnsafe(
-        `UPDATE "Order" SET "fulfillmentStatus" = 'pending' WHERE "fulfillmentStatus" = 'em_revisao'`,
-      )
-      await client.$executeRawUnsafe(
-        `UPDATE "Order" SET "fulfillmentStatus" = 'na_fila' WHERE "fulfillmentStatus" = 'aguardando_producao'`,
-      )
-      console.log('[startup-fallback] migration 20260507180000 aplicada via SQL')
-    } else {
-      console.log('[startup-fallback] migration 20260507180000 ja aplicada')
-    }
-  } catch (err) {
-    console.error('[startup-fallback] falha em 20260507180000:', err?.message || err)
-  }
+async function listAppliedMigrations(client) {
+  const res = await client.query(
+    `SELECT migration_name, finished_at, rolled_back_at
+       FROM "_prisma_migrations"
+      ORDER BY started_at`,
+  )
+  return res.rows
+}
 
-  // Migration 20260508030000_order_type_persisted
+async function validateSchema() {
+  const Client = await loadPgClient()
+  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  await client.connect()
   try {
-    if (!(await columnExists('Order', 'orderType'))) {
-      await client.$executeRawUnsafe(
-        `ALTER TABLE "Order" ADD COLUMN "orderType" TEXT NOT NULL DEFAULT 'sob_encomenda'`,
-      )
-      await client.$executeRawUnsafe(
-        `UPDATE "Order" o
-           SET "orderType" = 'pronta_entrega'
-           WHERE NOT EXISTS (
-             SELECT 1 FROM "OrderItem" oi
-             JOIN "Product" p ON p.id = oi."productId"
-             WHERE oi."orderId" = o.id
-               AND (p."underOrder" = true OR p."isPersonalizable" = true)
-           )`,
-      )
-      console.log('[startup-fallback] migration 20260508030000 aplicada via SQL')
-    } else {
-      console.log('[startup-fallback] migration 20260508030000 ja aplicada')
-    }
-  } catch (err) {
-    console.error('[startup-fallback] falha em 20260508030000:', err?.message || err)
-  }
-
-  try {
-    await client.$disconnect()
-  } catch {
-    // ignore
+    const local = listLocalMigrations()
+    const applied = await listAppliedMigrations(client)
+    const appliedOk = new Set(
+      applied.filter((m) => m.finished_at && !m.rolled_back_at).map((m) => m.migration_name),
+    )
+    const issues = applied
+      .filter((m) => m.rolled_back_at || !m.finished_at)
+      .map((m) => ({
+        migration_name: m.migration_name,
+        issue: m.rolled_back_at ? 'rolled_back' : 'unfinished',
+      }))
+    const missing = local.filter((m) => !appliedOk.has(m))
+    return { local, applied: [...appliedOk], missing, issues }
+  } finally {
+    await client.end().catch(() => {})
   }
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    console.log('[startup] DATABASE_URL ausente — pulando migrations (modo localDb)')
+  const url = process.env.DATABASE_URL
+  const isProd = process.env.NODE_ENV === 'production'
+
+  if (!url || isDummyDatabaseUrl(url)) {
+    console.log('[startup] DATABASE_URL ausente ou dummy — pulando validacao de schema (modo dev/build)')
   } else {
-    console.log('[startup] tentando prisma migrate deploy via CLI')
-    const cliOk = await runMigrationsCli()
-    if (!cliOk) {
-      console.warn('[startup] CLI falhou — aplicando fallback SQL inline')
-      await applySqlFallback()
+    try {
+      const { local, applied, missing, issues } = await validateSchema()
+      console.log(
+        `[startup] schema check: ${applied.length}/${local.length} migrations aplicadas`,
+      )
+
+      let abort = false
+
+      if (missing.length > 0) {
+        console.error(
+          `[startup] FAIL: ${missing.length} migration(s) faltando: ${missing.join(', ')}`,
+        )
+        abort = isProd
+      }
+
+      if (issues.length > 0) {
+        const desc = issues.map((i) => `${i.migration_name}=${i.issue}`).join(', ')
+        console.error(`[startup] FAIL: migrations em estado invalido: ${desc}`)
+        abort = isProd
+      }
+
+      if (abort) {
+        console.error(
+          '[startup] abortando boot em producao — o GitHub Action ' +
+            '(.github/workflows/migrate.yml) deveria ter aplicado/regularizado ' +
+            'essas migrations antes do deploy. Veja https://github.com/' +
+            'eduardushenrique-create/BED-Site/actions/workflows/migrate.yml',
+        )
+        process.exit(1)
+      } else if (missing.length > 0 || issues.length > 0) {
+        console.warn(
+          '[startup] continuando em modo nao-producao (NODE_ENV != production)',
+        )
+      }
+    } catch (err) {
+      console.error('[startup] falha ao validar schema:', err?.message || err)
+      if (isProd) {
+        console.error('[startup] abortando boot em producao')
+        process.exit(1)
+      }
     }
   }
+
   console.log('[startup] iniciando Next.js standalone')
   await import('./../server.js')
 }
