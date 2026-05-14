@@ -1,0 +1,71 @@
+name: Database Migrations — Staging
+
+# Aplica `prisma migrate deploy` contra o Postgres de STAGING via runner
+# GitHub. Espelho do migrate-prd.yml, mas usa DATABASE_URL_STAGING e roda
+# em todo push pra `main` (o gate de release).
+#
+# Pre-requisito: secret DATABASE_URL_STAGING com a URL PUBLICA do
+# Railway (formato `<host>.proxy.rlwy.net:<port>`). A URL interna
+# (`postgres.railway.internal`) NAO funciona aqui.
+# Memoria: feedback_railway_db_url_publica.md
+#
+# Este eh o PR-staging-A da Onda 1 (vide HANDOFF-SPEC-007.md §4).
+# Fluxo esperado:
+#   push em main -> migrate-staging.yml (este) -> smoke-staging.yml -> QA manual
+#   -> promote.yml (cria tag v*) -> migrate-prd.yml (em outra branch)
+
+on:
+  push:
+    branches: [main]
+    # Pular se push so afeta documentacao/configuracao sem schema
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+      - '.github/labeler.yml'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Motivo do disparo manual (auditoria)'
+        required: false
+        default: 'Manual run'
+
+# Concurrency group separado de prd: staging serializa sozinho, mas nao
+# bloqueia eventual disparo manual de migrate-prd.yml em paralelo.
+concurrency:
+  group: db-migrations-staging
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply Prisma migrations (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Show current migration status
+        run: npx prisma migrate status || true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+      - name: Apply pending migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+      - name: Confirm sync
+        run: npx prisma migrate status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
