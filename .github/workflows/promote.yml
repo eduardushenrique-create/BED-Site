@@ -1,0 +1,169 @@
+name: Promote staging -> prd
+
+# Promove um commit que ja foi validado em staging para producao.
+#
+# Como funciona:
+# 1. Resolve o commit alvo (input `commit_sha` ou HEAD de main).
+# 2. Verifica que o smoke staging (workflow `Smoke — Staging`) ficou
+#    verde naquele commit. Se nao, falha com mensagem leiga — esse eh
+#    o GATE de release.
+# 3. Calcula a proxima tag `vYYYY.MM.DD-N` (N sequencial por dia).
+# 4. Cria a tag, faz push. O push da tag dispara `migrate-prd.yml`
+#    (aplicar migrations em prd) e o Railway prd faz deploy automatico
+#    da tag (apos stakeholder ter ajustado os triggers no painel —
+#    vide ADR-004 e comentario no PR-staging-C+D).
+#
+# PR-staging-D da Onda 1 (HANDOFF-SPEC-007.md §4).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'SHA do commit a promover (vazio = HEAD de main)'
+        required: false
+        default: ''
+      reason:
+        description: 'Motivo da promocao (auditoria — ex: "release SPEC-005 final")'
+        required: true
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Validate smoke & tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write     # push tag
+      actions: read       # listar check-runs/workflow-runs
+      checks: read        # ler check_runs API
+
+    steps:
+      - name: Checkout main (full history for tag computation)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          # Token padrao do GITHUB_TOKEN ja eh suficiente porque
+          # `permissions.contents: write` autoriza push de tag.
+
+      - name: Resolve target commit
+        id: resolve
+        env:
+          INPUT_SHA: ${{ github.event.inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_SHA" ]; then
+            SHA="$INPUT_SHA"
+          else
+            SHA="$(git rev-parse origin/main)"
+          fi
+          # Normaliza pra full SHA (40 chars). Falha se commit nao existe.
+          FULL_SHA="$(git rev-parse "$SHA^{commit}")"
+          SHORT_SHA="${FULL_SHA:0:7}"
+          SUBJECT="$(git log -1 --format=%s "$FULL_SHA")"
+          echo "sha=$FULL_SHA"        >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT_SHA"     >> "$GITHUB_OUTPUT"
+          echo "subject=$SUBJECT"     >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "::notice::Promovendo commit $SHORT_SHA ('$SUBJECT')"
+
+      - name: Verify staging smoke is green for this commit
+        id: smoke
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          SHORT: ${{ steps.resolve.outputs.short }}
+        run: |
+          set -euo pipefail
+          # Lista check_runs deste SHA cujo nome bate com o JOB do
+          # smoke-staging.yml (`Playwright smoke`). Olhamos conclusion.
+          # Se nao existir nenhum, ou se nenhum for success, bloqueia.
+          RESPONSE="$(gh api \
+            "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=Playwright%20smoke&per_page=20")"
+
+          TOTAL="$(echo "$RESPONSE" | jq '.total_count')"
+          SUCCESSES="$(echo "$RESPONSE" | jq '[.check_runs[] | select(.conclusion=="success")] | length')"
+
+          echo "Total smoke check-runs no commit $SHORT: $TOTAL"
+          echo "Sucesso: $SUCCESSES"
+
+          if [ "$SUCCESSES" -lt 1 ]; then
+            echo ""
+            echo "::error::Staging nao foi validado para o commit $SHORT."
+            echo "::error::Verifique em Actions -> Smoke — Staging se rodou e ficou verde."
+            echo "::error::Se nao rodou, dispare manualmente: Actions -> Smoke — Staging -> Run workflow."
+            exit 1
+          fi
+
+          echo "::notice::Smoke staging verde no commit $SHORT — gate liberado."
+
+      - name: Compute next tag (vYYYY.MM.DD-N)
+        id: tag
+        run: |
+          set -euo pipefail
+          # Tags do dia, ex: v2026.05.14-1, v2026.05.14-2
+          DATE="v$(date -u +%Y.%m.%d)"
+          git fetch --tags origin
+          # Lista tags do dia, extrai sufixo N (numero apos hifen), pega max.
+          MAX="$(git tag --list "${DATE}-*" \
+            | sed -E "s/^${DATE}-([0-9]+)$/\1/" \
+            | grep -E '^[0-9]+$' \
+            | sort -n \
+            | tail -1 || true)"
+          if [ -z "$MAX" ]; then
+            NEXT=1
+          else
+            NEXT=$((MAX + 1))
+          fi
+          TAG="${DATE}-${NEXT}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "::notice::Proxima tag calculada: $TAG"
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          SHORT: ${{ steps.resolve.outputs.short }}
+          REASON: ${{ github.event.inputs.reason }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Tag anotada (carrega autor + motivo no audit trail).
+          git tag -a "$TAG" "$SHA" -m "Promote staging -> prd
+
+          Commit: $SHORT
+          Actor:  $ACTOR
+          Reason: $REASON"
+          git push origin "$TAG"
+          echo "::notice::Tag $TAG criada e enviada."
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          SHORT: ${{ steps.resolve.outputs.short }}
+          SUBJECT: ${{ steps.resolve.outputs.subject }}
+          ACTOR: ${{ github.actor }}
+          REASON: ${{ github.event.inputs.reason }}
+        run: |
+          {
+            echo "## Promote -> prd"
+            echo ""
+            echo "| Campo | Valor |"
+            echo "|---|---|"
+            echo "| Commit | \`$SHORT\` |"
+            echo "| Subject | $SUBJECT |"
+            echo "| Tag | \`$TAG\` |"
+            echo "| Actor | @$ACTOR |"
+            echo "| Reason | $REASON |"
+            echo ""
+            echo "**Proximos passos automaticos:**"
+            echo "- \`Database Migrations — Production\` vai aplicar migrations em prd"
+            echo "- Railway prd vai fazer deploy da tag (apos reconfiguracao manual de triggers — vide ADR-004)"
+            echo ""
+            echo "[Ver Actions](https://github.com/${GITHUB_REPOSITORY}/actions)"
+          } >> "$GITHUB_STEP_SUMMARY"

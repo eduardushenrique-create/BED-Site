@@ -1,9 +1,12 @@
-name: Database Migrations
+name: Database Migrations — Production
 
-# Aplica `prisma migrate deploy` contra o Postgres de producao via runner
-# GitHub. Substitui a tentativa de migrate no startup do Railway, que
-# ficou silenciosamente quebrada desde o upgrade pra Prisma 7 e causou
-# os incidentes de 2026-05-13. Decisao em ADR-002.
+# Aplica `prisma migrate deploy` contra o Postgres de PRODUCAO.
+#
+# IMPORTANTE: este workflow SO dispara em push de tag `v*`. Tags sao
+# criadas pelo `promote.yml` (Actions → Promote staging → prd), que
+# valida o smoke verde em staging antes de promover. NUNCA criar tag
+# `v*` manualmente sem rodar promote — isso pula o gate de smoke e
+# pode levar uma regressao direto pra prd.
 #
 # Pre-requisito: secret DATABASE_URL_PRODUCTION com a URL PUBLICA do
 # Railway (formato `<host>.proxy.rlwy.net:<port>`). A URL interna
@@ -11,21 +14,17 @@ name: Database Migrations
 # falhou e quebrou prod por 6min em 2026-05-14.
 # Memoria: feedback_railway_db_url_publica.md
 #
-# Este eh o PR-5a do plano da ADR-003 v2: SO o workflow, sem o resto.
-# Ao mergear, o workflow dispara automaticamente em push pra main e
-# valida que conecta no banco (alem de aplicar migrations idempotentes
-# — sem migrations novas no disco, sera no-op). Se ficar verde, abre
-# PR-5b com start.mjs + Dockerfile + canary + boot-smoke.
+# Historico: este workflow foi renomeado de `migrate.yml` para
+# `migrate-prd.yml` no PR-staging-C (Onda 1 da SPEC-007), quando o
+# trigger mudou de `push: branches: [main]` para `push: tags: ['v*']`.
+# A versao em staging eh aplicada por `migrate-staging.yml`, em todo
+# push em main (gate antes da promocao).
+# Decisao registrada em ADR-002 (motivacao original) + ADR-004
+# (separacao staging/prd).
 
 on:
   push:
-    branches: [main]
-    # Pular se push so afeta documentacao/configuracao sem schema
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - '.gitignore'
-      - '.github/labeler.yml'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       reason:
@@ -39,7 +38,7 @@ concurrency:
 
 jobs:
   migrate:
-    name: Apply Prisma migrations
+    name: Apply Prisma migrations (production)
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
