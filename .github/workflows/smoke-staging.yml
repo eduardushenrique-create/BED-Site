@@ -1,0 +1,79 @@
+name: Smoke — Staging
+
+# Roda smoke Playwright contra Railway staging (STAGING_BASE_URL).
+#
+# Dispara apos o `Database Migrations — Staging` (migrate-staging.yml)
+# completar verde, garantindo que: (1) migrations aplicaram, (2) o build
+# do Railway terminou de fato — o smoke tenta uma navegacao real.
+#
+# Tambem aceita disparo manual (workflow_dispatch) para investigar staging
+# sem precisar de novo commit.
+#
+# PR-staging-B da Onda 1 (HANDOFF-SPEC-007.md §4). Pre-requisito: PR-staging-A
+# mergeado (este workflow_run aponta pelo nome do workflow gatilhador).
+# Pre-requisitos de secrets: STAGING_BASE_URL.
+
+on:
+  workflow_run:
+    workflows: ['Database Migrations — Staging']
+    types:
+      - completed
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Motivo do disparo manual (auditoria)'
+        required: false
+        default: 'Manual smoke'
+
+concurrency:
+  group: smoke-staging
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Quando dispara via workflow_run, so segue se o anterior foi success.
+    # Para workflow_dispatch, github.event.workflow_run e undefined e a
+    # condicao vira true por curto-circuito.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Install Playwright browser (chromium only)
+        run: npx playwright install --with-deps chromium
+
+      - name: Show staging target
+        run: echo "Smoking $STAGING_BASE_URL"
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+
+      - name: Run smoke tests
+        run: npx playwright test --config=playwright.staging.config.ts
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-staging-report
+          path: |
+            playwright-report-staging/
+            test-results/
+          retention-days: 14
