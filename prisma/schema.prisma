@@ -63,6 +63,8 @@ model Product {
   reviews               Review[]
   components            ProductComponent[]
   filaments             ProductFilament[]
+  // SPEC-007: orcamentos vinculados a este produto (recotacoes).
+  pricingEstimates      PricingEstimate[]
 
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -235,6 +237,19 @@ model Order {
   // manualmente via PR-7c (que vira SPEC-006 separada).
   refundStatus       String?
 
+  // SPEC-007 §3.3.1 — granularidade dentro de createdVia='admin'.
+  // NULL quando createdVia='site'. Valores tipicos: 'whatsapp' | 'instagram'
+  // | 'indicacao' | 'presencial' | 'telefone' | 'outro'. Validacao no backend.
+  manualChannel    String?
+  // SPEC-007: nome de quem indicou (livre). Faz sentido quando manualChannel='indicacao'.
+  referredBy       String?
+  // SPEC-007: nota livre do atendimento — distinta de currentStageNote (que eh
+  // o estado da producao). Nao vaza para cliente nem para emails.
+  internalNotes    String?  @db.Text
+  // SPEC-007: email do admin que criou o pedido manual (auditoria). NULL para
+  // pedidos do site. Preenchido pelo backend a partir da sessao.
+  createdByEmail   String?
+
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
@@ -244,6 +259,8 @@ model Order {
   shipment        Shipment?
   productionTasks ProductionTask[]
   installments    PaymentInstallment[]
+  // SPEC-007: relacao inversa com PricingEstimate.convertedToOrderId (1:1).
+  fromEstimate    PricingEstimate? @relation("EstimateOrder")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -251,14 +268,19 @@ model Order {
   @@index([customerEmail])
   @@index([customerId])
   @@index([createdVia])
+  @@index([manualChannel])
 }
 
 model OrderItem {
   id                  String          @id @default(cuid())
   orderId             String
   order               Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId           String
-  product             Product         @relation(fields: [productId], references: [id])
+  // SPEC-007 §3.3.1: relaxado para opcional para permitir itens 'custom'
+  // (encomendas totalmente personalizadas sem product no catalogo).
+  // Itens com itemType='catalog' continuam obrigando productId — validado
+  // no backend, nao no schema.
+  productId           String?
+  product             Product?        @relation(fields: [productId], references: [id])
   variantId           String?
   variant             ProductVariant? @relation(fields: [variantId], references: [id])
   productNameSnapshot String
@@ -272,8 +294,25 @@ model OrderItem {
   // do pedido (modo ITEM_ONLY do DELETE de producao no PR-7b). Queries de
   // listagem filtram deletedAt IS NULL.
   deletedAt           DateTime?
+  // SPEC-007 §3.3.1 — discriminador. 'catalog' (default, retro-compativel):
+  // productId obrigatorio. 'custom': productId NULL, productNameSnapshot/
+  // unitPrice digitados pelo admin. Validado no backend.
+  itemType            String          @default("catalog")
+  // SPEC-007: texto livre adicional para itens personalizados (tema, cores,
+  // dimensoes pedidas). Visivel ao admin na producao.
+  description         String?         @db.Text
+  // SPEC-007: notas DE PRODUCAO especificas do item, separadas de
+  // Order.internalNotes (que eh do pedido inteiro).
+  productionNotesItem String?         @db.Text
+  // SPEC-007: indicador 'preco foi sobrescrito pelo admin' (gestao/auditoria).
+  // Calculado pelo backend ao criar OrderItem catalog, NAO enviado pelo client.
+  priceOverridden     Boolean         @default(false)
+  // SPEC-007 §3.1.1 ponte: orcamento que originou este item (quando aplicavel).
+  estimateId          String?
+  estimate            PricingEstimate? @relation(fields: [estimateId], references: [id], onDelete: SetNull)
 
   @@index([deletedAt])
+  @@index([itemType])
 }
 
 model Address {
@@ -417,6 +456,8 @@ model Printer {
   productionTasks        ProductionTask[]
   costProducts           Product[]        @relation("PrinterCostProducts")
   expenses               CompanyExpense[]
+  // SPEC-007: orcamentos que escolheram esta impressora.
+  pricingEstimates       PricingEstimate[]
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -686,6 +727,8 @@ model Filament {
 
   productLinks ProductFilament[]
   expenses     CompanyExpense[]
+  // SPEC-007: orcamentos que usaram este filamento (com snapshot historico).
+  pricingEstimates PricingEstimate[]
 
   @@index([isActive])
   @@index([type])
@@ -826,4 +869,112 @@ model ExpenseBudget {
 
   @@unique([categoryId, month, year])
   @@index([year, month])
+}
+
+// SPEC-007 §3.4 — parametros globais da calculadora de preco. Tabela singleton
+// (1 linha so, id='singleton'). Admin edita via /admin/configuracoes/precificacao.
+// Migration faz seed com defaults da planilha do stakeholder.
+model PricingSettings {
+  id                          String   @id @default("singleton")
+
+  // Defaults usados quando o calculo nao tem Printer vinculada, ou quando
+  // Printer nao tem powerConsumptionWatts/acquisitionCostBRL/lifetimeHours.
+  defaultEnergyCostPerHour    Decimal  @db.Decimal(10, 4)
+  defaultDepreciationPerHour  Decimal  @db.Decimal(10, 4)
+  defaultErrorRate            Decimal  @db.Decimal(5, 4)
+
+  // Tarifa de energia em R$/kWh. Quando o calculo tem Printer.powerConsumptionWatts:
+  //   costEnergy = (watts / 1000) * energyTariffPerKwh * hours
+  // Caso contrario usa defaultEnergyCostPerHour * hours.
+  energyTariffPerKwh          Decimal  @db.Decimal(10, 4)
+
+  // Faixas de margem sugerida (editavel pelo admin).
+  // Estrutura: [{ maxCost: number|null, marginPercent: number }]
+  // Ordenado por maxCost asc. O ultimo item com maxCost=null = "acima de tudo".
+  marginTiersJson             Json
+
+  updatedAt                   DateTime @updatedAt
+  updatedByEmail              String?
+}
+
+// SPEC-007 §3.1 — calculadora de orcamento avulso (Modo 2). Tabela separada
+// de Product: orcamentos podem nao ter produto vinculado (encomenda nova),
+// guardam snapshots de TODOS os parametros do calculo para reproducao historica
+// mesmo se Filament/Printer/PricingSettings mudarem depois.
+model PricingEstimate {
+  id          String   @id @default(cuid())
+
+  // Identificacao humana (substitui a linha da planilha Excel).
+  name        String
+
+  // Status do orcamento:
+  // 'draft'     — em construcao, nao enviado
+  // 'sent'      — admin marcou como enviado ao cliente (controle interno)
+  // 'approved'  — cliente aprovou (controle interno)
+  // 'rejected'  — cliente rejeitou
+  // 'converted' — virou Pedido (convertedToOrderId preenchido)
+  status      String   @default("draft")
+
+  // Vinculo opcional com produto (recotacao). NULL = encomenda totalmente nova.
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // Cliente — sempre opcional, sempre texto livre. Consistente com Order
+  // createdVia='admin'. Nao vincular a Customer aqui — orcamento pode existir
+  // sem cliente cadastrado.
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  notes         String?  @db.Text
+
+  // INPUTS DA CALCULADORA
+  quantity      Int      @default(1)
+
+  filamentId    String?
+  filament      Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
+  filamentGrams Decimal   @db.Decimal(10, 2)
+  printHours    Decimal   @db.Decimal(10, 2)
+
+  printerId     String?
+  printer       Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
+
+  // Componentes escolhidos — JSON preserva snapshot historico mesmo se
+  // Component for editado/desativado depois. Estrutura:
+  // [{ componentId, name, unit, qty, unitCostSnapshot, total }]
+  componentsJson Json    @default("[]")
+
+  // SNAPSHOTS DOS PARAMETROS APLICADOS (congelam cenario do calculo).
+  filamentPricePerKgSnapshot    Decimal  @db.Decimal(10, 2)
+  energyCostPerHourSnapshot     Decimal  @db.Decimal(10, 4)
+  depreciationPerHourSnapshot   Decimal  @db.Decimal(10, 4)
+  errorRate                     Decimal  @db.Decimal(5, 4)
+  marginPercent                 Decimal  @db.Decimal(5, 4)
+
+  // RESULTADOS CONGELADOS (backend calcula, jamais confia no client).
+  costFilament     Decimal  @db.Decimal(10, 2)
+  costEnergy       Decimal  @db.Decimal(10, 2)
+  costDepreciation Decimal  @db.Decimal(10, 2)
+  costError        Decimal  @db.Decimal(10, 2)
+  costComponents   Decimal  @db.Decimal(10, 2)
+  costTotal        Decimal  @db.Decimal(10, 2)
+  suggestedPrice   Decimal  @db.Decimal(10, 2)
+  finalPrice       Decimal? @db.Decimal(10, 2)
+
+  // PONTE COM PEDIDO MANUAL — 1:1 (um orcamento gera no maximo 1 pedido).
+  convertedToOrderId String?  @unique
+  convertedToOrder   Order?   @relation("EstimateOrder", fields: [convertedToOrderId], references: [id], onDelete: SetNull)
+  convertedAt        DateTime?
+
+  // OrderItems criados a partir deste orcamento (geralmente 1).
+  orderItems         OrderItem[]
+
+  // AUDITORIA
+  createdByEmail  String?
+  updatedByEmail  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
 }
