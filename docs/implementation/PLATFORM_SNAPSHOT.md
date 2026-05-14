@@ -449,6 +449,7 @@ export async function GET(request: NextRequest) {
 - Todos os componentes em `components/` são `'use client'` por padrão
 - Páginas em `app/` são Server Components por padrão; viram client quando precisam de hooks
 - Estilização inline (`style={{}}`). Sem classes Tailwind/CSS Modules
+- **Admin tem design system inline documentado** em [`coding-standards.md`](coding-standards.md#design-tokens-do-admin-tema-claro) (paleta, Card/Modal/Input/Tabela canônicos, anti-padrões). Qualquer componente novo dentro de `/admin/**` deve seguir esses tokens — não importar classes Tailwind dark
 
 ### Carrinho
 - `context/CartContext.tsx` mantém em React state + localStorage
@@ -526,13 +527,13 @@ export async function GET(request: NextRequest) {
 - ✅ `/admin/categorias` CRUD
 - ✅ `/admin/banners` CRUD com tempo de exibição
 - ✅ `/admin/clientes` lista + busca + **drill-down `/admin/clientes/[id]`** (totais + pedidos + endereços)
-- ✅ `/admin/pedidos` lista com **filtros avançados** (status, pagamento, intervalo de datas, total mínimo) + **export CSV**
-- ✅ `/admin/pedidos/[id]` detalhe com **botão Estorno** (refund MP) e cupom/desconto
+- ✅ `/admin/pedidos` lista com **filtros avançados** (status, pagamento, intervalo de datas, total mínimo) + **export CSV** + filtro `createdVia` (site / admin)
+- ✅ `/admin/pedidos/[id]` detalhe com **botão Estorno** (refund MP), cupom/desconto, **pagamentos parciais manuais** (PaymentInstallment com lock pessimista, paymentStatus `partial`) e **exclusão permanente** (zona de perigo, soft-delete em OrderItem)
 - ✅ `/admin/cupons` CRUD com ativação, validade e limite de uso
 - ✅ `/admin/auditoria` — log de ações sensíveis (estornos, alterações, exclusões) com filtros e paginação
 - ✅ `/admin/avaliacoes` — moderação das reviews de produto (aprovar/ocultar/excluir)
 - ✅ `/admin/impressoras` — CRUD de impressoras (capacidade, status, materiais)
-- ✅ `/admin/producao` — coluna de impressora com select inline para atribuir tarefas
+- ✅ `/admin/producao` — coluna de impressora com select inline para atribuir tarefas + **exclusão em 3 modos** (TASK_ONLY / ITEM_ONLY / ORDER) com reason obrigatório
 - ✅ `/admin/producao/board` — visão Kanban por impressora (carga estimada vs capacidade diária)
 - ✅ Sidebar admin com link "Painel" + todas as seções (incluindo as criadas nesta sessão)
 - ✅ Login scrypt restrito por env var (com fluxo de redefinição via email)
