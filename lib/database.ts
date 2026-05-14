@@ -1758,6 +1758,10 @@ export async function createOrder(
     discountKind?: 'fixed' | 'percentage' | null
     discountInput?: number | null
     discountAppliedBy?: string | null
+    // SPEC-005 §9.1 / R9 do ADR-003 v2: origem do pedido. Caller deve
+    // passar EXPLICITAMENTE 'site' (POST /api/orders) ou 'admin' (POST
+    // /api/pedidos). Default 'site' eh fallback defensivo.
+    createdVia?: 'site' | 'admin' | null
   },
 ) {
   if (!hasDatabase || !prisma?.order) {

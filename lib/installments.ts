@@ -85,7 +85,7 @@ function serializeInstallment(row: any): InstallmentDto {
   }
 }
 
-function ensureDb(): asserts prisma is NonNullable<typeof prisma> {
+function getPrisma(): NonNullable<typeof prisma> {
   if (!hasDatabase || !prisma?.order || !installmentClient()) {
     if (FAIL_FAST_IN_PRODUCTION) {
       throw new DatabaseUnavailableError(
@@ -94,6 +94,7 @@ function ensureDb(): asserts prisma is NonNullable<typeof prisma> {
     }
     throw new DatabaseUnavailableError('DB indisponivel (modo dev/teste sem prisma).')
   }
+  return prisma!
 }
 
 function validateInput(input: InstallmentInput): { ok: true; data: Required<InstallmentInput> } | { ok: false; error: string } {
@@ -191,14 +192,14 @@ export async function createInstallment(
   input: InstallmentInput,
   by: { email: string; isWebhook?: boolean; paymentId?: string | null },
 ): Promise<{ installment: InstallmentDto; totals: OrderTotals }> {
-  ensureDb()
+  const db = getPrisma()
 
   const validated = validateInput(input)
   if (!validated.ok) {
     throw new Error(validated.error)
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     // Lock pessimista no Order pra serializar com outras mutacoes (R3)
     await tx.$executeRawUnsafe(
       `SELECT id FROM "Order" WHERE id = $1 FOR UPDATE`,
@@ -246,7 +247,8 @@ export async function createInstallment(
  * cronologica (sequence ASC).
  */
 export async function listInstallmentsByOrder(orderId: string): Promise<InstallmentDto[]> {
-  ensureDb()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _db = getPrisma()
   const rows = await installmentClient().findMany({
     where: { orderId, deletedAt: null },
     orderBy: { sequence: 'asc' },
@@ -264,9 +266,9 @@ export async function updateInstallment(
   input: Partial<InstallmentInput>,
   by: { email: string },
 ): Promise<{ installment: InstallmentDto; totals: OrderTotals }> {
-  ensureDb()
+  const db = getPrisma()
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     const existing = await (tx as any).paymentInstallment.findUnique({
       where: { id: installmentId },
       select: { id: true, orderId: true, deletedAt: true },
@@ -323,9 +325,9 @@ export async function softDeleteInstallment(
   installmentId: string,
   by: { email: string },
 ): Promise<{ totals: OrderTotals; orderId: string }> {
-  ensureDb()
+  const db = getPrisma()
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     const existing = await (tx as any).paymentInstallment.findUnique({
       where: { id: installmentId },
       select: { id: true, orderId: true, deletedAt: true },
