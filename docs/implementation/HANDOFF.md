@@ -135,7 +135,7 @@ Adotado a partir de 2026-05-14 (Onda 1 do plano SPEC-007). Decisão completa em 
 2. **PR pra `main`** → CI verde (Lint+Typecheck+Build, boot smoke, Prisma smoke) → merge.
 3. **Auto-deploy em staging:** Railway staging detecta push em `main` e faz deploy.
 4. **`migrate-staging.yml`** roda automaticamente — aplica migrations no Postgres staging.
-5. **`smoke-staging.yml`** roda em seguida (workflow_run) — 3 testes Playwright contra `https://bed-site-staging.up.railway.app`:
+5. **Smoke Playwright** roda em seguida — vive como job do próprio `migrate-staging.yml` (não em workflow separado, vide ADR-004 atualização 2026-05-14). 3 testes contra `https://bed-site-staging.up.railway.app`:
    - GET `/` retorna 200 com título correto
    - GET `/api/health` retorna `status=ok` com 4 checks up
    - GET `/admin` retorna < 500
@@ -164,8 +164,10 @@ Adotado a partir de 2026-05-14 (Onda 1 do plano SPEC-007). Decisão completa em 
 ### Comandos úteis (referência)
 
 ```bash
-# Disparar smoke manualmente (sem novo commit)
+# Disparar smoke manualmente (sem novo commit; default ref=main)
 gh workflow run smoke-staging.yml
+# Ou testar um SHA/tag/branch especifico:
+gh workflow run smoke-staging.yml -f ref=<sha|tag|branch>
 
 # Promover head de main (atalho via CLI)
 gh workflow run promote.yml -f reason="motivo aqui"

@@ -32,6 +32,8 @@ push em main  ──►  Railway staging (auto-deploy)
 
 > **Atualização 2026-05-14 (pós-implementação):** descobrimos que [Railway não suporta deploy em push de tag](https://docs.railway.com/deployments/github-autodeploys) — só de branch. Por isso o gate de Railway prd é fechado via branch dedicada **`production`** (atualizada pelo `promote.yml` em conjunto com a tag), e não pela tag direta. A tag `v*` mantém seu papel como audit trail + gatilho do `migrate-prd.yml`. Detalhes em §"Decisão" item 2.
 
+> **Atualização 2026-05-14 (pós-teste 3):** o smoke automático foi movido para dentro do `migrate-staging.yml` (como job dependente) em vez de viver em workflow separado. Razão: workflows disparados via `workflow_run` recebem `GITHUB_SHA = HEAD do branch no momento do evento`, não o SHA do upstream. Em rajadas de push, isso fazia o check_run "Playwright smoke" ficar registrado num SHA diferente do que foi testado — o gate aceitava promoções de commits "validados" sob o SHA de outro commit. Solução: smoke + migrate no mesmo workflow = mesmo contexto = check_run no SHA correto. `smoke-staging.yml` continua existindo apenas para disparo manual (workflow_dispatch com input `ref`), com job nomeado **"Playwright smoke (manual)"** para o promote ignorar.
+
 ---
 
 ## Contexto
