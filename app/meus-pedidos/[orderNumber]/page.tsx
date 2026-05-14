@@ -44,7 +44,16 @@ type OrderDetail = {
     pixQrCodeBase64?: string
     pixCopyPaste?: string
   }
+  // SPEC-005 §3.2.1 — totais agregados de pagamento
+  paidAmount?: number
+  dueAmount?: number
 }
+
+// SPEC-005 §3.2.5 — bloco de pagamentos visivel ao cliente.
+// MVP do PR-8b: mostra apenas totais agregados (paidAmount/dueAmount),
+// sem lista detalhada de installments. Lista detalhada cliente-friendly
+// (sem description/notes/receivedByEmail — PII / dado interno) fica
+// pra PR futuro se stakeholder pedir.
 
 type ProductionItem = {
   productName: string
@@ -278,6 +287,34 @@ export default function MeuPedidoDetailPage({ params }: { params: Promise<{ orde
             <Row label="Frete" value={`R$ ${order.shippingCost.toFixed(2).replace('.', ',')}`} />
             <Row label="Total" value={`R$ ${order.total.toFixed(2).replace('.', ',')}`} bold />
           </Section>
+
+          {/* SPEC-005 §3.2.5: bloco de Pagamentos cliente. Mostra apenas
+              os totais agregados (paidAmount/dueAmount) — sem detalhes de
+              cada parcela (PII / dado interno). Aparece quando ha pagamento
+              parcial ou saldo aberto. */}
+          {(typeof order.paidAmount === 'number' && order.paidAmount > 0) ||
+          (typeof order.dueAmount === 'number' && order.dueAmount > 0) ? (
+            <Section title="Pagamentos">
+              <Row
+                label="Pago"
+                value={`R$ ${(order.paidAmount ?? 0).toFixed(2).replace('.', ',')}`}
+              />
+              {typeof order.dueAmount === 'number' && order.dueAmount > 0 && (
+                <Row
+                  label="Saldo a pagar"
+                  value={`R$ ${order.dueAmount.toFixed(2).replace('.', ',')}`}
+                  bold
+                />
+              )}
+              {typeof order.dueAmount === 'number' &&
+                order.dueAmount === 0 &&
+                (order.paidAmount ?? 0) >= order.total && (
+                  <p style={{ fontSize: '13px', color: '#3DA15D', margin: '8px 0 0' }}>
+                    ✓ Pagamento completo
+                  </p>
+                )}
+            </Section>
+          ) : null}
 
           {order.paymentMethod === 'pix' && order.paymentStatus !== 'paid' && order.status !== 'cancelled' && (
             <Section title="Pague com Pix">

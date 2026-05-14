@@ -21,5 +21,15 @@ export async function GET(
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
   }
 
+  // SPEC-005 §9.3 / R5: pedidos createdVia='admin' nao aparecem para
+  // clientes (mesmo se customerEmail bater). Admin acessa via /admin.
+  // Retorna 404 (nao 403) pra nao revelar a existencia.
+  if (
+    (order as { createdVia?: string }).createdVia === 'admin' &&
+    !isAdminRole(auth.user?.role)
+  ) {
+    return NextResponse.json({ error: 'Pedido nao encontrado.' }, { status: 404 })
+  }
+
   return NextResponse.json(order)
 }

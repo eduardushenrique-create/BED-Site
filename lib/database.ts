@@ -1133,6 +1133,11 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
   if (!hasDatabase || !prisma?.order) {
     const db = readDB()
     let filtered = db.orders.filter(o => o.customerEmail.toLowerCase() === normalized)
+    // SPEC-005 §9.3 / R5 do ADR-003 v2: pedidos createdVia='admin' nao
+    // aparecem em /minha-conta. Local DB nao tem o campo entao filtra
+    // pra fora APENAS se ele estiver setado como 'admin' explicitamente
+    // (legado nao tem o campo -> trata como 'site' por seguranca).
+    filtered = filtered.filter((o) => (o as { createdVia?: string }).createdVia !== 'admin')
     if (opts.status) filtered = filtered.filter(o => o.status === opts.status)
     return {
       orders: filtered.slice(offset, offset + limit),
@@ -1143,7 +1148,13 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
   }
 
   try {
-    const where: any = { customerEmail: { equals: normalized, mode: 'insensitive' } }
+    // SPEC-005 §9.3 / R5: filtro createdVia='site' obrigatorio em queries
+    // que entregam dados pra cliente cadastrado. Pedidos manuais (admin)
+    // nao aparecem em /minha-conta mesmo se customerEmail bater.
+    const where: any = {
+      customerEmail: { equals: normalized, mode: 'insensitive' },
+      createdVia: 'site',
+    }
     if (opts.status) where.status = opts.status
 
     const [orders, total] = await Promise.all([
@@ -1168,6 +1179,7 @@ export async function listOrdersByCustomerEmail(email: string, opts: ListOrdersB
     reportDbError('listOrdersByCustomerEmail Prisma failed, using fallback', error)
     const db = readDB()
     let filtered = db.orders.filter(o => o.customerEmail.toLowerCase() === normalized)
+    filtered = filtered.filter((o) => (o as { createdVia?: string }).createdVia !== 'admin')
     if (opts.status) filtered = filtered.filter(o => o.status === opts.status)
     return {
       orders: filtered.slice(offset, offset + limit),
