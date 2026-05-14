@@ -1845,6 +1845,19 @@ export async function createOrder(
           }
         : null
 
+    // SPEC-005 §9.1 / R9 do ADR-003 v2: createdVia obrigatorio. Caller
+    // EXPLICITO ('site' em /api/orders publico, 'admin' em /api/pedidos
+    // POST). Default 'site' eh fallback defensivo so pra nao quebrar
+    // chamadas legadas (deve ser raro).
+    const createdVia =
+      (data as unknown as { createdVia?: string | null }).createdVia === 'admin' ? 'admin' : 'site'
+
+    // Backfill de paidAmount/dueAmount no momento da criacao. Se o pedido
+    // ja nasce 'paid' (ex: admin marca como pago no momento de criar),
+    // paidAmount = total. Caso contrario dueAmount = total.
+    const paidAmount = data.paymentStatus === 'paid' ? data.total : 0
+    const dueAmount = Math.max(0, Math.round((Number(data.total) - Number(paidAmount)) * 100) / 100)
+
     const order = await prisma.order.create({
       data: {
         orderNumber: data.orderNumber,
@@ -1863,6 +1876,9 @@ export async function createOrder(
         trackingCode: data.trackingCode,
         deliveryMethod,
         orderType,
+        createdVia,
+        paidAmount,
+        dueAmount,
         ...(hasShippingAddress
           ? {
               address: {

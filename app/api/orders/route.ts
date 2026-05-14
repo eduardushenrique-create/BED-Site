@@ -223,6 +223,9 @@ export async function POST(request: Request) {
     const order = await createOrder({
       id: `order_${Date.now()}`,
       orderNumber,
+      // SPEC-005 §9.1: pedido criado pelo CLIENTE (checkout publico).
+      // Recebe email, aparece em /minha-conta.
+      createdVia: 'site',
       customerName,
       customerEmail,
       customerPhone,

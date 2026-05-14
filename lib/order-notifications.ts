@@ -27,6 +27,10 @@ export type OrderSnapshot = {
   status: string
   paymentStatus: string
   fulfillmentStatus: string
+  // SPEC-005 §9.2: pedidos `createdVia='admin'` sao internos (loja fisica,
+  // WhatsApp, telefone) e NAO recebem nenhuma notificacao automatica.
+  // Quando undefined (legado), assume 'site' (comportamento de antes).
+  createdVia?: string | null
   items: Array<{
     productName: string
     quantity: number
@@ -52,6 +56,14 @@ export async function notifyOrderStatusChange(
   after: OrderSnapshot,
 ): Promise<void> {
   if (!after.customerEmail) return
+
+  // SPEC-005 §9.2 / R5 do ADR-003 v2: pedidos `createdVia='admin'` sao
+  // internos. Admin se comunica com o cliente fora do sistema (WhatsApp,
+  // telefone, balcao). Skip silencioso de TODA notificacao automatica.
+  if (after.createdVia === 'admin') {
+    return
+  }
+
   const previous = before || ({} as Partial<OrderSnapshot>)
 
   const paymentChanged = previous.paymentStatus !== after.paymentStatus
