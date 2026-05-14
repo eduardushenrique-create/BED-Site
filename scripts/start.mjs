@@ -33,10 +33,14 @@ const MIGRATIONS_DIR = join(__dirname, '..', 'prisma', 'migrations')
 
 // Dummies conhecidos: builder do Dockerfile e CI do GitHub.
 // Listados explicitamente — adicionar aqui se introduzir outro padrão.
+//
+// NUNCA adicionar aqui o user do Postgres do CI ('smoke'). Ele é DB real
+// (efemero, mas real) — boot smoke precisa que start.mjs valide schema
+// de fato, senao o teste de regressao da migration `rolled_back` (que
+// derrubou prod no PR #153) nao testa nada.
 const DUMMY_DB_PATTERNS = [
   /:\/\/dummy:dummy@/i,
   /:\/\/johndoe:randompassword@/i,
-  /:\/\/smoke:smoke@/i,
 ]
 
 function isDummyDatabaseUrl(url) {

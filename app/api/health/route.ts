@@ -115,17 +115,23 @@ export async function GET() {
   // 3) Migrations: alguma falhou ou está em estado de checksum mismatch?
   //    Olhamos a tabela _prisma_migrations diretamente — o status que
   //    `prisma migrate status` exporia, mas sem rodar o CLI.
+  //
+  //    `rolled_back` NAO eh erro — eh estado valido (revertida intencionalmente).
+  //    O Postgres do Railway tem `20260430210000_init_railway_postgres`
+  //    rolled_back desde a inicializacao. PR #153 derrubou prod 18min em
+  //    2026-05-14 por confundir os dois estados.
+  //    Vide feedback_rolled_back_migration_nao_eh_erro.md.
   try {
     const rows = await prisma.$queryRawUnsafe<
-      Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>
+      Array<{ migration_name: string; started_at: Date | null; finished_at: Date | null; rolled_back_at: Date | null }>
     >(
-      `SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations" ORDER BY started_at DESC LIMIT 20`,
+      `SELECT migration_name, started_at, finished_at, rolled_back_at FROM "_prisma_migrations" ORDER BY started_at DESC LIMIT 20`,
     )
     const issues: Array<{ migration_name: string; issue: string }> = []
     for (const m of rows) {
-      if (m.rolled_back_at) {
-        issues.push({ migration_name: m.migration_name, issue: 'rolled_back' })
-      } else if (!m.finished_at) {
+      // CRITICO apenas: travada no meio (started_at sem finished_at sem rolled_back_at).
+      // rolled_back eh INFORMATIVO, nao erro — nao reportar como issue.
+      if (m.started_at && !m.finished_at && !m.rolled_back_at) {
         issues.push({ migration_name: m.migration_name, issue: 'unfinished' })
       }
     }
