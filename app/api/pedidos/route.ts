@@ -182,6 +182,10 @@ export async function POST(request: NextRequest) {
   try {
     const newOrder = await createOrder({
       ...body,
+      // SPEC-005 §9.1: pedido criado pelo ADMIN (loja, WhatsApp, telefone).
+      // NAO recebe email automatico, NAO aparece em /minha-conta.
+      // Comunicacao com o cliente fica a cargo do admin fora do sistema.
+      createdVia: 'admin',
       discountTotal: discount.normalized.discountTotal,
       discountReason: discount.normalized.reason,
       discountKind: discount.normalized.kind,
@@ -338,6 +342,7 @@ export async function PUT(request: NextRequest) {
         status: before.status,
         paymentStatus: before.paymentStatus,
         fulfillmentStatus: before.fulfillmentStatus,
+        createdVia: (before as { createdVia?: string }).createdVia,
         items: before.items.map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
       },
       {
@@ -349,6 +354,7 @@ export async function PUT(request: NextRequest) {
         status: order.status,
         paymentStatus: order.paymentStatus,
         fulfillmentStatus: order.fulfillmentStatus,
+        createdVia: (order as { createdVia?: string }).createdVia,
         items: (order.items || []).map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
       },
     ).catch(() => {})
@@ -474,6 +480,7 @@ async function handleStageTransition(input: {
       status: before.status,
       paymentStatus: before.paymentStatus,
       fulfillmentStatus: before.fulfillmentStatus,
+      createdVia: (before as { createdVia?: string }).createdVia,
       items: before.items.map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
     },
     {
@@ -485,6 +492,7 @@ async function handleStageTransition(input: {
       status: updated.status,
       paymentStatus: updated.paymentStatus,
       fulfillmentStatus: updated.fulfillmentStatus,
+      createdVia: (updated as { createdVia?: string }).createdVia,
       items: (updated.items || []).map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
     },
   ).catch(() => {})

@@ -228,6 +228,7 @@ export async function POST(request: NextRequest) {
             status: before.status,
             paymentStatus: before.paymentStatus,
             fulfillmentStatus: before.fulfillmentStatus,
+            createdVia: (before as { createdVia?: string }).createdVia,
             items: before.items.map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
           },
           {
@@ -239,6 +240,7 @@ export async function POST(request: NextRequest) {
             status: updated.status,
             paymentStatus: updated.paymentStatus,
             fulfillmentStatus: updated.fulfillmentStatus,
+            createdVia: (updated as { createdVia?: string }).createdVia,
             items: (updated.items || []).map(it => ({ productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice })),
           },
         ).catch(() => {})
