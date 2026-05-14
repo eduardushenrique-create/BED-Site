@@ -125,6 +125,63 @@ Estes itens estão **implementados no código mas inativos** até o stakeholder 
 - Sem credenciais → app continua salvando imagens como base64 inline (zero regressão)
 - Após ativar, rodar `POST /api/admin/migrate-images` para mover imagens antigas
 
+## 3-bis. Release process & Rollback
+
+Adotado a partir de 2026-05-14 (Onda 1 do plano SPEC-007). Decisão completa em [ADR-004](adr/ADR-004-staging-environment.md).
+
+### Como liberar uma mudança em produção
+
+1. **Trabalho em branch de feature** (ex: `feat/nova-feature`). Commits + push.
+2. **PR pra `main`** → CI verde (Lint+Typecheck+Build, boot smoke, Prisma smoke) → merge.
+3. **Auto-deploy em staging:** Railway staging detecta push em `main` e faz deploy.
+4. **`migrate-staging.yml`** roda automaticamente — aplica migrations no Postgres staging.
+5. **`smoke-staging.yml`** roda em seguida (workflow_run) — 3 testes Playwright contra `https://bed-site-staging.up.railway.app`:
+   - GET `/` retorna 200 com título correto
+   - GET `/api/health` retorna `status=ok` com 4 checks up
+   - GET `/admin` retorna < 500
+6. **QA manual** (opcional, recomendado para mudanças visuais): abrir `https://bed-site-staging.up.railway.app`, navegar pelo fluxo afetado. Smoke não detecta regressão visual — humano precisa olhar.
+7. **Promover para prd:** Actions → **Promote staging → prd** → Run workflow:
+   - `commit_sha`: vazio (usa HEAD de main) ou SHA específico
+   - `reason`: obrigatório, ex: `"release SPEC-007 fase 1"`
+   - Click "Run"
+8. **Promote valida e cria tag:** confere que smoke ficou verde naquele commit, calcula próxima tag `vYYYY.MM.DD-N`, cria tag anotada com motivo.
+9. **Tag dispara automaticamente:**
+   - `migrate-prd.yml` aplica migrations em prd
+   - Railway prd faz deploy da tag (requer reconfiguração manual prévia — vide [ADR-004 §Ações manuais](adr/ADR-004-staging-environment.md))
+
+### Como fazer rollback
+
+| Situação | Caminho |
+|---|---|
+| **PR ruim já mergeado em main, ainda não promovido** | `git revert <sha>` na main + nova PR + smoke verde + Promote novamente. Prd não foi afetado. |
+| **Tag promovida tem bug em prd** | Em Railway prd → **Deployments** → encontrar deploy da tag anterior → **Redeploy**. Migration de prd permanece aplicada (Prisma migrations não voltam sozinhas — apenas o código volta). |
+| **Migration aplicada em prd é destrutiva** | Ação manual: `npx prisma migrate resolve --rolled-back <migration_name>` apontando para o Postgres prd, **só depois de aprovação explícita**. NUNCA apagar linha de `_prisma_migrations` direto no SQL. |
+| **Schema mudou e Prisma client espera coluna que não existe** | Sintoma é health 503 com `missingColumns`. Aplicar migration pendente via `migrate-prd.yml` (workflow_dispatch). Se a migration em si está errada, criar nova migration corretiva — não editar a falha. |
+
+### Comandos úteis (referência)
+
+```bash
+# Disparar smoke manualmente (sem novo commit)
+gh workflow run smoke-staging.yml
+
+# Promover head de main (atalho via CLI)
+gh workflow run promote.yml -f reason="motivo aqui"
+
+# Promover SHA específico
+gh workflow run promote.yml -f commit_sha=<sha> -f reason="motivo"
+
+# Listar tags do dia (para conferir N atual)
+git tag --list "v$(date -u +%Y.%m.%d)-*"
+```
+
+### ⚠️ Pendência operacional (uma vez só)
+
+Após mergear PR #165 (PR-staging-C+D), **reconfigurar Railway prd para escutar tags `v*` em vez de pushes em `main`**. Sem isso, prd continua subindo todo push em main e o gate de smoke é ignorado.
+
+Caminho: painel Railway → projeto BED-Site → Service → Settings → Source/Triggers → mudar para "Deploy on tag push" (ou `railway.toml` com `[deploy].source = "tag:v*"`). Stakeholder faz isso manualmente.
+
+---
+
 ## 4. 🐛 Bugs reportados pelo stakeholder — TODOS RESOLVIDOS ✅
 
 | Bug | PR | Resumo |
