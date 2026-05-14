@@ -56,6 +56,12 @@ const REQUIRED_ORDER_COLUMNS = [
   'paidAmount',
   'dueAmount',
   'refundStatus',
+  // SPEC-007 §3.3.1 — 4 colunas novas para pedidos manuais com granularidade
+  // de canal. Sem essas, vazamento silencioso igual ao incidente 2026-05-13.
+  'manualChannel',
+  'referredBy',
+  'internalNotes',
+  'createdByEmail',
   'createdAt',
   'updatedAt',
 ] as const
