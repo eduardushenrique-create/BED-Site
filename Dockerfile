@@ -31,15 +31,38 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma CLI + schema + migrations ficam disponiveis no container final
-# para o startup wrapper rodar `prisma migrate deploy` automaticamente. Sem
-# isso, cada deploy exigia rodar migrations manualmente, abrindo janelas
-# em que o Prisma client esperava colunas que ainda nao existiam no banco.
+# Schema + migrations: o startup wrapper (start.mjs) le `prisma/migrations/`
+# para conferir se o banco esta sincronizado. Migrations sao APLICADAS por
+# .github/workflows/migrate.yml (ADR-002), nao mais no startup do container.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# @prisma/* fica disponivel pro Prisma client em runtime (adapter-pg,
+# engine etc.). O CLI (node_modules/prisma) NAO eh mais copiado — ele
+# exigia effect/c12/deepmerge-ts/empathic ausentes no runner, e seu
+# unico uso era `prisma migrate deploy` no startup, agora movido pro
+# GitHub Action.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# Wrapper de startup: roda migrations e depois sobe o Next.
+# `pg` + transitivas usado pelo start.mjs para validar _prisma_migrations
+# sem depender do PrismaClient. Lista derivada de package-lock.json
+# (fechamento transitivo de `pg` em 2026-05-13: 13 pacotes). Cirurgico
+# — copiar node_modules inteiro derruba o Railway (vide PR #136 e
+# memoria project_railway_dockerfile_limits.md).
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg ./node_modules/pg
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg-int8 ./node_modules/pg-int8
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg-pool ./node_modules/pg-pool
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg-protocol ./node_modules/pg-protocol
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pg-types ./node_modules/pg-types
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pgpass ./node_modules/pgpass
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres-array ./node_modules/postgres-array
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres-bytea ./node_modules/postgres-bytea
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres-date ./node_modules/postgres-date
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres-interval ./node_modules/postgres-interval
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/split2 ./node_modules/split2
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/xtend ./node_modules/xtend
+
+# Wrapper de startup: valida schema (sem aplicar) e sobe o Next.
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start.mjs ./scripts/start.mjs
 
 # Diretório para o fallback JSON (quando DATABASE_URL não está configurado)
@@ -49,6 +72,7 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Startup auto-migrate: chama prisma migrate deploy antes de subir o Next.
-# Migrations sao idempotentes; se DATABASE_URL nao existir, pula com aviso.
+# Startup: valida que todas as migrations locais estao no banco; aborta
+# (fail-fast) em producao se houver atraso. Migrations aplicadas pelo
+# .github/workflows/migrate.yml antes do deploy.
 CMD ["node", "scripts/start.mjs"]
