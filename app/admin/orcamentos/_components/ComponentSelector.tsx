@@ -80,12 +80,21 @@ export default function ComponentSelector({ components, onChange }: Props) {
       setFetching(true)
       try {
         const res = await fetch(
-          `/api/componentes?search=${encodeURIComponent(search)}&pageSize=20`,
+          `/api/componentes?search=${encodeURIComponent(search)}`,
           { cache: 'no-store' },
         )
         if (!res.ok) return
         const data = await res.json()
-        const items: ComponentOption[] = (data.items ?? data ?? []).map((c: any) => ({
+        // /api/componentes retorna { components: [...] }. Cobrimos também
+        // items/array direto pra robustez se o endpoint mudar.
+        const arr: unknown[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.components)
+            ? data.components
+            : Array.isArray(data?.items)
+              ? data.items
+              : []
+        const items: ComponentOption[] = arr.map((c: any) => ({
           id: c.id,
           name: c.name,
           unit: c.unit,
