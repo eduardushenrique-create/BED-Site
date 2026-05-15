@@ -5,6 +5,9 @@
  */
 
 import { notFound } from 'next/navigation'
+import prisma from '@/lib/prisma'
+import { hasDatabase } from '@/lib/database'
+import { serializeEstimate } from '@/lib/orcamentos'
 import EstimateForm from '../_components/EstimateForm'
 
 type EstimateComponent = {
@@ -38,15 +41,14 @@ type EstimateData = {
 }
 
 async function getEstimate(id: string): Promise<EstimateData | null> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // Carrega direto do DB para evitar dependência de NEXT_PUBLIC_APP_URL no
+  // server component (em Railway staging a env não existe e o fetch caía em
+  // localhost:3000 → ECONNREFUSED → catch → notFound() → 404).
+  if (!hasDatabase || !(prisma as any)?.pricingEstimate) return null
   try {
-    const res = await fetch(`${baseUrl}/api/orcamentos/${id}`, {
-      cache: 'no-store',
-      headers: { 'x-internal-request': '1' },
-    })
-    if (res.status === 404) return null
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
+    const row = await (prisma as any).pricingEstimate.findUnique({ where: { id } })
+    if (!row) return null
+    const data = serializeEstimate(row)
     return {
       ...data,
       components: data.components ?? [],
