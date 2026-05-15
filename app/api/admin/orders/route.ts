@@ -111,20 +111,26 @@ export async function POST(request: NextRequest) {
     // paidAmount/dueAmount/paymentStatus (lib/installments.ts).
     if (initial && hasDatabase && (prisma as any)?.paymentInstallment) {
       try {
-        await (prisma as any).paymentInstallment.create({
-          data: {
-            orderId: order.id,
-            sequence: 1,
-            amount: new Prisma.Decimal(Number(initial.amount)),
-            method: initial.method,
-            description: initial.description ?? 'Entrada',
-            receivedAt: initial.receivedAt ? new Date(initial.receivedAt) : new Date(),
-            receivedByEmail: auth.user?.email ?? 'unknown',
-            notes: initial.notes ?? null,
-            isRefund: false,
-          },
+        // Transação garante atomicidade: installment criado e totals
+        // recalculados juntos (recalculatePaidAmount exige tx desde refactor
+        // de installments). Falha em qualquer um aborta o pagamento inicial
+        // sem desfazer o pedido (catch externo só audita).
+        await prisma.$transaction(async (tx: any) => {
+          await tx.paymentInstallment.create({
+            data: {
+              orderId: order.id,
+              sequence: 1,
+              amount: new Prisma.Decimal(Number(initial.amount)),
+              method: initial.method,
+              description: initial.description ?? 'Entrada',
+              receivedAt: initial.receivedAt ? new Date(initial.receivedAt) : new Date(),
+              receivedByEmail: auth.user?.email ?? 'unknown',
+              notes: initial.notes ?? null,
+              isRefund: false,
+            },
+          })
+          await recalculatePaidAmount(order.id, tx)
         })
-        await recalculatePaidAmount(order.id)
       } catch (err) {
         // Audit a falha do installment mas nao desfaz o pedido — admin pode
         // registrar a entrada manualmente em /admin/pedidos/[id] depois.

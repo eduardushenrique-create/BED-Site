@@ -148,20 +148,24 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     // Pagamento inicial (entrada) opcional
     if (initial && (prisma as any)?.paymentInstallment) {
       try {
-        await (prisma as any).paymentInstallment.create({
-          data: {
-            orderId: order.id,
-            sequence: 1,
-            amount: new Prisma.Decimal(Number(initial.amount)),
-            method: initial.method,
-            description: initial.description ?? 'Entrada',
-            receivedAt: initial.receivedAt ? new Date(initial.receivedAt) : new Date(),
-            receivedByEmail: auth.user?.email ?? 'unknown',
-            notes: initial.notes ?? null,
-            isRefund: false,
-          },
+        // Transação para installment + recalculo serem atômicos
+        // (recalculatePaidAmount exige tx desde refactor de installments).
+        await prisma.$transaction(async (tx: any) => {
+          await tx.paymentInstallment.create({
+            data: {
+              orderId: order.id,
+              sequence: 1,
+              amount: new Prisma.Decimal(Number(initial.amount)),
+              method: initial.method,
+              description: initial.description ?? 'Entrada',
+              receivedAt: initial.receivedAt ? new Date(initial.receivedAt) : new Date(),
+              receivedByEmail: auth.user?.email ?? 'unknown',
+              notes: initial.notes ?? null,
+              isRefund: false,
+            },
+          })
+          await recalculatePaidAmount(order.id, tx)
         })
-        await recalculatePaidAmount(order.id)
       } catch (err) {
         captureException(err, {
           context: 'api.orcamentos.converter-pedido.initialInstallment',
