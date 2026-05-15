@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { href: '/admin/banners', label: 'Banners' },
   { href: '/admin/cupons', label: 'Cupons' },
   { href: '/admin/despesas', label: 'Despesas' },
+  { href: '/admin/orcamentos', label: 'Orçamentos' },
   { href: '/admin/avaliacoes', label: 'Avaliações' },
   { href: '/admin/emails', label: 'E-mails' },
   { href: '/admin/auditoria', label: 'Auditoria' },
