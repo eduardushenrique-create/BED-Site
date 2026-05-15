@@ -136,19 +136,31 @@ export default function EstimateForm({ estimate }: Props) {
   const [printers, setPrinters] = useState<PrinterOption[]>([])
 
   useEffect(() => {
-    // Carrega filamentos e impressoras em paralelo
+    // Carrega filamentos e impressoras em paralelo. Os 3 endpoints de lookup
+    // usam shapes diferentes: /filamentos -> { filaments }, /impressoras ->
+    // array direto, /componentes -> { components } (vide ComponentSelector).
+    // Esse parser cobre todos.
+    const pickArray = (d: unknown, key: string): unknown[] => {
+      if (Array.isArray(d)) return d
+      if (d && typeof d === 'object') {
+        const obj = d as Record<string, unknown>
+        if (Array.isArray(obj[key])) return obj[key] as unknown[]
+        if (Array.isArray(obj.items)) return obj.items as unknown[]
+      }
+      return []
+    }
     Promise.all([
-      fetch('/api/filamentos?pageSize=100', { cache: 'no-store' })
-        .then(r => r.ok ? r.json() : { items: [] })
-        .then(d => (d.items ?? d ?? []).map((f: any) => ({
+      fetch('/api/filamentos', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => pickArray(d, 'filaments').map((f: any) => ({
           id: f.id,
           name: f.name,
           brand: f.brand ?? '',
           pricePerKg: Number(f.pricePerKg),
         }))),
-      fetch('/api/impressoras?pageSize=100', { cache: 'no-store' })
-        .then(r => r.ok ? r.json() : { items: [] })
-        .then(d => (d.items ?? d ?? []).map((p: any) => ({ id: p.id, name: p.name }))),
+      fetch('/api/impressoras', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => pickArray(d, 'printers').map((p: any) => ({ id: p.id, name: p.name }))),
     ]).then(([fils, prts]) => {
       setFilaments(fils)
       setPrinters(prts)
