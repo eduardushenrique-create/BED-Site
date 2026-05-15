@@ -150,7 +150,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       try {
         // Transação para installment + recalculo serem atômicos
         // (recalculatePaidAmount exige tx desde refactor de installments).
-        await prisma.$transaction(async (tx: any) => {
+        await (prisma as any).$transaction(async (tx: any) => {
           await tx.paymentInstallment.create({
             data: {
               orderId: order.id,

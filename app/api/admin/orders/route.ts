@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         // recalculados juntos (recalculatePaidAmount exige tx desde refactor
         // de installments). Falha em qualquer um aborta o pagamento inicial
         // sem desfazer o pedido (catch externo só audita).
-        await prisma.$transaction(async (tx: any) => {
+        await (prisma as any).$transaction(async (tx: any) => {
           await tx.paymentInstallment.create({
             data: {
               orderId: order.id,
