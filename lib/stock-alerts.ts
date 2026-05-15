@@ -194,6 +194,8 @@ export async function checkOrderShortages(orderId: string): Promise<OrderShortag
     const aggregate = new Map<string, OrderShortageItem & { componentId: string }>()
 
     for (const item of order.items) {
+      // SPEC-007 §3.3.1: itens custom (productId=null) não têm BOM no catálogo.
+      if (!item.productId) continue
       const bom = await prisma.productComponent.findMany({
         where: {
           productId: item.productId,
