@@ -142,8 +142,10 @@ const ORDER_INCLUDE_SAFE = {
   },
 } as const
 
+// SPEC-007 §3.3.1: productId é nullable em OrderItem para suportar itens
+// custom (sem produto do catálogo). hydrateOrderProducts já filtra nulls.
 type OrderWithItems = {
-  items: Array<{ productId: string; product?: unknown }>
+  items: Array<{ productId: string | null; product?: unknown }>
 }
 
 /**
