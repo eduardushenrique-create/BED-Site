@@ -538,6 +538,9 @@ export async function applyProductionConsumption(
     },
   })
   if (!task || !task.orderItem) return empty
+  // SPEC-007 §3.3.1: itens custom (productId=null) não têm BOM no catálogo —
+  // não há consumo planejado de componentes para reverter/efetivar.
+  if (!task.orderItem.productId) return empty
 
   // BOM: vínculos globais OR específicos da variante deste OrderItem.
   const bomRows = await tx.productComponent.findMany({

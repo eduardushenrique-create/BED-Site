@@ -142,8 +142,10 @@ const ORDER_INCLUDE_SAFE = {
   },
 } as const
 
+// SPEC-007 §3.3.1: productId é nullable em OrderItem para suportar itens
+// custom (sem produto do catálogo). hydrateOrderProducts já filtra nulls.
 type OrderWithItems = {
-  items: Array<{ productId: string; product?: unknown }>
+  items: Array<{ productId: string | null; product?: unknown }>
 }
 
 /**
@@ -157,7 +159,13 @@ async function hydrateOrderProducts<T extends OrderWithItems>(orders: T[]): Prom
   if (!prisma?.product || orders.length === 0) return
 
   const productIds = Array.from(
-    new Set(orders.flatMap(order => order.items.map(item => item.productId).filter(Boolean))),
+    new Set(
+      orders.flatMap(order =>
+        order.items
+          .map(item => item.productId)
+          .filter((id): id is string => id !== null && id !== ''),
+      ),
+    ),
   )
   if (productIds.length === 0) return
 
@@ -169,6 +177,8 @@ async function hydrateOrderProducts<T extends OrderWithItems>(orders: T[]): Prom
     const productMap = new Map(products.map(p => [p.id, p]))
     for (const order of orders) {
       for (const item of order.items) {
+        // SPEC-007 §3.3.1: itens custom (productId=null) ficam sem product.
+        if (!item.productId) continue
         ;(item as { product?: unknown }).product = productMap.get(item.productId) ?? null
       }
     }
