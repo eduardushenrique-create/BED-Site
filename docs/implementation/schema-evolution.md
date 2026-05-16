@@ -21,8 +21,6 @@
 | `Address` | id, orderId (uniq), zipCode, street, ..., city, state | ← Order |
 | `Payment` | id, orderId (uniq), provider, providerPaymentId, method, status, amount, pixQrCode, pixCopyPaste | ← Order |
 | `Shipment` | id, orderId (uniq), provider, serviceName, price, trackingCode | ← Order |
-| `Cart` | id, sessionId, userId, couponCode | → CartItem[] (NÃO USADO HOJE) |
-| `CartItem` | id, cartId, productId, variantId, quantity, unitPrice | ← Cart, ← Product (NÃO USADO HOJE) |
 | `Coupon` | id, code (uniq), type, value, minSubtotal, startsAt, endsAt, usageLimit, usedCount, isActive | (USO PLANEJADO FASE 3) |
 | `AuthCode` | id, email, codeHash, ipHash, attempts, expiresAt, usedAt | — |
 | `RateLimitBucket` | key (PK), count, resetAt, updatedAt | — (bucket compartilhado para `request-code`, `verify-code`, `password-login`) |
