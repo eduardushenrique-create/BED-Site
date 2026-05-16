@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -43,11 +43,7 @@ export default function NovoBannerPage() {
     displayOrder: 0,
   })
   const [saving, setSaving] = useState(false)
-  const [detectedLinks, setDetectedLinks] = useState<{ index: number; label: string; href: string }[]>([])
-
-  useEffect(() => {
-    setDetectedLinks(parseLinks(formData.htmlContent))
-  }, [formData.htmlContent])
+  const detectedLinks = useMemo(() => parseLinks(formData.htmlContent), [formData.htmlContent])
 
   function handleLinkHrefChange(linkIndex: number, newHref: string) {
     setFormData(prev => ({ ...prev, htmlContent: updateLinkHref(prev.htmlContent, linkIndex, newHref) }))
