@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { decodeSessionToken } from '@/lib/session-token'
 import { SESSION_COOKIE, isAdminRole } from '@/lib/auth-shared'
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const session = decodeSessionToken(request.cookies.get(SESSION_COOKIE)?.value)
 
