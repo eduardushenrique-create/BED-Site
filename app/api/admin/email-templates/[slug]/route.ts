@@ -5,6 +5,10 @@ import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { TEMPLATE_CATALOG, type EmailTemplateSlug } from '@/lib/email-templates'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/admin/email-templates/slug' })
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +35,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     try {
       override = await prisma.emailTemplate.findUnique({ where: { slug } })
     } catch (error) {
-      console.error('[api/admin/email-templates/[slug]] GET override failed:', error)
+      captureException(error, { context: 'api/admin/email-templates/slug', detail: 'GET override failed' })
+      log.error({ err: error }, 'GET /api/admin/email-templates/[slug]: override failed')
     }
   }
 
@@ -116,7 +121,8 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
       updatedAt: saved.updatedAt,
     })
   } catch (error) {
-    console.error('[api/admin/email-templates/[slug]] PUT failed:', error)
+    captureException(error, { context: 'api/admin/email-templates/slug', detail: 'PUT failed' })
+    log.error({ err: error }, 'PUT /api/admin/email-templates/[slug] failed')
     return NextResponse.json({ error: 'Erro ao salvar template.' }, { status: 500 })
   }
 }
@@ -150,7 +156,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext) {
     }).catch(() => {})
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[api/admin/email-templates/[slug]] DELETE failed:', error)
+    captureException(error, { context: 'api/admin/email-templates/slug', detail: 'DELETE failed' })
+    log.error({ err: error }, 'DELETE /api/admin/email-templates/[slug] failed')
     return NextResponse.json({ error: 'Erro ao restaurar padrão.' }, { status: 500 })
   }
 }

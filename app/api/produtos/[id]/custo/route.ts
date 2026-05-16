@@ -9,6 +9,10 @@ import {
 } from '@/lib/product-cost'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/produtos/custo' })
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +72,8 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
         await prisma.product.update({ where: { id }, data: { price: body.price } })
       } catch (err) {
         // Não bloqueia — settings já foram salvas
-        console.error('[product-cost] failed to update price:', err)
+        captureException(err, { context: 'api/produtos/custo', detail: 'failed to update price' })
+        log.error({ err }, 'product-cost: failed to update price')
       }
     }
   }

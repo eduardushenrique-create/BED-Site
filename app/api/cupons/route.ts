@@ -8,6 +8,10 @@ import {
 import { requireApiAdmin } from '@/lib/api-auth'
 import { recordAuditEntry } from '@/lib/audit-log'
 import { getClientIp } from '@/lib/rate-limit'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/cupons' })
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +42,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
     return NextResponse.json(coupon, { status: 201 })
   } catch (error) {
-    console.error('[api/cupons] POST error:', error)
+    captureException(error, { context: 'api/cupons', detail: 'POST failed' })
+    log.error({ err: error }, 'POST /api/cupons failed')
     return NextResponse.json({ error: 'Erro ao criar cupom.' }, { status: 500 })
   }
 }
@@ -68,7 +73,8 @@ export async function PUT(request: NextRequest) {
     }).catch(() => {})
     return NextResponse.json(coupon)
   } catch (error) {
-    console.error('[api/cupons] PUT error:', error)
+    captureException(error, { context: 'api/cupons', detail: 'PUT failed' })
+    log.error({ err: error }, 'PUT /api/cupons failed')
     return NextResponse.json({ error: 'Erro ao atualizar cupom.' }, { status: 500 })
   }
 }

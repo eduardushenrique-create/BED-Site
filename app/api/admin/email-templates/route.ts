@@ -3,6 +3,10 @@ import { requireApiAdmin } from '@/lib/api-auth'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { getCatalog } from '@/lib/email-templates'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/admin/email-templates' })
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +28,8 @@ export async function GET() {
       })
       overrides = Object.fromEntries(rows.map(row => [row.slug, row]))
     } catch (error) {
-      console.error('[api/admin/email-templates] failed to load overrides:', error)
+      captureException(error, { context: 'api/admin/email-templates', detail: 'failed to load overrides' })
+      log.error({ err: error }, 'GET /api/admin/email-templates: failed to load overrides')
     }
   }
 

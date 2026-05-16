@@ -5,6 +5,10 @@ import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { parseSegment } from '@/lib/email-segments'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/admin/email-campaigns/id' })
 
 export const dynamic = 'force-dynamic'
 
@@ -92,7 +96,8 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
     }).catch(() => {})
     return NextResponse.json(saved)
   } catch (error) {
-    console.error('[api/admin/email-campaigns/[id]] PUT failed:', error)
+    captureException(error, { context: 'api/admin/email-campaigns/id', detail: 'PUT failed' })
+    log.error({ err: error }, 'PUT /api/admin/email-campaigns/[id] failed')
     return NextResponse.json({ error: 'Erro ao salvar campanha.' }, { status: 500 })
   }
 }
@@ -124,7 +129,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext) {
     }).catch(() => {})
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[api/admin/email-campaigns/[id]] DELETE failed:', error)
+    captureException(error, { context: 'api/admin/email-campaigns/id', detail: 'DELETE failed' })
+    log.error({ err: error }, 'DELETE /api/admin/email-campaigns/[id] failed')
     return NextResponse.json({ error: 'Erro ao excluir campanha.' }, { status: 500 })
   }
 }

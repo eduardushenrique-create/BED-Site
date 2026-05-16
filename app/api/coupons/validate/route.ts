@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateAndCalculateCoupon } from '@/lib/database'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/coupons/validate' })
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +40,8 @@ export async function POST(request: NextRequest) {
       message,
     })
   } catch (error) {
-    console.error('[api/coupons/validate] error:', error)
+    captureException(error, { context: 'api/coupons/validate', detail: 'POST failed' })
+    log.error({ err: error }, 'POST /api/coupons/validate failed')
     return NextResponse.json({ valid: false, error: 'Erro ao validar cupom.' }, { status: 500 })
   }
 }

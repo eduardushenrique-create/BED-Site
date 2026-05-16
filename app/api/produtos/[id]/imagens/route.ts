@@ -3,6 +3,10 @@ import { requireApiAdmin } from '@/lib/api-auth'
 import { addProductImage, listProductImages, reorderProductImages } from '@/lib/database'
 import { getStorage } from '@/lib/storage'
 import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/produtos/imagens' })
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +58,8 @@ export async function POST(
       url = uploaded.url
       storageKey = uploaded.storageKey
     } catch (uploadError) {
-      console.error('[POST /produtos/imagens] storage upload falhou:', uploadError)
+      captureException(uploadError, { context: 'api/produtos/imagens', detail: 'storage upload falhou' })
+      log.error({ err: uploadError }, 'POST /produtos/imagens: storage upload falhou')
       return NextResponse.json({ error: 'Falha ao salvar a imagem no storage.' }, { status: 500 })
     }
   }

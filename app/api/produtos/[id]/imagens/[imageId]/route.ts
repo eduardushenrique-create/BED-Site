@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiAdmin } from '@/lib/api-auth'
 import { removeProductImage, setMainProductImage, setVariantForImage } from '@/lib/database'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/produtos/imagens/imageId' })
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +53,8 @@ export async function PATCH(
       { status: 400 }
     )
   } catch (error) {
-    console.error('[PATCH /produtos/imagens/:imageId] erro:', error)
+    captureException(error, { context: 'api/produtos/imagens/imageId', detail: 'PATCH failed' })
+    log.error({ err: error }, 'PATCH /produtos/imagens/:imageId erro')
     return NextResponse.json({ error: 'Erro interno ao atualizar imagem.' }, { status: 500 })
   }
 }
@@ -68,7 +73,8 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[DELETE /produtos/imagens/:imageId] erro:', error)
+    captureException(error, { context: 'api/produtos/imagens/imageId', detail: 'DELETE failed' })
+    log.error({ err: error }, 'DELETE /produtos/imagens/:imageId erro')
     return NextResponse.json({ error: 'Erro interno ao remover imagem.' }, { status: 500 })
   }
 }
