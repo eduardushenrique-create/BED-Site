@@ -2,7 +2,7 @@
 
 > **Como usar este documento:** abra uma nova sessão do Claude Code no diretório `C:\PROJETOS\BED-Site` e cole o conteúdo abaixo na primeira mensagem (ou referencie o arquivo `docs/implementation/HANDOFF.md`). O assistente terá contexto completo para continuar de onde paramos.
 >
-> **Última atualização:** 2026-05-14 — SPEC-005 fechada em produção (pagamentos parciais + exclusão de produção em 3 modos + design polish).
+> **Última atualização:** 2026-05-16 — Varredura de legado + 7 PRs de limpeza (#178–#184). Dívidas técnicas verificadas no código real (ver seção "Dívidas técnicas" abaixo).
 
 ---
 
@@ -104,6 +104,23 @@ Antes de qualquer trabalho, leia:
 | [#46](https://github.com/eduardushenrique-create/BED-Site/pull/46) | feat(observability): logs estruturados (pino) com redact | ✅ |
 | [#47](https://github.com/eduardushenrique-create/BED-Site/pull/47) | feat(rate-limit): Upstash Redis (opcional, fallback Postgres+memory) | ✅ |
 | [#48](https://github.com/eduardushenrique-create/BED-Site/pull/48) | fix(admin+login): sidebar Painel + uniformiza largura do login (640px) | ✅ |
+| *(SPEC-007 — sessão 2026-05-15)* | | |
+| [#170](https://github.com/eduardushenrique-create/BED-Site/pull/170) | feat(db): SPEC-007 PR-1 schema + migration consolidada | ✅ |
+| [#171](https://github.com/eduardushenrique-create/BED-Site/pull/171) | fix(types): guard productId=null em BOM/estoque pós-SPEC-007 PR-1 | ✅ |
+| [#172](https://github.com/eduardushenrique-create/BED-Site/pull/172) | feat(api): SPEC-007 PR-2a calculadora de preço + endpoints de orçamento | ✅ |
+| [#173](https://github.com/eduardushenrique-create/BED-Site/pull/173) | feat(api): SPEC-007 PR-2b pedido manual + ponte orçamento→pedido | ✅ |
+| [#174](https://github.com/eduardushenrique-create/BED-Site/pull/174) | feat(ui): SPEC-007 PR-3a3 tela de configurações de precificação | ✅ |
+| [#175](https://github.com/eduardushenrique-create/BED-Site/pull/175) | feat(ui): SPEC-007 PR-3a1 UI calculadora de orçamentos /admin/orcamentos | ✅ |
+| [#176](https://github.com/eduardushenrique-create/BED-Site/pull/176) | fix(orcamentos): parser dos lookups aceita shape real de cada API | ✅ |
+| [#177](https://github.com/eduardushenrique-create/BED-Site/pull/177) | fix(orcamentos): server component carrega estimate direto do Prisma | ✅ |
+| *(Limpeza de legado — sessão 2026-05-16)* | | |
+| [#178](https://github.com/eduardushenrique-create/BED-Site/pull/178) | fix(security): renomeia proxy.ts → middleware.ts para ativar guard de /admin | ✅ |
+| [#179](https://github.com/eduardushenrique-create/BED-Site/pull/179) | chore(cleanup): remove ShippingSelector.tsx (componente não usado) | ✅ |
+| [#180](https://github.com/eduardushenrique-create/BED-Site/pull/180) | docs(env): adiciona BLOB_READ_WRITE_TOKEN ao .env.example | ✅ |
+| [#181](https://github.com/eduardushenrique-create/BED-Site/pull/181) | chore(observability): padroniza logs de erro com captureException + logger em 14 arquivos | ✅ |
+| [#182](https://github.com/eduardushenrique-create/BED-Site/pull/182) | fix(lint): remove react-hooks/set-state-in-effect nos banners (useMemo) | ✅ |
+| [#183](https://github.com/eduardushenrique-create/BED-Site/pull/183) | docs(cleanup): remove HANDOFF-SPEC-007 e entradas Cart/CartItem obsoletas de schema-evolution | ✅ |
+| [#184](https://github.com/eduardushenrique-create/BED-Site/pull/184) | chore(cleanup): remove docs de processo órfãos da raiz (erros.md, SKILL.md, SPEC.md, TEST_PLAN.md) | ✅ |
 
 ## 3. ⚠️ Pendências do stakeholder (configuração externa)
 
@@ -258,12 +275,19 @@ Outros futuros:
 - **Pendência operacional do stakeholder:** cadastrar e-mails em `/admin/configuracoes/alertas` após o deploy pra alertas dispararem (sem cadastro, fallback é `RESEND_REPLY_TO_EMAIL`)
 
 ### 🧹 Dívidas técnicas — TODAS LIMPAS
-- ✅ `lib/supabase.ts` + `lib/db.ts` (PR #63 + dependência npm desinstalada)
-- ✅ `assertRateLimitLegacy` deprecated (PR #57)
-- ✅ Modelos `Cart`/`CartItem` + `DROP TABLE` em prod (PR #65)
-- ✅ `console.error` → `captureException` + `pino` em `lib/database.ts` (PRs #67 + #69, 71 ocorrências migradas via helper `reportDbError`)
+
+> Verificado em varredura completa de código em 2026-05-16 (sessão de limpeza de legado, PRs #178–#184). Cada item abaixo foi confirmado com `grep` no código real — não apenas declarado.
+
+- ✅ `lib/supabase.ts` + `lib/db.ts` (PR #63 + dependência npm desinstalada) — **confirmado em 2026-05-16**: arquivo inexistente, `@supabase/supabase-js` ausente do `package.json`, zero ocorrências de `supabase` em `*.ts`/`*.tsx`
+- ✅ `assertRateLimitLegacy` deprecated (PR #57) — **confirmado em 2026-05-16**: zero ocorrências de `assertRateLimit` em todo o código TS/TSX
+- ✅ Modelos `Cart`/`CartItem` + `DROP TABLE` em prod (PR #65) — entradas removidas de `schema-evolution.md` em PR #183
+- ✅ `console.error` → `captureException` + `pino` em `lib/database.ts` (PRs #67 + #69, 71 ocorrências via helper `reportDbError`) — estendido em PR #181 para mais 14 arquivos (libs + rotas produto + rotas email-admin + rotas cupons)
 - ✅ Erros pré-existentes em `tests/e2e.spec.ts` (PR #66)
 - ✅ Erro `RouteContext` em `app/api/orders/[orderNumber]/route.ts` (resolvido em PR antigo)
+- ✅ `proxy.ts` renomeado para `middleware.ts` + export corrigido (PR #178) — guard de `/admin` estava inativo por nome de arquivo errado
+- ✅ `components/ShippingSelector.tsx` removido (PR #179) — componente sem nenhum importador
+- ✅ Lint `react-hooks/set-state-in-effect` em banners (PR #182) — `useState+useEffect` derivado substituído por `useMemo`
+- ✅ Docs de processo órfãos da raiz removidos (PR #184): `erros.md`, `SKILL.md`, `SPEC.md`, `TEST_PLAN.md`
 
 ## 6. Subagents disponíveis (já criados)
 
