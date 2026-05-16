@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, useMemo, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/Button'
@@ -57,11 +57,7 @@ export default function EditarBannerPage({ params }: { params: Promise<{ id: str
   const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<Omit<Banner, 'id'>>(emptyForm)
-  const [detectedLinks, setDetectedLinks] = useState<{ index: number; label: string; href: string }[]>([])
-
-  useEffect(() => {
-    setDetectedLinks(parseLinks(formData.htmlContent))
-  }, [formData.htmlContent])
+  const detectedLinks = useMemo(() => parseLinks(formData.htmlContent), [formData.htmlContent])
 
   function handleLinkHrefChange(linkIndex: number, newHref: string) {
     setFormData(prev => ({ ...prev, htmlContent: updateLinkHref(prev.htmlContent, linkIndex, newHref) }))
