@@ -5,6 +5,10 @@ import {
   listProductVariants,
   type ProductVariantInput,
 } from '@/lib/database'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/produtos/variacoes' })
 
 export const dynamic = 'force-dynamic'
 
@@ -71,7 +75,8 @@ export async function GET(
     const variants = await listProductVariants(id)
     return NextResponse.json(variants)
   } catch (error) {
-    console.error('[GET /produtos/variacoes] erro:', error)
+    captureException(error, { context: 'api/produtos/variacoes', detail: 'GET failed' })
+    log.error({ err: error }, 'GET /produtos/variacoes erro')
     return NextResponse.json({ error: 'Erro ao listar variações.' }, { status: 500 })
   }
 }
@@ -101,7 +106,8 @@ export async function POST(
 
     return NextResponse.json(result.variant, { status: 201 })
   } catch (error) {
-    console.error('[POST /produtos/variacoes] erro:', error)
+    captureException(error, { context: 'api/produtos/variacoes', detail: 'POST failed' })
+    log.error({ err: error }, 'POST /produtos/variacoes erro')
     return NextResponse.json({ error: 'Erro interno ao criar variação.' }, { status: 500 })
   }
 }

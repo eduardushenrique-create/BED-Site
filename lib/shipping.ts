@@ -1,3 +1,8 @@
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'shipping' })
+
 const MELHOR_ENVIO_BASE = 'https://www.melhorenvio.com.br/api/v2/me'
 
 const CEP_ORIGEM = process.env.SHIPPING_ORIGIN_CEP || '01001000'
@@ -64,7 +69,7 @@ export async function calculateShipping(
 ): Promise<ShippingQuote[]> {
   const token = getToken()
   if (!token) {
-    console.warn('[shipping] Melhor Envio token not configured — returning mock quotes')
+    log.warn('[shipping] Melhor Envio token not configured — returning mock quotes')
     return getMockShippingQuotes()
   }
 
@@ -96,14 +101,18 @@ export async function calculateShipping(
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '')
-      console.error('[shipping] Melhor Envio API error', response.status, errorBody)
+      const apiErr = new Error(`Melhor Envio API error ${response.status}: ${errorBody}`)
+      captureException(apiErr, { context: 'shipping', detail: 'Melhor Envio API error' })
+      log.error({ status: response.status, body: errorBody }, 'Melhor Envio API error')
       return getMockShippingQuotes()
     }
 
     const data = await response.json()
 
     if (!Array.isArray(data)) {
-      console.error('[shipping] Melhor Envio unexpected payload shape:', JSON.stringify(data).slice(0, 200))
+      const shapeErr = new Error('Melhor Envio unexpected payload shape')
+      captureException(shapeErr, { context: 'shipping', detail: JSON.stringify(data).slice(0, 200) })
+      log.error({ payload: JSON.stringify(data).slice(0, 200) }, 'Melhor Envio unexpected payload shape')
       return getMockShippingQuotes()
     }
 
@@ -141,13 +150,14 @@ export async function calculateShipping(
     }
 
     if (quotes.length === 0) {
-      console.warn('[shipping] Melhor Envio returned no usable quotes for', { fromCep, toCep })
+      log.warn({ fromCep, toCep }, 'Melhor Envio returned no usable quotes')
       return getMockShippingQuotes()
     }
 
     return quotes
   } catch (error) {
-    console.error('[shipping] calculateShipping threw:', error)
+    captureException(error, { context: 'shipping', detail: 'calculateShipping threw' })
+    log.error({ err: error }, 'calculateShipping threw')
     return getMockShippingQuotes()
   }
 }
@@ -215,7 +225,7 @@ export interface ShipmentData {
 export async function createShipment(data: ShipmentData): Promise<{ trackingCode?: string; labelUrl?: string } | null> {
   const token = getToken()
   if (!token) {
-    console.warn('[shipping] Melhor Envio token not configured — returning mock shipment')
+    log.warn('[shipping] Melhor Envio token not configured — returning mock shipment')
     return { trackingCode: 'MOCK123456BR', labelUrl: '#' }
   }
 
@@ -237,7 +247,9 @@ export async function createShipment(data: ShipmentData): Promise<{ trackingCode
     })
 
     if (!response.ok) {
-      console.error('Melhor Envio shipment error:', await response.text())
+      const shipErr = new Error(`Melhor Envio createShipment error: ${await response.text()}`)
+      captureException(shipErr, { context: 'shipping', detail: 'createShipment non-ok response' })
+      log.error({ status: response.status }, 'Melhor Envio createShipment non-ok response')
       return null
     }
 
@@ -247,7 +259,8 @@ export async function createShipment(data: ShipmentData): Promise<{ trackingCode
       labelUrl: result.label,
     }
   } catch (error) {
-    console.error('Error creating shipment:', error)
+    captureException(error, { context: 'shipping', detail: 'createShipment threw' })
+    log.error({ err: error }, 'createShipment threw')
     return null
   }
 }
@@ -288,7 +301,8 @@ export async function getTrackingInfo(trackingCode: string): Promise<{
 
     return await response.json()
   } catch (error) {
-    console.error('Error getting tracking:', error)
+    captureException(error, { context: 'shipping', detail: 'getTrackingInfo threw' })
+    log.error({ err: error }, 'getTrackingInfo threw')
     return null
   }
 }

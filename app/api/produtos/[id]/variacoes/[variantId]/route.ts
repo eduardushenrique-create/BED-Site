@@ -5,6 +5,10 @@ import {
   updateProductVariant,
   type ProductVariantInput,
 } from '@/lib/database'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/produtos/variacoes/variantId' })
 
 export const dynamic = 'force-dynamic'
 
@@ -83,7 +87,8 @@ export async function PATCH(
 
     return NextResponse.json(result.variant)
   } catch (error) {
-    console.error('[PATCH /produtos/variacoes/:variantId] erro:', error)
+    captureException(error, { context: 'api/produtos/variacoes/variantId', detail: 'PATCH failed' })
+    log.error({ err: error }, 'PATCH /produtos/variacoes/:variantId erro')
     return NextResponse.json({ error: 'Erro interno ao atualizar variação.' }, { status: 500 })
   }
 }
@@ -105,7 +110,8 @@ export async function DELETE(
     }
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[DELETE /produtos/variacoes/:variantId] erro:', error)
+    captureException(error, { context: 'api/produtos/variacoes/variantId', detail: 'DELETE failed' })
+    log.error({ err: error }, 'DELETE /produtos/variacoes/:variantId erro')
     return NextResponse.json({ error: 'Erro interno ao remover variação.' }, { status: 500 })
   }
 }

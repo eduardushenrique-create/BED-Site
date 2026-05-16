@@ -3,6 +3,10 @@ import 'server-only'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { readDB, writeDB, type ReviewRecord } from '@/lib/localDb'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'reviews' })
 
 export type ReviewStatus = 'pending' | 'approved' | 'hidden'
 
@@ -93,7 +97,8 @@ export async function isCustomerEligibleToReview(
 
     return { eligible: true, orderNumber: paidOrder.orderNumber }
   } catch (error) {
-    console.error('[reviews] isCustomerEligibleToReview failed:', error)
+    captureException(error, { context: 'reviews', detail: 'isCustomerEligibleToReview failed' })
+    log.error({ err: error }, 'isCustomerEligibleToReview failed')
     return { eligible: false, reason: 'no_paid_order' }
   }
 }
@@ -159,7 +164,8 @@ export async function createReview(input: CreateReviewInput): Promise<{ ok: bool
     })
     return { ok: true, review: serializeAdminReview(created) }
   } catch (error) {
-    console.error('[reviews] createReview failed:', error)
+    captureException(error, { context: 'reviews', detail: 'createReview failed' })
+    log.error({ err: error }, 'createReview failed')
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -200,7 +206,8 @@ export async function listFeaturedApprovedReviews(limit = 6): Promise<FeaturedRe
       productSlug: r.product?.slug ?? null,
     }))
   } catch (error) {
-    console.error('[reviews] listFeaturedApprovedReviews failed:', error)
+    captureException(error, { context: 'reviews', detail: 'listFeaturedApprovedReviews failed' })
+    log.error({ err: error }, 'listFeaturedApprovedReviews failed')
     return []
   }
 }
@@ -232,7 +239,8 @@ export async function listApprovedReviewsForProduct(productId: string, limit = 5
       aggregate: buildAggregate(all),
     }
   } catch (error) {
-    console.error('[reviews] listApprovedReviewsForProduct failed:', error)
+    captureException(error, { context: 'reviews', detail: 'listApprovedReviewsForProduct failed' })
+    log.error({ err: error }, 'listApprovedReviewsForProduct failed')
     return { reviews: [], aggregate: buildAggregate([]) }
   }
 }
@@ -269,7 +277,8 @@ export async function getRatingsForProductIds(ids: string[]): Promise<Record<str
     }
     return map
   } catch (error) {
-    console.error('[reviews] getRatingsForProductIds failed:', error)
+    captureException(error, { context: 'reviews', detail: 'getRatingsForProductIds failed' })
+    log.error({ err: error }, 'getRatingsForProductIds failed')
     return {}
   }
 }
@@ -306,7 +315,8 @@ export async function listReviewsAdmin(query: ListReviewsAdminQuery = {}): Promi
     ])
     return { items: records.map(serializeAdminReview), total }
   } catch (error) {
-    console.error('[reviews] listReviewsAdmin failed:', error)
+    captureException(error, { context: 'reviews', detail: 'listReviewsAdmin failed' })
+    log.error({ err: error }, 'listReviewsAdmin failed')
     return { items: [], total: 0 }
   }
 }
@@ -335,7 +345,8 @@ export async function moderateReview(
     })
     return { ok: true, review: serializeAdminReview(updated) }
   } catch (error) {
-    console.error('[reviews] moderateReview failed:', error)
+    captureException(error, { context: 'reviews', detail: 'moderateReview failed' })
+    log.error({ err: error }, 'moderateReview failed')
     return { ok: false }
   }
 }
@@ -353,7 +364,8 @@ export async function deleteReview(id: string): Promise<boolean> {
     await reviewClient().delete({ where: { id } })
     return true
   } catch (error) {
-    console.error('[reviews] deleteReview failed:', error)
+    captureException(error, { context: 'reviews', detail: 'deleteReview failed' })
+    log.error({ err: error }, 'deleteReview failed')
     return false
   }
 }

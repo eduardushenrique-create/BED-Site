@@ -5,6 +5,10 @@ import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { parseSegment } from '@/lib/email-segments'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/admin/email-campaigns' })
 
 export const dynamic = 'force-dynamic'
 
@@ -88,7 +92,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
-    console.error('[api/admin/email-campaigns] POST failed:', error)
+    captureException(error, { context: 'api/admin/email-campaigns', detail: 'POST failed' })
+    log.error({ err: error }, 'POST /api/admin/email-campaigns failed')
     return NextResponse.json({ error: 'Erro ao criar campanha.' }, { status: 500 })
   }
 }

@@ -3,6 +3,10 @@ import 'server-only'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
 import { readDB, writeDB, type PrinterRecord } from '@/lib/localDb'
+import { captureException } from '@/lib/observability'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'printers' })
 
 export type PrinterStatus = 'active' | 'maintenance' | 'offline'
 const VALID_STATUSES: PrinterStatus[] = ['active', 'maintenance', 'offline']
@@ -110,7 +114,8 @@ export async function listPrinters(): Promise<PrinterDto[]> {
     const records = await printerClient().findMany({ orderBy: [{ status: 'asc' }, { name: 'asc' }] })
     return records.map(serialize)
   } catch (error) {
-    console.error('[printers] listPrinters failed:', error)
+    captureException(error, { context: 'printers', detail: 'listPrinters failed' })
+    log.error({ err: error }, 'listPrinters failed')
     return []
   }
 }
@@ -125,7 +130,8 @@ export async function getPrinterById(id: string): Promise<PrinterDto | null> {
     const record = await printerClient().findUnique({ where: { id } })
     return record ? serialize(record) : null
   } catch (error) {
-    console.error('[printers] getPrinterById failed:', error)
+    captureException(error, { context: 'printers', detail: 'getPrinterById failed' })
+    log.error({ err: error }, 'getPrinterById failed')
     return null
   }
 }
@@ -147,7 +153,8 @@ export async function createPrinter(input: PrinterInput): Promise<{ ok: boolean;
     const created = await printerClient().create({ data })
     return { ok: true, printer: serialize(created) }
   } catch (error) {
-    console.error('[printers] createPrinter failed:', error)
+    captureException(error, { context: 'printers', detail: 'createPrinter failed' })
+    log.error({ err: error }, 'createPrinter failed')
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -197,7 +204,8 @@ export async function updatePrinter(id: string, input: Partial<PrinterInput>): P
     const updated = await printerClient().update({ where: { id }, data: partial })
     return { ok: true, printer: serialize(updated) }
   } catch (error) {
-    console.error('[printers] updatePrinter failed:', error)
+    captureException(error, { context: 'printers', detail: 'updatePrinter failed' })
+    log.error({ err: error }, 'updatePrinter failed')
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -219,7 +227,8 @@ export async function deletePrinter(id: string): Promise<{ ok: boolean; error?: 
     await printerClient().delete({ where: { id } })
     return { ok: true }
   } catch (error) {
-    console.error('[printers] deletePrinter failed:', error)
+    captureException(error, { context: 'printers', detail: 'deletePrinter failed' })
+    log.error({ err: error }, 'deletePrinter failed')
     return { ok: false, error: 'persist_failed' }
   }
 }
@@ -249,7 +258,8 @@ export async function assignTaskToPrinter(taskId: string, printerId: string | nu
     await prisma.productionTask.update({ where: { id: taskId }, data: { printerId: printerId } })
     return { ok: true }
   } catch (error) {
-    console.error('[printers] assignTaskToPrinter failed:', error)
+    captureException(error, { context: 'printers', detail: 'assignTaskToPrinter failed' })
+    log.error({ err: error }, 'assignTaskToPrinter failed')
     return { ok: false, error: 'persist_failed' }
   }
 }
