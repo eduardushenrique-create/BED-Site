@@ -6,10 +6,14 @@ import { hasDatabase } from '@/lib/database'
 import { readDB, writeDB } from '@/lib/localDb'
 import type { SessionUser } from '@/lib/auth'
 
-const BOOTSTRAP_ADMIN_EMAIL = 'eduardus.henrique@gmail.com'
-const BOOTSTRAP_ADMIN_NAME = 'Eduardus Henrique'
-const BOOTSTRAP_ADMIN_ROLE = 'owner'
-const BOOTSTRAP_ADMIN_HASH = 'cebb82d82a8e46fe2016faabce185ccc:e6c76b139fc3a07a14f785fb98a4f3652c0fc8acce796d86ee962db510d32dc286ce03fadbc2dbf852740722dd76b1c68cc6d67bbfd91bda3da0eff522663906'
+// A6 — o bootstrap do admin "owner" vem de variáveis de ambiente (secret FORA
+// do código-fonte). Sem BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD_HASH
+// configurados, o bootstrap fica DESABILITADO — não há conta-backdoor embutida
+// no repositório. O fluxo normal de login via AdminUser no banco é inalterado.
+const BOOTSTRAP_ADMIN_EMAIL = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase()
+const BOOTSTRAP_ADMIN_NAME = process.env.BOOTSTRAP_ADMIN_NAME?.trim() || 'Admin'
+const BOOTSTRAP_ADMIN_ROLE = process.env.BOOTSTRAP_ADMIN_ROLE?.trim() || 'owner'
+const BOOTSTRAP_ADMIN_HASH = (process.env.BOOTSTRAP_ADMIN_PASSWORD_HASH || '').trim()
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -24,7 +28,14 @@ function verifyPassword(password: string, encodedHash: string) {
   return derived.length === target.length && crypto.timingSafeEqual(derived, target)
 }
 
+function bootstrapConfigured() {
+  return Boolean(BOOTSTRAP_ADMIN_EMAIL && BOOTSTRAP_ADMIN_HASH)
+}
+
 function matchesBootstrapAdmin(email: string, password: string) {
+  // Desabilitado quando as envs de bootstrap não estão configuradas (A6) —
+  // sem fallback hardcoded.
+  if (!bootstrapConfigured()) return false
   return normalizeEmail(email) === BOOTSTRAP_ADMIN_EMAIL && verifyPassword(password, BOOTSTRAP_ADMIN_HASH)
 }
 
