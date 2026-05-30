@@ -10,10 +10,14 @@ export type SessionTokenPayload = {
 
 function getSecret(name: string, fallback: string) {
   const value = process.env[name] || process.env.NEXTAUTH_SECRET
-  if (!value && process.env.NODE_ENV === 'production') {
-    throw new Error(`${name} precisa estar configurado em produção.`)
-  }
-  return value || fallback
+  if (value) return value
+  // M4 — sem valor configurado, o fallback público de DEV só é aceitável em
+  // desenvolvimento/teste local. Em produção, staging ou qualquer ambiente
+  // implantado, assinar sessões com um segredo conhecido deixaria qualquer um
+  // forjar um cookie de admin — então recusamos inicializar.
+  const env = process.env.NODE_ENV
+  if (env === 'development' || env === 'test') return fallback
+  throw new Error(`${name} precisa estar configurado fora de desenvolvimento.`)
 }
 
 export function getSessionSecret() {
