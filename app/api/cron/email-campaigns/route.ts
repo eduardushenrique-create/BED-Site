@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { hasDatabase } from '@/lib/database'
@@ -8,6 +9,17 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger({ component: 'cron.email-campaigns' })
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * B1 — comparação de strings em tempo constante. Este endpoint dispara envio
+ * de e-mail em massa, então protegemos o CRON_SECRET contra timing attack
+ * (mesmo padrão de lib/session-token.ts e lib/mercadopago.ts).
+ */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const left = Buffer.from(a)
+  const right = Buffer.from(b)
+  return left.length === right.length && crypto.timingSafeEqual(left, right)
+}
 
 /**
  * Cron handler — busca campanhas com status='scheduled' cujo scheduledAt
@@ -39,7 +51,7 @@ export async function POST(request: NextRequest) {
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() ||
     request.headers.get('x-cron-secret')?.trim() ||
     ''
-  if (!provided || provided !== secret) {
+  if (!provided || !timingSafeEqualStr(provided, secret)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
