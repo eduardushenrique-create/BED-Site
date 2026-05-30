@@ -24,7 +24,7 @@ const baseOptions: pino.LoggerOptions = {
     service: 'bed-site',
   },
   redact: {
-    paths: ['password', '*.password', 'token', '*.token', 'authorization', 'cookie', 'set-cookie'],
+    paths: ['password', '*.password', 'token', '*.token', 'authorization', 'cookie', 'set-cookie', 'customerEmail', '*.customerEmail'],
     censor: '[redacted]',
   },
   timestamp: pino.stdTimeFunctions.isoTime,

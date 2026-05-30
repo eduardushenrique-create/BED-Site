@@ -41,7 +41,7 @@ import type {
   UpdateProductionSettingsInput,
 } from '@/lib/types'
 import { getStorage } from '@/lib/storage'
-import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
+import { isDataUrl, validateImageDataUrl } from '@/lib/storage/data-url'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
 import { applyProductionConsumption } from '@/lib/components-stock'
@@ -84,9 +84,15 @@ async function persistImageIfDataUrl(
   if (!value) return { url: '', storageKey: null }
   if (!isDataUrl(value)) return { url: value, storageKey: null }
 
-  const contentType = extractContentType(value, 'image/jpeg')
+  // M5/M8 — rejeita tipo fora da allowlist ou acima do teto de tamanho.
+  // Fail-safe: descarta a imagem (não persiste blob arbitrário) e loga.
+  const check = validateImageDataUrl(value)
+  if (!check.ok) {
+    log.warn({ detail: check.error, prefix }, 'persistImageIfDataUrl: imagem rejeitada (M5/M8)')
+    return { url: '', storageKey: null }
+  }
   try {
-    const result = await getStorage().upload({ data: value, contentType, prefix })
+    const result = await getStorage().upload({ data: value, contentType: check.contentType, prefix })
     return { url: result.url, storageKey: result.storageKey }
   } catch (error) {
     reportDbError('storage upload failed, mantendo data URL inline', error)
