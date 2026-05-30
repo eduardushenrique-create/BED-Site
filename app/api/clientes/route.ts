@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCustomer, listCustomers, updateCustomer } from '@/lib/database'
-import { requireApiAdmin } from '@/lib/api-auth'
+import { requireApiRole } from '@/lib/api-auth'
+import { PRIVILEGED_ROLES } from '@/lib/auth-shared'
 
 export async function GET(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  const auth = await requireApiRole(PRIVILEGED_ROLES)
   if (auth.response) return auth.response
   const { searchParams } = new URL(request.url)
   const q = searchParams.get('q') || ''
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  const auth = await requireApiRole(PRIVILEGED_ROLES)
   if (auth.response) return auth.response
   const body = await request.json()
   const newUser = await createCustomer(body)
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  const auth = await requireApiRole(PRIVILEGED_ROLES)
   if (auth.response) return auth.response
   const { id, ...data } = await request.json()
   const user = await updateCustomer(id, data)
