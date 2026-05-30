@@ -48,11 +48,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const [lowStockCount, setLowStockCount] = useState<number>(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [trackedPath, setTrackedPath] = useState(pathname)
 
-  // Close sidebar on route change (mobile navigation)
-  useEffect(() => {
+  // Fecha a sidebar ao trocar de rota (navegação mobile). Ajuste de estado
+  // durante o render — padrão React para "resetar ao mudar de prop" — em vez
+  // de um efeito. Evita o react-hooks/set-state-in-effect e o render extra.
+  if (trackedPath !== pathname) {
+    setTrackedPath(pathname)
     setSidebarOpen(false)
-  }, [pathname])
+  }
 
   useEffect(() => {
     let cancelled = false
