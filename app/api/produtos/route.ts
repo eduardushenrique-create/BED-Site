@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '@/lib/database'
-import { requireApiAdmin } from '@/lib/api-auth'
+import { requireApiAdmin, requireApiRole } from '@/lib/api-auth'
+import { CATALOG_ROLES } from '@/lib/auth-shared'
 import { recordAuditEntry } from '@/lib/audit-log'
 import { getClientIp } from '@/lib/rate-limit'
 import prisma from '@/lib/prisma'
@@ -12,7 +13,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  // M1 — criar produto: papéis de catálogo (exclui support/orders_manager).
+  const auth = await requireApiRole(CATALOG_ROLES)
   if (auth.response) return auth.response
   const body = await request.json()
   const newProduct = await createProduct(body)
@@ -20,7 +22,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  // M1 — editar produto (inclui preço/visibilidade): papéis de catálogo.
+  const auth = await requireApiRole(CATALOG_ROLES)
   if (auth.response) return auth.response
   const { id, ...data } = await request.json()
 
@@ -69,7 +72,8 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  // M1 — deletar produto (destrutivo): papéis de catálogo.
+  const auth = await requireApiRole(CATALOG_ROLES)
   if (auth.response) return auth.response
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

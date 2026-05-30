@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiAdmin } from '@/lib/api-auth'
+import { requireApiRole } from '@/lib/api-auth'
+import { PRIVILEGED_ROLES } from '@/lib/auth-shared'
 import { getCustomerById, listOrdersByCustomerEmail, listAddressesByCustomerId } from '@/lib/database'
 import { captureException } from '@/lib/observability'
 
@@ -9,7 +10,8 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireApiAdmin()
+  // M1 — detalhe de cliente (PII + histórico de pedidos): alta alçada.
+  const auth = await requireApiRole(PRIVILEGED_ROLES)
   if (auth.response) return auth.response
 
   try {

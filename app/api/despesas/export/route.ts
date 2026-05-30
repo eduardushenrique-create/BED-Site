@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiAdmin } from '@/lib/api-auth'
+import { requireApiRole } from '@/lib/api-auth'
+import { PRIVILEGED_ROLES } from '@/lib/auth-shared'
 import { listExpenses } from '@/lib/expenses'
 import { recordAuditEntry } from '@/lib/audit-log'
 import {
@@ -31,7 +32,8 @@ function toCsvRow(fields: (string | null | undefined)[]): string {
 // Same filters as GET /api/despesas
 // Returns CSV with Content-Disposition: attachment
 export async function GET(request: NextRequest) {
-  const auth = await requireApiAdmin()
+  // M1 — export de dados financeiros: restrito a papéis de alta alçada.
+  const auth = await requireApiRole(PRIVILEGED_ROLES)
   if (auth.response) return auth.response
 
   // Rate-limit check (keyed by actor email)
