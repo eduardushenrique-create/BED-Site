@@ -2,28 +2,46 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import BrandLogo from '@/components/BrandLogo'
 
 type NavItem = { href: string; label: string; exact?: boolean; badgeKey?: 'lowStock' }
+type NavGroup = { title: string; items: NavItem[] }
 
-const navItems: NavItem[] = [
-  { href: '/admin', label: 'Painel', exact: true },
-  { href: '/admin/pedidos', label: 'Pedidos' },
-  { href: '/admin/producao', label: 'Produção' },
-  { href: '/admin/impressoras', label: 'Impressoras' },
-  { href: '/admin/clientes', label: 'Clientes' },
-  { href: '/admin/produtos', label: 'Produtos' },
-  { href: '/admin/componentes', label: 'Componentes', badgeKey: 'lowStock' },
-  { href: '/admin/filamentos', label: 'Filamentos' },
-  { href: '/admin/categorias', label: 'Categorias' },
-  { href: '/admin/banners', label: 'Banners' },
-  { href: '/admin/cupons', label: 'Cupons' },
-  { href: '/admin/despesas', label: 'Despesas' },
-  { href: '/admin/orcamentos', label: 'Orçamentos' },
-  { href: '/admin/avaliacoes', label: 'Avaliações' },
-  { href: '/admin/emails', label: 'E-mails' },
-  { href: '/admin/auditoria', label: 'Auditoria' },
+// Item solto no topo: é a home do painel, não pertence a nenhum grupo.
+const homeItem: NavItem = { href: '/admin', label: 'Painel', exact: true }
+
+const navGroups: NavGroup[] = [
+  {
+    title: 'Pedidos',
+    items: [
+      { href: '/admin/pedidos', label: 'Pedidos' },
+      { href: '/admin/producao', label: 'Produção' },
+      { href: '/admin/orcamentos', label: 'Orçamentos' },
+    ],
+  },
+  {
+    title: 'Insumos',
+    items: [
+      { href: '/admin/impressoras', label: 'Impressoras' },
+      { href: '/admin/filamentos', label: 'Filamentos' },
+      { href: '/admin/componentes', label: 'Componentes', badgeKey: 'lowStock' },
+    ],
+  },
+  {
+    title: 'Configurações',
+    items: [
+      { href: '/admin/produtos', label: 'Produtos' },
+      { href: '/admin/categorias', label: 'Categorias' },
+      { href: '/admin/banners', label: 'Banners' },
+      { href: '/admin/clientes', label: 'Clientes' },
+      { href: '/admin/cupons', label: 'Cupons' },
+      { href: '/admin/avaliacoes', label: 'Avaliações' },
+      { href: '/admin/despesas', label: 'Despesas' },
+      { href: '/admin/emails', label: 'E-mails' },
+      { href: '/admin/auditoria', label: 'Auditoria' },
+    ],
+  },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +69,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [pathname])
 
+  const renderNavItem = (item: NavItem) => {
+    const active = item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`)
+    const badgeCount = item.badgeKey === 'lowStock' ? lowStockCount : 0
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          padding: '12px 16px',
+          color: active ? '#F0F5FB' : 'rgba(240,245,251,0.72)',
+          backgroundColor: active ? 'rgba(187,207,235,0.14)' : 'transparent',
+          borderLeft: active ? '3px solid #D4849A' : '3px solid transparent',
+          borderRadius: '0 12px 12px 0',
+          fontWeight: active ? 700 : 500,
+        }}
+      >
+        <span>{item.label}</span>
+        {badgeCount > 0 && (
+          <span
+            title={`${badgeCount} componente(s) em baixa`}
+            style={{
+              background: '#B42318',
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 700,
+              borderRadius: '999px',
+              padding: '2px 7px',
+              lineHeight: 1.4,
+              minWidth: '18px',
+              textAlign: 'center',
+            }}
+          >
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
   const sidebarContent = (
     <>
       <div style={{ padding: '0 24px', marginBottom: '32px' }}>
@@ -61,51 +125,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <nav style={{ display: 'grid', gap: '6px', padding: '0 12px' }}>
-        {navItems.map(item => {
-          const active = item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
-          const badgeCount = item.badgeKey === 'lowStock' ? lowStockCount : 0
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
+        {renderNavItem(homeItem)}
+        {navGroups.map(group => (
+          <Fragment key={group.title}>
+            <span
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                padding: '12px 16px',
-                color: active ? '#F0F5FB' : 'rgba(240,245,251,0.72)',
-                backgroundColor: active ? 'rgba(187,207,235,0.14)' : 'transparent',
-                borderLeft: active ? '3px solid #D4849A' : '3px solid transparent',
-                borderRadius: '0 12px 12px 0',
-                fontWeight: active ? 700 : 500,
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'rgba(240,245,251,0.45)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                padding: '14px 16px 2px',
               }}
             >
-              <span>{item.label}</span>
-              {badgeCount > 0 && (
-                <span
-                  title={`${badgeCount} componente(s) em baixa`}
-                  style={{
-                    background: '#B42318',
-                    color: 'white',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: '999px',
-                    padding: '2px 7px',
-                    lineHeight: 1.4,
-                    minWidth: '18px',
-                    textAlign: 'center',
-                  }}
-                >
-                  {badgeCount > 99 ? '99+' : badgeCount}
-                </span>
-              )}
-            </Link>
-          )
-        })}
+              {group.title}
+            </span>
+            {group.items.map(renderNavItem)}
+          </Fragment>
+        ))}
       </nav>
 
       <div style={{ marginTop: 'auto', padding: '24px' }}>
