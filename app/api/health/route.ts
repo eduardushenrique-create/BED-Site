@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ component: 'api/health' })
 
 export const dynamic = 'force-dynamic'
 
@@ -110,8 +113,16 @@ export async function GET() {
     if (missing.length > 0) {
       report.status = 'degraded'
       report.checks.schema = 'mismatch'
-      report.missingColumns = missing
-      report.error = `Schema do banco está atrás do Prisma client. Colunas faltando: ${missing.join(', ')}. Migration pendente.`
+      const detail = `Schema do banco está atrás do Prisma client. Colunas faltando: ${missing.join(', ')}. Migration pendente.`
+      // B5 — em produção não expomos os nomes das colunas no corpo público
+      // (info disclosure do schema); o detalhe vai só pros logs/observability.
+      log.error({ missingColumns: missing }, detail)
+      if (process.env.NODE_ENV === 'production') {
+        report.error = 'Schema desatualizado (migration pendente).'
+      } else {
+        report.missingColumns = missing
+        report.error = detail
+      }
       return NextResponse.json(report, { status: 503 })
     }
     report.checks.schema = 'ok'

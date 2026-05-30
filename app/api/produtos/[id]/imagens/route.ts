@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireApiAdmin } from '@/lib/api-auth'
 import { addProductImage, listProductImages, reorderProductImages } from '@/lib/database'
 import { getStorage } from '@/lib/storage'
-import { extractContentType, isDataUrl } from '@/lib/storage/data-url'
+import { isDataUrl, validateImageDataUrl } from '@/lib/storage/data-url'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
 
@@ -52,9 +52,15 @@ export async function POST(
   let url = body.url as string
   let storageKey: string | null = null
   if (isDataUrl(url)) {
+    // M5/M8 — valida tipo (allowlist de imagem) e tamanho ANTES de subir pro
+    // storage. Sem isso, um admin poderia hospedar application/javascript ou
+    // um blob de centenas de MB (DoS de storage/banda).
+    const check = validateImageDataUrl(url)
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 400 })
+    }
     try {
-      const contentType = extractContentType(url, 'image/jpeg')
-      const uploaded = await getStorage().upload({ data: url, contentType, prefix: 'products' })
+      const uploaded = await getStorage().upload({ data: url, contentType: check.contentType, prefix: 'products' })
       url = uploaded.url
       storageKey = uploaded.storageKey
     } catch (uploadError) {

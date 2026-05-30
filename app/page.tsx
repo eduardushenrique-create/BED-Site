@@ -8,6 +8,7 @@ import HomeCustomProjectCTA from '@/components/home/HomeCustomProjectCTA'
 import { getLocalCatalogProducts, getPublicCatalogCategories } from '@/lib/catalog'
 import { listBanners } from '@/lib/database'
 import { listFeaturedApprovedReviews } from '@/lib/reviews'
+import { safeJsonLd } from '@/lib/safe-json-ld'
 
 // ISR: regenera estática a cada 60s. Como toda a leitura passa por Prisma
 // puro (sem cookies/headers nesta página), trocamos o force-dynamic por
@@ -181,9 +182,9 @@ export default async function Home() {
 
   return (
     <main className="container" style={{ paddingTop: '20px', paddingBottom: '64px' }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(categoriesItemListJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(orgJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(categoriesItemListJsonLd) }} />
       <Banner banners={activeBanners.length > 0 ? activeBanners : undefined} />
 
       <HomeBenefitsBar />

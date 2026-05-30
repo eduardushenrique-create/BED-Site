@@ -3,6 +3,7 @@ import { getLocalCatalogProductBySlug } from '@/lib/catalog'
 import { Product } from '@/lib/types'
 import ProductDetailClient from './ProductDetailClient'
 import { sanitizeRichText } from '@/lib/sanitize'
+import { safeJsonLd } from '@/lib/safe-json-ld'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +78,7 @@ export default async function ProductPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <ProductDetailClient product={safeProduct} />
     </>

@@ -15,6 +15,7 @@ import { createPaymentForOrder, mapMercadoPagoStatus } from '@/lib/payment'
 import { validateCEP, validateCPF, validateEmail } from '@/lib/validation'
 import { captureException } from '@/lib/observability'
 import { createLogger } from '@/lib/logger'
+import { hashEmail } from '@/lib/pii'
 import { withTimelineStamp, type ProductionTimeline } from '@/lib/order-statuses'
 
 const log = createLogger({ component: 'api.orders' })
@@ -367,7 +368,8 @@ export async function POST(request: Request) {
       })
     }
 
-    log.info({ orderNumber, customerEmail, total: safeTotal, paymentMethod }, 'Order created')
+    // M6 — não logar PII em claro (LGPD). Hash curto preserva correlação.
+    log.info({ orderNumber, customerEmailHash: hashEmail(customerEmail), total: safeTotal, paymentMethod }, 'Order created')
 
     return NextResponse.json({
       success: true,
