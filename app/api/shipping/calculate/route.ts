@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import { calculateShipping } from '@/lib/shipping'
 import { getLocalCatalogProducts } from '@/lib/catalog'
+import {
+  buildRateLimitKey,
+  consumeRateLimit,
+  getClientIp,
+  rateLimitResponseBody,
+} from '@/lib/rate-limit'
 
 interface ShippingRequest {
   fromPostalCode: string
@@ -18,6 +24,15 @@ interface ShippingRequest {
 
 export async function POST(request: Request) {
   try {
+    // A4 — cada cotação aciona a API do Melhor Envio (cota limitada). Sem
+    // throttle, dá pra exaurir/bloquear o token do ME ou fazer scraping de
+    // cotações. 30 req / 60 s por IP cobre o uso normal (recalcular no carrinho).
+    const rl = await consumeRateLimit(buildRateLimitKey('shipping-calculate', getClientIp(request)), 30, 60)
+    if (!rl.ok) {
+      const { body, status, headers } = rateLimitResponseBody(rl)
+      return NextResponse.json(body, { status, headers })
+    }
+
     const body: ShippingRequest = await request.json()
 
     const { fromPostalCode, toPostalCode } = body

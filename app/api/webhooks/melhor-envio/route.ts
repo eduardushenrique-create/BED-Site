@@ -86,6 +86,16 @@ export async function POST(request: NextRequest) {
     const auth = authorizeRequest(request, rawPayload)
 
     if (!auth.ok) {
+      // A5 — fail-closed em produção quando o webhook não está configurado.
+      // Sem MELHOR_ENVIO_TOKEN/SECRET não há como verificar a origem, então
+      // recusamos (503) em vez de aceitar — senão qualquer um forja eventos
+      // shipped/delivered e polui a auditoria. Fora de produção mantemos o
+      // 200-acked pra permitir o cadastro inicial da URL (o painel do ME valida
+      // o endpoint via GET, que continua respondendo 200).
+      if (auth.reason === 'no_auth_configured' && process.env.NODE_ENV === 'production') {
+        log.warn({ reason: auth.reason }, 'Melhor Envio webhook not configured in production — 503')
+        return NextResponse.json({ error: 'webhook_not_configured' }, { status: 503 })
+      }
       // Log + 200-acked. ME retries on non-2xx, which would create noise; we'd
       // rather see the orphan event in the WebhookEvent table.
       log.warn({ reason: auth.reason }, 'Melhor Envio webhook unauthorized — acked')

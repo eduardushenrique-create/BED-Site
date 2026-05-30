@@ -50,10 +50,17 @@ export async function POST(request: NextRequest) {
         log.warn({ svixId }, 'Resend webhook rejected — invalid signature')
         return NextResponse.json({ error: 'invalid_signature' }, { status: 401 })
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      // M7 — fail-closed em produção. Sem RESEND_WEBHOOK_SECRET não há como
+      // verificar a assinatura Svix, então um atacante poderia forjar eventos
+      // bounce/complaint e remover e-mails de clientes da lista. Recusamos (503).
+      // O cadastro inicial no Svix usa o GET acima, então isso não bloqueia setup.
+      log.warn('Resend webhook secret missing in production — 503')
+      return NextResponse.json({ error: 'webhook_not_configured' }, { status: 503 })
     } else {
-      // Sem secret configurada: aceita pra permitir cadastro inicial via Svix,
+      // Fora de produção: aceita pra permitir cadastro/testes via Svix,
       // mas marca o evento como inseguro pra forensics.
-      log.warn('Resend webhook secret missing — accepting unverified payload')
+      log.warn('Resend webhook secret missing — accepting unverified payload (non-prod)')
     }
 
     let event: ResendEvent
