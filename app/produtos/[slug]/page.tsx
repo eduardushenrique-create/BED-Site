@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getLocalCatalogProductBySlug } from '@/lib/catalog'
 import { Product } from '@/lib/types'
 import ProductDetailClient from './ProductDetailClient'
+import { sanitizeRichText } from '@/lib/sanitize'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,8 +64,14 @@ export default async function ProductPage({ params }: PageProps) {
     notFound()
   }
 
+  // A1: sanitiza a descrição (HTML rico do admin) antes de renderizar como
+  // HTML no cliente (ProductDetailClient) — fecha o XSS armazenado.
+  const safeProduct: Product = product.description
+    ? { ...product, description: sanitizeRichText(product.description) }
+    : product
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-  const jsonLd = buildProductJsonLd(product, appUrl)
+  const jsonLd = buildProductJsonLd(safeProduct, appUrl)
 
   return (
     <>
@@ -72,7 +79,7 @@ export default async function ProductPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ProductDetailClient product={product} />
+      <ProductDetailClient product={safeProduct} />
     </>
   )
 }
