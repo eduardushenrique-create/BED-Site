@@ -7,6 +7,7 @@ import Button from '@/components/Button'
 import Input from '@/components/Input'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useAuth } from '@/context/AuthContext'
+import { safeInternalPath } from '@/lib/safe-redirect'
 
 type Tab = 'login' | 'signup'
 type Mode = 'code' | 'password'
@@ -15,7 +16,8 @@ export default function LoginClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh: refreshAuth } = useAuth()
-  const redirectTo = useMemo(() => searchParams.get('redirect') || '/minha-conta', [searchParams])
+  // A2: valida o redirect (só caminho interno) para evitar open redirect.
+  const redirectTo = useMemo(() => safeInternalPath(searchParams.get('redirect'), '/minha-conta'), [searchParams])
   const initialTab = (searchParams.get('tab') as Tab) || 'login'
 
   const [tab, setTab] = useState<Tab>(initialTab)
