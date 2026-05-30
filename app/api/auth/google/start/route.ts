@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { safeInternalPath } from '@/lib/safe-redirect'
 
 export async function GET(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
-  const redirect = request.nextUrl.searchParams.get('redirect') || '/checkout'
+  // A2: valida o redirect (só caminho interno) para evitar open redirect.
+  const redirect = safeInternalPath(request.nextUrl.searchParams.get('redirect'), '/checkout')
 
   if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) {
     return NextResponse.json(

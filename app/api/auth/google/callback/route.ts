@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession } from '@/lib/auth'
 import { findOrCreateSessionUser } from '@/lib/auth-users'
+import { safeInternalPath } from '@/lib/safe-redirect'
 
 type GoogleTokenResponse = {
   access_token?: string
@@ -66,5 +67,6 @@ export async function GET(request: NextRequest) {
   const user = await findOrCreateSessionUser(profile.email, profile.name)
   await createSession(user)
 
-  return NextResponse.redirect(new URL(state.redirect || '/minha-conta', baseUrl))
+  // A2: valida o redirect vindo do state (só caminho interno) — evita open redirect.
+  return NextResponse.redirect(new URL(safeInternalPath(state.redirect, '/minha-conta'), baseUrl))
 }
